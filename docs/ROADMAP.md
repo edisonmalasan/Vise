@@ -75,16 +75,16 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: A single input can be transcoded end-to-end with common baseline codecs and output containers.*
 
-- [ ] Common video decoding
-- [ ] Common audio decoding
-- [ ] H.264 software encoding
-- [ ] AAC audio encoding
-- [ ] MP4 muxing
-- [ ] MKV muxing
-- [ ] WebM muxing
-- [ ] End-to-end single-file transcode
+- [x] Common video decoding
+- [x] Common audio decoding
+- [x] H.264 software encoding
+- [x] AAC audio encoding
+- [x] MP4 muxing
+- [x] MKV muxing
+- [x] WebM muxing
+- [x] End-to-end single-file transcode
 
-**Status:** Not started (0/8 verified)
+**Status:** Complete (8/8 verified)
 
 ---
 
@@ -286,7 +286,7 @@ Required groups: 11, 12
 |---|---|---|
 | 0 | Project foundation | Complete (6/6) |
 | 1 | Media ingestion | In progress (8/10) |
-| 2 | Core transcode baseline | Not started (0/8) |
+| 2 | Core transcode baseline | Complete (8/8) |
 | 3 | Command-line interface | Not started (0/6) |
 | 4 | Desktop application shell | Not started (0/7) |
 | 5 | Presets and configuration | Not started (0/7) |

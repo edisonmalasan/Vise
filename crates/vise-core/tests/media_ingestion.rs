@@ -3,19 +3,12 @@ use std::process::Command;
 use vise_core::{FfprobeScanner, MediaScanner};
 
 fn tool(name: &str) -> Option<PathBuf> {
-    std::env::var_os("PATH").and_then(|paths| {
-        for dir in std::env::split_paths(&paths) {
-            let with_exe = dir.join(format!("{}.exe", name));
-            if with_exe.is_file() {
-                return Some(with_exe);
-            }
-            let plain = dir.join(name);
-            if plain.is_file() {
-                return Some(plain);
-            }
-        }
-        None
-    })
+    let scanner = vise_core::FfprobeScanner::default();
+    match name {
+        "ffmpeg" => scanner.ffmpeg_path().map(PathBuf::from),
+        "ffprobe" => scanner.ffprobe_path().map(PathBuf::from),
+        _ => None,
+    }
 }
 
 fn generate_chaptered_media(dir: &Path) -> PathBuf {
