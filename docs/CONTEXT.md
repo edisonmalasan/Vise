@@ -17,6 +17,7 @@
 | Current application behavior | No application source exists yet; inspect `docs/ROADMAP.md` for intended behavior |
 | Technical design and key boundaries | `re` reverse-engineering notes (behavioral/structural reference only); `docs/ROADMAP.md` architecture decisions |
 | Build and test commands | Root `AGENTS.md` (none currently configured) |
+| Agent skills and lock | `.agents/skills/` and `skills-lock.json` (vendored skill definitions) |
 | Important existing dependencies | No runtime dependencies; Graphify output in `graphify-out/` is derived analysis |
 | Reusable lessons from other projects | Central Obsidian vault, when configured |
 
