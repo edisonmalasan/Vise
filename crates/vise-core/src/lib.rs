@@ -13,11 +13,13 @@ mod pipeline;
 mod preset;
 mod progress;
 mod session;
+mod subtitle;
 mod video;
 pub use audio::*;
 pub use error::CoreError;
 pub use geometry::*;
 pub use job::{AudioCodec, ContainerFormat, JobSpec, SubtitleMode, VideoCodec};
+pub use subtitle::*;
 pub use media::{
     parse_ffprobe_output, ChapterInfo, CropDetection, FfprobeScanner, FormatInfo, MediaBuffer,
     MediaScanner, Packet, ScanResult, StreamInfo, TitleInfo, TrackKind,
