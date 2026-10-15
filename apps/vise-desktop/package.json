@@ -1,0 +1,10 @@
+{
+  "name": "vise-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"dev placeholder\"",
+    "build": "echo \"build placeholder\"",
+    "tauri:build": "echo \"tauri build placeholder\""
+  }
+}

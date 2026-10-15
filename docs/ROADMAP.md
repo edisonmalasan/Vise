@@ -243,18 +243,18 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 ---
 
-## Group 12 — Platform packaging and release
+## Group 12 - Platform packaging and release
 
 *Outcome: Installable platform builds, release notes, and reproducible releases are available.*
 
 - [ ] Windows build and installer
 - [ ] macOS build and app bundle
 - [ ] Linux build and package
-- [ ] Versioned release notes
-- [ ] Reproducible build process
-- [ ] Update delivery mechanism `(optional)`
+- [x] Versioned release notes
+- [x] Reproducible build process
+- [x] Update delivery mechanism `(optional)`
 
-**Status:** Not started (0/6 verified)
+**Status:** In progress (3/6 verified; platform installers pending)
 
 ---
 

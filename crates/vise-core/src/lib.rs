@@ -15,6 +15,7 @@ mod metadata;
 mod pipeline;
 mod preset;
 mod progress;
+mod release;
 mod session;
 mod subtitle;
 mod video;
@@ -33,5 +34,7 @@ pub use media::{
 pub use pipeline::{transcode, transcode_file, TranscodeResult, Transcoder};
 pub use preset::*;
 pub use progress::{JobState, JobStatus, Progress};
+pub use release::{ReleaseInfo, UpdateManifest, VISE_VERSION};
 pub use session::{Job, JobId, Session, SessionSnapshot};
+pub use video::*;
 pub use video::*;
