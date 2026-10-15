@@ -15,7 +15,8 @@
 |---|---|
 | Goals, features, and progress | `docs/ROADMAP.md` |
 | Current application behavior | No application source exists yet; inspect `docs/ROADMAP.md` for intended behavior |
-| Technical design and key boundaries | `re/docs/` reverse-engineering notes (behavioral/structural reference only); `docs/ROADMAP.md` architecture decisions |
+| Technical design and key boundaries | `re/docs/` reverse-engineering notes in a local-only workspace (behavioral/structural reference only); `docs/ROADMAP.md` architecture decisions |
+| Reverse-engineering workspace | `re/` (gitignored) contains local reference material; it is not tracked project source |
 | Build and test commands | Root `AGENTS.md` (none currently configured) |
 | Important existing dependencies | No runtime dependencies; Graphify output in `graphify-out/` is derived analysis |
 | Reusable lessons from other projects | Central Obsidian vault, when configured |
@@ -24,7 +25,7 @@
 
 *Only record constraints that affect many tasks. Link to detailed authoritative documents instead of repeating them.*
 
-- Clean-room implementation must not copy HandBrake source, strings, presets verbatim, or protected assets; the reverse-engineering notes are behavioral/structural reference only. Source: `re/docs/README.md`.
+- Clean-room implementation must not copy source code, strings, presets verbatim, or protected assets; the reverse-engineering notes are behavioral/structural reference only. Source: `re/docs/README.md`.
 - Core must have no UI dependency; frontends should call core public APIs and poll state. Source: `re/docs/01-system-overview.md`.
 - `re/` is gitignored, so reverse-engineering notes are local-only reference material and are outside the tracked/documented project source by default.
 - `graphify-out/` is derived knowledge and is not the source of truth for code behavior.
