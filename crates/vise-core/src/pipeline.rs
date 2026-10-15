@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::{AudioCodec, ContainerFormat, CoreError, FfprobeScanner, JobSpec, VideoCodec};
+use crate::{
+    AudioCodec, ContainerFormat, CoreError, FfprobeScanner, JobSpec, VideoCodec,
+    VideoProcessingOptions,
+};
 
 /// Baseline transcode planning and execution.
 #[derive(Debug, Clone)]
@@ -74,14 +77,68 @@ impl Transcoder {
             _ => (spec.video_codec, spec.audio_codec),
         };
 
+        // Merge video processing options from all aliases and legacy fields.
+        let mut video_opts = spec.video_processing.clone();
+        for o in [
+            spec.video_filters.as_ref(),
+            spec.video_options.as_ref(),
+            spec.filters.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            merge_video_options(&mut video_opts, o);
+        }
+        if let Some(crop) = spec.crop {
+            if video_opts.crop.is_none() {
+                video_opts.crop = Some(crop);
+            }
+        }
+        if let Some(scale) = spec.scale_to {
+            if video_opts.scale.is_none() && video_opts.scale_to.is_none() {
+                video_opts.scale_to = Some(scale);
+            }
+        }
+
+        let filter_chain = video_opts.build_filter_chain();
+
         let mut cmd = Command::new(&ffmpeg);
         cmd.arg("-y").arg("-i").arg(&input);
+        if !filter_chain.is_empty() {
+            cmd.arg("-vf").arg(&filter_chain);
+        }
         cmd.arg("-c:v").arg(video_encoder(video_codec));
         cmd.arg("-c:a").arg(audio_encoder(audio_codec));
         // Keep broad compatibility for software baseline encoding.
-        cmd.arg("-pix_fmt").arg("yuv420p");
+        let pix_fmt = if video_opts.ten_bit {
+            "yuv420p10le"
+        } else {
+            "yuv420p"
+        };
+        cmd.arg("-pix_fmt").arg(pix_fmt);
+        // constant frame rate handling
+        let cfr_fps = match &video_opts.frame_rate {
+            Some(crate::FrameRateMode::Constant(fps)) => Some(*fps),
+            _ => video_opts.constant_frame_rate,
+        };
+        if let Some(fps) = cfr_fps {
+            cmd.arg("-r").arg(fps.to_string());
+        }
+        // variable frame rate handling
+        if video_opts.variable_frame_rate
+            || matches!(video_opts.frame_rate, Some(crate::FrameRateMode::Variable))
+        {
+            cmd.arg("-vsync").arg("vfr");
+        }
         if container == ContainerFormat::Mp4 {
             cmd.arg("-movflags").arg("+faststart");
+        }
+        // HDR metadata preservation
+        if video_opts.hdr || video_opts.hdr_metadata {
+            cmd.arg("-color_primaries").arg("bt2020");
+            cmd.arg("-color_trc").arg("smpte2084");
+            cmd.arg("-colorspace").arg("bt2020nc");
+            cmd.arg("-map_metadata").arg("0");
         }
         cmd.arg("-shortest");
         cmd.arg(&spec.output_path);
@@ -245,6 +302,97 @@ fn parse_codecs(parsed: &serde_json::Value) -> (Option<String>, Option<String>) 
         }
     }
     (video, audio)
+}
+
+impl Transcoder {
+    /// Construct an ffmpeg filter chain string from video processing options.
+    pub fn build_filter_chain(&self, options: &VideoProcessingOptions) -> String {
+        options.build_filter_chain()
+    }
+
+    pub fn build_video_filter(&self, options: &VideoProcessingOptions) -> String {
+        options.build_video_filter()
+    }
+
+    pub fn build_video_filter_chain(&self, options: &VideoProcessingOptions) -> String {
+        options.build_video_filter_chain()
+    }
+}
+
+fn merge_video_options(target: &mut VideoProcessingOptions, src: &VideoProcessingOptions) {
+    if src.crop.is_some() {
+        target.crop = src.crop;
+    }
+    if src.scale.is_some() {
+        target.scale = src.scale;
+    }
+    if src.scale_to.is_some() {
+        target.scale_to = src.scale_to;
+    }
+    if src.deinterlace || src.deinterlacing {
+        target.deinterlace = true;
+        target.deinterlacing = true;
+    }
+    if src.comb_detect || src.comb_detection {
+        target.comb_detect = true;
+        target.comb_detection = true;
+    }
+    if src.detelecine {
+        target.detelecine = true;
+    }
+    if src.denoise {
+        target.denoise = true;
+    }
+    if src.denoise_strength.is_some() {
+        target.denoise_strength = src.denoise_strength;
+    }
+    if src.sharpen {
+        target.sharpen = true;
+    }
+    if src.sharpen_amount.is_some() {
+        target.sharpen_amount = src.sharpen_amount;
+    }
+    if src.rotate.is_some() {
+        target.rotate = src.rotate;
+    }
+    if src.rotate_degrees.is_some() {
+        target.rotate_degrees = src.rotate_degrees;
+    }
+    if src.pad.is_some() {
+        target.pad = src.pad;
+    }
+    if src.pad_to.is_some() {
+        target.pad_to = src.pad_to;
+    }
+    if src.color_space.is_some() {
+        target.color_space = src.color_space.clone();
+    }
+    if src.color_conversion.is_some() {
+        target.color_conversion = src.color_conversion.clone();
+    }
+    if src.grayscale {
+        target.grayscale = true;
+    }
+    if src.chroma_smooth || src.chroma_smoothing {
+        target.chroma_smooth = true;
+        target.chroma_smoothing = true;
+    }
+    if src.frame_rate.is_some() {
+        target.frame_rate = src.frame_rate.clone();
+    }
+    if src.constant_frame_rate.is_some() {
+        target.constant_frame_rate = src.constant_frame_rate;
+    }
+    if src.variable_frame_rate {
+        target.variable_frame_rate = true;
+    }
+    if src.ten_bit {
+        target.ten_bit = true;
+    }
+    if src.hdr || src.hdr_metadata {
+        target.hdr = true;
+        target.hdr_metadata = true;
+    }
 }
 
 // Free function convenience.
