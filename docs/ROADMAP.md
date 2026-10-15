@@ -41,14 +41,14 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Core crate, shared data models, session API, and geometry behavior are defined and reusable by later milestones.*
 
-- [ ] Rust core crate workspace established
-- [ ] Canonical job specification schema defined
-- [ ] Core session/job API defined
-- [ ] Media buffer and packet model defined
-- [ ] Progress/state model defined
-- [ ] Geometry and aspect-ratio behavior defined
+- [x] Rust core crate workspace established
+- [x] Canonical job specification schema defined
+- [x] Core session/job API defined
+- [x] Media buffer and packet model defined
+- [x] Progress/state model defined
+- [x] Geometry and aspect-ratio behavior defined
 
-**Status:** Not started (0/6 verified)
+**Status:** Complete (6/6 verified)
 
 ---
 
@@ -284,7 +284,7 @@ Required groups: 11, 12
 
 | Group | Milestone | Status |
 |---|---|---|
-| 0 | Project foundation | Not started (0/6) |
+| 0 | Project foundation | Complete (6/6) |
 | 1 | Media ingestion | Not started (0/10) |
 | 2 | Core transcode baseline | Not started (0/8) |
 | 3 | Command-line interface | Not started (0/6) |
