@@ -3,9 +3,10 @@
 ## Project
 
 - **Name:** Vise Transcoder
-- **Purpose:** Clean-room implementation of a media transcoder targeting a reference transcoder architecture at version 1.11.2 and its user-facing capabilities. The repository currently contains planning and reverse-engineering documentation; implementation has not started.
+- **Purpose:** Clean-room implementation of a media transcoder targeting a reference transcoder architecture at version 1.11.2 and its user-facing capabilities. The repository now contains Rust application source, tests, build manifests, and planning/reverse-engineering documentation.
 - **Primary users:** Not yet verified from repository evidence. Intended audiences are media-transcoding users and contributors; see `docs/ROADMAP.md` for the product/capability target.
-- **Current state:** No application source, manifests, tests, or build configuration are present. `docs/ROADMAP.md` defines intended milestones. `re/docs/` contains reverse-engineering notes for a reference transcoder at version 1.11.2 that inform the design.
+- **Current state:** Rust workspace (`Cargo.toml`, `crates/vise-core`, `crates/vise-cli`, `apps/vise-desktop`) with Group 0–12 required outcomes implemented where feasible. `docs/ROADMAP.md` tracks verified status. `re/docs/` and `re/README.md` contain reverse-engineering notes.
+- **Current progress:** `main` contains the merged integration branches and a reconciled roadmap. Platform installers and optional DVD/Blu-ray support remain pending.
 
 ## Source of Truth
 
@@ -25,27 +26,24 @@
 
 ## Tech Stack
 
-*No runtime, build, or test technology is implemented in this repository yet. Planned technologies are recorded separately and should not be treated as present until manifests or source exist.*
-
 | Layer | Technology / version | Evidence |
 |---|---|---|
-| Frontend / UI | Not implemented; planned: Tauri + web UI | `docs/ROADMAP.md` (architecture decision snapshot) |
-| Backend / runtime | Not implemented; planned: Rust core crate | `docs/ROADMAP.md` (architecture decision snapshot) |
-| Database / storage | Not used currently | `docs/ROADMAP.md`; no storage code or manifests present |
-| Build / tooling | Not configured. Optional derived analysis: Graphify (`graphify-out/`) | Repository file inventory; `graphify-out/` |
-| Tests | None present | Repository file inventory |
+| Frontend / UI | Tauri 2 desktop scaffold with placeholder web UI; planned full Tauri + web UI | `apps/vise-desktop`, `docs/ROADMAP.md` |
+| Backend / runtime | Rust stable workspace; verified with cargo 1.99.0 and rustc 1.99.0 | `Cargo.toml`, `crates/vise-core`, `crates/vise-cli` |
+| Media tooling | ffmpeg 9.0.2 / ffprobe via subprocess bridge | Group 1/2 implementations and tests |
+| Database / storage | Not used currently; JSON presets/settings via files | `docs/ROADMAP.md`; storage code |
+| Build / tooling | Cargo workspace + optional Graphify analysis | `Cargo.toml`, `graphify-out/` |
+| Tests | Rust unit/integration tests | `crates/*/tests`, `cargo test --workspace` |
 
 ## Build, Test, and Development Commands
 
-*No runnable project commands are defined yet. Do not invent scripts.*
-
 | Purpose | Command | Evidence / notes |
 |---|---|---|
-| Install dependencies | Not available | No dependency manifests in repository root |
-| Run locally | Not available | No application or package configuration present |
-| Build | Not available | No build configuration present |
-| Test | Not available | No tests present |
-| Lint / type-check | Not available | No lint or type configuration present |
+| Install dependencies | `cargo build --workspace` | Workspace manifests in `Cargo.toml` |
+| Run locally | `cargo run -p vise-cli -- --help` | CLI crate entry point |
+| Build | `cargo build --workspace` | Rust workspace |
+| Test | `cargo test --workspace` | Rust tests |
+| Lint / type-check | `cargo clippy --workspace --all-targets -- -D warnings` | Rust workspace |
 
 Run from the repository root unless a command explicitly requires another directory.
 
@@ -77,7 +75,7 @@ Do not create extra ICM stage folders or permanent plan files unless the task be
 
 ## Obsidian / Cross-Project Knowledge
 
-- **Central vault:** Not configured. No vault path is recorded in this repository.
+- **Central vault:** `C:\Users\Edison\Documents\Obsidian`
 - **Project notes:** `10 - Projects/Vise/`, if present.
 - Read only relevant notes, when the vault is configured and accessible; repository docs remain authoritative for project-specific requirements.
 - Propose meaningful updates after substantial work: project progress/decisions under `10 - Projects`, reusable lessons under `30 - Resources`, unverified ideas under `00 - Inbox`.
@@ -91,25 +89,5 @@ Do not create extra ICM stage folders or permanent plan files unless the task be
 3. Make focused commits at logical checkpoints **when commits are authorized**; do not commit automatically without permission.
 4. Use a configured `git` subagent for Git operations **if this harness provides one**. Otherwise, use permitted Git tooling; never assume a subagent exists.
 5. Do not merge until the relevant build/tests pass; report pre-existing warnings and introduce no new errors or warnings.
-6. Do not push, merge, reset, or discard changes without explicit authorization.
-
-### Branch lifecycle
-
-Before starting any repository-mutating stage:
-
-1. Check `git status`.
-2. Switch to `main`.
-3. Pull the latest `origin/main`.
-4. Create a new branch from the updated `main`.
-5. Immediately push the new branch to `origin` and set upstream tracking.
-6. Only then begin modifying files.
-
-Never leave active repository work only on a local branch.
-
-Recommended pattern:
-
-    git switch main
-    git pull --ff-only origin main
-    git switch -c <branch-name>
-    git push -u origin <branch-name>
-"
+6. Do not stage transient agent-generated plans (for example, `docs/superpowers/`) unless the user explicitly wants them versioned. Respect the repository's `.gitignore`.
+7. Do not push, merge, reset, or discard changes without explicit authorization.
