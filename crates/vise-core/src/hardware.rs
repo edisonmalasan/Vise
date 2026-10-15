@@ -4,7 +4,7 @@
 //! Detection is based on the installed ffmpeg binary; all paths fall back to
 //! software encoding/decoding when hardware support is unavailable.
 
-use crate::{CoreError, VideoCodec};
+use crate::{VideoCodec};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -231,7 +231,7 @@ impl HardwareCapabilities {
     }
 
     pub fn preferred_encoder(&self, codec: VideoCodec, hw: &HardwareAcceleration) -> String {
-        if !hw.is_enabled() || hw.encode.enabled == false && hw.mode == HardwareMode::Software {
+        if !hw.is_enabled() || !hw.encode.enabled && hw.mode == HardwareMode::Software {
             // fall through to software if explicitly disabled
         }
         if hw.mode == HardwareMode::Software || hw.preference == HardwarePreference::Disable {
@@ -241,7 +241,7 @@ impl HardwareCapabilities {
             if self.supports_encoder(enc) {
                 return enc.clone();
             }
-            if !hw.fallback && hw.encode.fallback == false {
+            if !hw.fallback && !hw.encode.fallback {
                 return enc.clone();
             }
         }

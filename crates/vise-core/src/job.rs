@@ -80,12 +80,7 @@ impl EncodingMode {
         matches!(self, Self::Lossless | Self::LosslessEncoding)
     }
 }
-// Compatibility aliases for type names used by frontends/tests.
-pub type RateControlMode = EncodingMode;
-pub type RateControl = EncodingMode;
-pub type VideoEncodingMode = EncodingMode;
-pub type VideoRateControl = EncodingMode;
-pub type EncodingRateControl = EncodingMode;
+// Compatibility aliases removed.
 
 /// Canonical, serializable specification for a single transcode job.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]

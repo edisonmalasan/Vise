@@ -37,4 +37,3 @@ pub use progress::{JobState, JobStatus, Progress};
 pub use release::{ReleaseInfo, UpdateManifest, VISE_VERSION};
 pub use session::{Job, JobId, Session, SessionSnapshot};
 pub use video::*;
-pub use video::*;

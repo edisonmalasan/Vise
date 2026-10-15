@@ -426,15 +426,6 @@ fn infer_container(path: &Path) -> ContainerFormat {
     }
 }
 
-fn video_encoder(codec: VideoCodec) -> &'static str {
-    match codec {
-        VideoCodec::H264 => "libx264",
-        VideoCodec::H265 => "libx265",
-        VideoCodec::Av1 => "libaom-av1",
-        VideoCodec::Vp9 => "libvpx-vp9",
-    }
-}
-
 fn audio_encoder(codec: AudioCodec) -> &'static str {
     match codec {
         AudioCodec::Aac => "aac",

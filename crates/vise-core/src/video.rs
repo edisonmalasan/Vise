@@ -221,15 +221,6 @@ impl VideoProcessingOptions {
     }
 }
 
-/// Free-function construction helper.
-pub fn build_filter_chain(options: &VideoProcessingOptions) -> String {
-    options.build()
-}
-
-pub fn build_video_filter(options: &VideoProcessingOptions) -> String {
-    options.build()
-}
-
 pub fn build_video_filter_chain(options: &VideoProcessingOptions) -> String {
     options.build()
 }

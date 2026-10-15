@@ -142,12 +142,7 @@ impl AudioProcessingOptions {
         }
         self.mixdown_enum.map(|m| m.to_string())
     }
-    fn effective_layout(&self) -> Option<String> {
-        self.layout
-            .clone()
-            .or_else(|| self.mixdown.clone())
-            .or_else(|| self.mixdown_enum.map(|m| m.to_string()))
-    }
+
     fn effective_rate(&self) -> Option<u32> {
         self.sample_rate
     }

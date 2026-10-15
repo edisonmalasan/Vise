@@ -4,9 +4,8 @@
 //! features. It covers text/bitmap subtitle passthrough, burn-in, format
 //! conversion, SSA/ASS handling, closed captions, and foreign-audio scanning.
 
-use crate::{CoreError, SubtitleMode};
+use crate::SubtitleMode;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -218,7 +217,7 @@ impl SubtitleProcessingOptions {
             }
         }
 
-        if self.closed_captions || self.closed_captions {
+        if self.closed_captions {
             parts.push("cc".to_string());
         }
 
