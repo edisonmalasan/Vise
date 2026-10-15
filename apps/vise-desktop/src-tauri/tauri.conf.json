@@ -1,0 +1,24 @@
+{
+  "productName": "Vise Transcoder",
+  "version": "0.1.0",
+  "identifier": "com.vise.transcoder",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Vise Transcoder",
+        "width": 1100,
+        "height": 720,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false
+  }
+}

@@ -21,4 +21,4 @@ pub use media::{
 };
 pub use pipeline::{transcode, transcode_file, TranscodeResult, Transcoder};
 pub use progress::{JobState, JobStatus, Progress};
-pub use session::{JobId, Session, SessionSnapshot};
+pub use session::{Job, JobId, Session, SessionSnapshot};
