@@ -214,16 +214,16 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Encoding modes, retries, queue persistence, and safe cancellation are reliable.*
 
-- [ ] Constant quality encoding
-- [ ] Average bitrate encoding
-- [ ] Target file size mode
-- [ ] Two-pass encoding
-- [ ] Lossless encoding where supported
-- [ ] Job retry and failure reporting
-- [ ] Queue persistence across app restarts
-- [ ] Cancel behavior without corrupting output
+- [x] Constant quality encoding
+- [x] Average bitrate encoding
+- [x] Target file size mode
+- [x] Two-pass encoding
+- [x] Lossless encoding where supported
+- [x] Job retry and failure reporting
+- [x] Queue persistence across app restarts
+- [x] Cancel behavior without corrupting output
 
-**Status:** Not started (0/8 verified)
+**Status:** Complete (8/8 verified)
 
 ---
 
@@ -294,7 +294,7 @@ Required groups: 11, 12
 | 7 | Audio pipeline | Complete (11/11) |
 | 8 | Subtitles | Complete (7/7) |
 | 9 | Chapters and metadata | Complete (6/6) |
-| 10 | Encoding control and job reliability | Not started (0/8) |
+| 10 | Encoding control and job reliability | Complete (8/8) |
 | 11 | Hardware acceleration | Not started (0/7) |
 | 12 | Platform packaging and release | Not started (0/6) |
 

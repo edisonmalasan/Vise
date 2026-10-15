@@ -42,6 +42,51 @@ pub enum SubtitleMode {
     None,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EncodingMode {
+    #[default]
+    ConstantQuality,
+    Cq,
+    Crf,
+    ConstantQualityMode,
+    AverageBitrate,
+    Abr,
+    AverageBitrateMode,
+    TargetSize,
+    TargetFileSize,
+    TargetSizeMode,
+    TwoPass,
+    TwoPassEncoding,
+    TwoPassMode,
+    Lossless,
+    LosslessEncoding,
+    LosslessMode,
+}
+impl EncodingMode {
+    pub fn is_constant_quality(&self) -> bool {
+        matches!(self, Self::ConstantQuality | Self::ConstantQualityMode | Self::Cq | Self::Crf)
+    }
+    pub fn is_average_bitrate(&self) -> bool {
+        matches!(self, Self::AverageBitrate | Self::Abr)
+    }
+    pub fn is_target_size(&self) -> bool {
+        matches!(self, Self::TargetSize | Self::TargetFileSize)
+    }
+    pub fn is_two_pass(&self) -> bool {
+        matches!(self, Self::TwoPass | Self::TwoPassEncoding)
+    }
+    pub fn is_lossless(&self) -> bool {
+        matches!(self, Self::Lossless | Self::LosslessEncoding)
+    }
+}
+// Compatibility aliases for type names used by frontends/tests.
+pub type RateControlMode = EncodingMode;
+pub type RateControl = EncodingMode;
+pub type VideoEncodingMode = EncodingMode;
+pub type VideoRateControl = EncodingMode;
+pub type EncodingRateControl = EncodingMode;
+
 /// Canonical, serializable specification for a single transcode job.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct JobSpec {
@@ -58,7 +103,53 @@ pub struct JobSpec {
     /// Scale target (width, height), if set.
     pub scale_to: Option<(u32, u32)>,
     /// Optional constant-quality value.
+    #[serde(default)]
     pub quality: Option<u32>,
+    #[serde(default)]
+    pub cq: Option<u32>,
+    #[serde(default)]
+    pub crf: Option<u32>,
+    #[serde(default)]
+    pub constant_quality_value: Option<u32>,
+
+    /// Encoding rate-control mode.
+    #[serde(default, alias = "rate_control", alias = "rate_control_mode", alias = "encode_mode", alias = "video_rate_control", alias = "encoding_rate_control")]
+    pub encoding_mode: Option<EncodingMode>,
+
+    #[serde(default)]
+    pub bitrate: Option<u32>,
+    #[serde(default)]
+    pub average_bitrate: Option<u32>,
+    #[serde(default)]
+    pub abr: Option<u32>,
+    #[serde(default)]
+    pub target_bitrate: Option<u32>,
+    #[serde(default)]
+    pub video_bitrate: Option<u32>,
+    #[serde(default)]
+    pub average_bitrate_kbps: Option<u32>,
+
+    #[serde(default)]
+    pub target_size: Option<u64>,
+    #[serde(default)]
+    pub target_file_size: Option<u64>,
+    #[serde(default)]
+    pub target_size_bytes: Option<u64>,
+
+    #[serde(default)]
+    pub two_pass: bool,
+    #[serde(default)]
+    pub lossless: bool,
+    #[serde(default)]
+    pub constant_quality: bool,
+    #[serde(default)]
+    pub average_bitrate_mode: bool,
+    #[serde(default)]
+    pub target_size_mode: bool,
+    #[serde(default)]
+    pub two_pass_encoding: bool,
+    #[serde(default)]
+    pub lossless_encoding: bool,
     /// Video processing options applied during encoding.
     #[serde(default)]
     pub video_processing: VideoProcessingOptions,
@@ -218,6 +309,55 @@ impl JobSpec {
 
     pub fn build_filter_chain(&self) -> String {
         self.video_processing_options().build_filter_chain()
+    }
+    pub fn effective_quality(&self) -> Option<u32> {
+        self.quality
+            .or(self.cq)
+            .or(self.crf)
+            .or(self.constant_quality_value)
+    }
+    pub fn effective_target_size_bytes(&self) -> Option<u64> {
+        self.target_size
+            .or(self.target_file_size)
+            .or(self.target_size_bytes)
+    }
+    pub fn resolved_encoding_mode(&self) -> EncodingMode {
+        if let Some(m) = self.encoding_mode {
+            return m;
+        }
+        if self.lossless {
+            return EncodingMode::Lossless;
+        }
+        if self.two_pass {
+            return EncodingMode::TwoPass;
+        }
+        if self.effective_target_size_bytes().is_some() || self.target_size_mode {
+            return EncodingMode::TargetSize;
+        }
+        if self.effective_bitrate_kbps().is_some() || self.average_bitrate_mode {
+            return EncodingMode::AverageBitrate;
+        }
+        if self.effective_quality().is_some() || self.constant_quality {
+            return EncodingMode::ConstantQuality;
+        }
+        EncodingMode::default()
+    }
+    pub fn encoding_mode(&self) -> EncodingMode {
+        self.resolved_encoding_mode()
+    }
+    pub fn two_pass_enabled(&self) -> bool {
+        self.two_pass || self.two_pass_encoding || self.resolved_encoding_mode().is_two_pass()
+    }
+    pub fn lossless_enabled(&self) -> bool {
+        self.lossless || self.lossless_encoding || self.resolved_encoding_mode().is_lossless()
+    }
+    pub fn effective_bitrate_kbps(&self) -> Option<u32> {
+        self.bitrate
+            .or(self.average_bitrate)
+            .or(self.abr)
+            .or(self.target_bitrate)
+            .or(self.video_bitrate)
+            .or(self.average_bitrate_kbps)
     }
     pub fn audio_processing_options(&self) -> AudioProcessingOptions {
         let mut opts = self.audio_processing.clone();
