@@ -1,0 +1,14 @@
+{
+  "skills-lock.json": {
+    "mtime": 1792011165.6022413,
+    "seen": 1792019996.7094023,
+    "ast_hash": "c340785da71ad0bf357137618ca97229",
+    "semantic_hash": "c340785da71ad0bf357137618ca97229"
+  },
+  ".agents/skills/apple-design/SKILL.md": {
+    "mtime": 1792010364.7609777,
+    "seen": 1792019996.7094073,
+    "ast_hash": "b6e45240038f62aeeec9a39fdd6fcbbe",
+    "semantic_hash": "b6e45240038f62aeeec9a39fdd6fcbbe"
+  }
+}
