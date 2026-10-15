@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/vise-core"]
+members = ["crates/vise-core", "crates/vise-cli"]
 resolver = "2"
 
 [workspace.package]
