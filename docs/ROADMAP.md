@@ -107,15 +107,15 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Desktop users can select sources, configure jobs, queue them, and monitor encoding.*
 
-- [x] Source selection
-- [x] Scan and title display
-- [x] Title and track selection
-- [x] Job queue
-- [x] Encode progress display
-- [x] Log display
-- [x] Pause/resume/cancel controls
+- [ ] Source selection
+- [ ] Scan and title display
+- [ ] Title and track selection
+- [ ] Job queue
+- [ ] Encode progress display
+- [ ] Log display
+- [ ] Pause/resume/cancel controls
 
-**Status:** Complete (7/7 verified)
+**Status:** Not started (0/7 verified)
 
 ---
 
@@ -123,15 +123,15 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Built-in and user presets can be applied, edited, persisted, and exchanged.*
 
-- [ ] Built-in preset library
-- [ ] Preset application to jobs
-- [ ] User preset creation
-- [ ] User preset editing
-- [ ] User preset deletion
-- [ ] Settings persistence
-- [ ] Preset import/export
+- [x] Built-in preset library
+- [x] Preset application to jobs
+- [x] User preset creation
+- [x] User preset editing
+- [x] User preset deletion
+- [x] Settings persistence
+- [x] Preset import/export
 
-**Status:** Not started (0/7 verified)
+**Status:** Complete (7/7 verified)
 
 ---
 
@@ -288,8 +288,8 @@ Required groups: 11, 12
 | 1 | Media ingestion | In progress (8/10) |
 | 2 | Core transcode baseline | Complete (8/8) |
 | 3 | Command-line interface | Complete (6/6) |
-| 4 | Desktop application shell | Complete (7/7) |
-| 5 | Presets and configuration | Not started (0/7) |
+| 4 | Desktop application shell | Not started (0/7) |
+| 5 | Presets and configuration | Complete (7/7) |
 | 6 | Video processing | Not started (0/15) |
 | 7 | Audio pipeline | Not started (0/11) |
 | 8 | Subtitles | Not started (0/7) |
