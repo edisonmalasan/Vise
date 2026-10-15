@@ -139,23 +139,23 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Supported video filters and frame-rate/color behavior are available in the encode pipeline.*
 
-- [ ] Crop and scale
-- [ ] Deinterlacing
-- [ ] Comb detection
-- [ ] Detelecine
-- [ ] Denoise
-- [ ] Sharpen
-- [ ] Rotate
-- [ ] Pad
-- [ ] Color space conversion
-- [ ] Grayscale
-- [ ] Chroma smoothing
-- [ ] Constant frame rate handling
-- [ ] Variable frame rate handling
-- [ ] 10-bit processing
-- [ ] HDR metadata preservation
+- [x] Crop and scale
+- [x] Deinterlacing
+- [x] Comb detection
+- [x] Detelecine
+- [x] Denoise
+- [x] Sharpen
+- [x] Rotate
+- [x] Pad
+- [x] Color space conversion
+- [x] Grayscale
+- [x] Chroma smoothing
+- [x] Constant frame rate handling
+- [x] Variable frame rate handling
+- [x] 10-bit processing
+- [x] HDR metadata preservation
 
-**Status:** Not started (0/15 verified)
+**Status:** Complete (15/15 verified)
 
 ---
 
@@ -290,7 +290,7 @@ Required groups: 11, 12
 | 3 | Command-line interface | Complete (6/6) |
 | 4 | Desktop application shell | Not started (0/7) |
 | 5 | Presets and configuration | Complete (7/7) |
-| 6 | Video processing | Not started (0/15) |
+| 6 | Video processing | Complete (15/15) |
 | 7 | Audio pipeline | Not started (0/11) |
 | 8 | Subtitles | Not started (0/7) |
 | 9 | Chapters and metadata | Not started (0/6) |
