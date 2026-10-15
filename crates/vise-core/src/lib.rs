@@ -21,7 +21,7 @@ pub use audio::*;
 pub use chapter::*;
 pub use error::CoreError;
 pub use geometry::*;
-pub use job::{AudioCodec, ContainerFormat, JobSpec, SubtitleMode, VideoCodec};
+pub use job::{AudioCodec, ContainerFormat, EncodingMode, JobSpec, SubtitleMode, VideoCodec};
 pub use metadata::*;
 pub use subtitle::*;
 pub use media::{

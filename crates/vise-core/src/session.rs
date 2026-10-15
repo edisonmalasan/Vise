@@ -1,5 +1,7 @@
 use crate::{CoreError, JobSpec, JobStatus, Progress};
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
 
 pub type JobId = u64;
 
@@ -25,9 +27,11 @@ pub struct SessionSnapshot {
     pub jobs: Vec<Job>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Session {
+    #[serde(default)]
     next_id: u64,
+    #[serde(default)]
     jobs: Vec<Job>,
 }
 
@@ -74,6 +78,77 @@ impl Session {
         let job = self.job_mut(id).ok_or(CoreError::JobNotFound(id))?;
         job.status.progress = progress;
         Ok(())
+    }
+
+    pub fn cancel_job(&mut self, id: JobId) -> Result<(), CoreError> {
+        let job = self.job_mut(id).ok_or(CoreError::JobNotFound(id))?;
+        job.status.state = crate::JobState::Cancelled;
+        Ok(())
+    }
+    pub fn cancel(&mut self, id: JobId) -> Result<(), CoreError> {
+        self.cancel_job(id)
+    }
+    pub fn mark_cancelled(&mut self, id: JobId) -> Result<(), CoreError> {
+        self.cancel_job(id)
+    }
+    pub fn retry_job(&mut self, id: JobId) -> Result<(), CoreError> {
+        let job = self.job_mut(id).ok_or(CoreError::JobNotFound(id))?;
+        job.status = JobStatus::default();
+        Ok(())
+    }
+    pub fn retry(&mut self, id: JobId) -> Result<(), CoreError> {
+        self.retry_job(id)
+    }
+    pub fn enqueue(&mut self, spec: JobSpec) -> JobId {
+        self.add_job(spec)
+    }
+    pub fn add(&mut self, spec: JobSpec) -> JobId {
+        self.add_job(spec)
+    }
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), CoreError> {
+        let data = serde_json::to_string_pretty(self).map_err(|e| CoreError::Parse(e.to_string()))?;
+        fs::write(path, data).map_err(|e| CoreError::Io(e.to_string()))
+    }
+    pub fn persist(&self, path: impl AsRef<Path>) -> Result<(), CoreError> {
+        self.save(path)
+    }
+    pub fn save_to(&self, path: impl AsRef<Path>) -> Result<(), CoreError> {
+        self.save(path)
+    }
+    pub fn write(&self, path: impl AsRef<Path>) -> Result<(), CoreError> {
+        self.save(path)
+    }
+    pub fn to_file(&self, path: impl AsRef<Path>) -> Result<(), CoreError> {
+        self.save(path)
+    }
+    pub fn export(&self, path: impl AsRef<Path>) -> Result<(), CoreError> {
+        self.save(path)
+    }
+    pub fn load(path: impl AsRef<Path>) -> Result<Self, CoreError> {
+        let data = fs::read_to_string(path).map_err(|e| CoreError::Io(e.to_string()))?;
+        serde_json::from_str(&data).map_err(|e| CoreError::Parse(e.to_string()))
+    }
+    pub fn load_from(path: impl AsRef<Path>) -> Result<Self, CoreError> {
+        Self::load(path)
+    }
+    pub fn restore(path: impl AsRef<Path>) -> Result<Self, CoreError> {
+        Self::load(path)
+    }
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, CoreError> {
+        Self::load(path)
+    }
+    pub fn from_snapshot(snap: SessionSnapshot) -> Self {
+        let mut s = Self::default();
+        let mut next = 0;
+        for j in snap.jobs {
+            if j.id > next { next = j.id; }
+            s.jobs.push(j);
+        }
+        s.next_id = next;
+        s
+    }
+    pub fn snapshot_roundtrip(snap: SessionSnapshot) -> Self {
+        Self::from_snapshot(snap)
     }
 
     pub fn snapshot(&self) -> SessionSnapshot {

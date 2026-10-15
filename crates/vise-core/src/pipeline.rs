@@ -207,6 +207,51 @@ impl Transcoder {
             cmd.arg(arg);
         }
 
+        // Encoding rate-control mode.
+        let resolved_mode = spec.resolved_encoding_mode();
+        let quality = spec.effective_quality();
+        let bitrate = spec.effective_bitrate_kbps();
+        let target = spec.effective_target_size_bytes();
+
+        let input_duration = self.probe_duration(&input);
+        if resolved_mode.is_lossless() {
+            cmd.arg("-crf").arg("0");
+        } else if resolved_mode.is_constant_quality() {
+            if let Some(q) = quality {
+                cmd.arg("-crf").arg(q.to_string());
+            }
+        } else if resolved_mode.is_average_bitrate() {
+            if let Some(b) = bitrate {
+                cmd.arg("-b:v").arg(format!("{}k", b));
+            }
+        } else if resolved_mode.is_target_size() {
+            if let (Some(bytes), Some(dur)) = (target, input_duration) {
+                if dur > 0.0 {
+                    let kbps = ((bytes as f64) * 8.0 / 1000.0 / dur) as u64;
+                    if kbps > 0 { cmd.arg("-b:v").arg(format!("{}k", kbps)); }
+                }
+            }
+        }
+
+        if spec.two_pass_enabled() {
+            cmd.arg("-pass").arg("2");
+        }
+
+        if spec.two_pass_enabled() {
+            let null_device = if cfg!(windows) { "NUL" } else { "/dev/null" };
+            let mut first = Command::new(&ffmpeg);
+            first.arg("-y").arg("-i").arg(&input);
+            if !combined_filter.is_empty() {
+                first.arg("-vf").arg(&combined_filter);
+            }
+            first.arg("-c:v").arg(video_encoder(video_codec));
+            first.arg("-an");
+            first.arg("-pass").arg("1");
+            first.arg("-f").arg("null");
+            first.arg(null_device);
+            let _ = first.output();
+        }
+
         cmd.arg("-shortest");
         cmd.arg(&spec.output_path);
 
@@ -267,6 +312,17 @@ impl Transcoder {
         self.transcode_job(&spec)
     }
 
+    fn probe_duration(&self, path: &Path) -> Option<f64> {
+        let ffprobe = self.ffprobe_bin().ok()?;
+        let output = Command::new(&ffprobe)
+            .arg("-v").arg("error")
+            .arg("-show_entries").arg("format=duration")
+            .arg("-of").arg("default=noprint_wrappers=1:nokey=1")
+            .arg(path)
+            .output().ok()?;
+        if !output.status.success() { return None; }
+        String::from_utf8_lossy(&output.stdout).trim().parse::<f64>().ok()
+    }
     fn probe_output(&self, path: &Path) -> (Option<f64>, Option<String>, Option<String>) {
         let ffprobe = match self.ffprobe_bin() {
             Ok(p) => p,
