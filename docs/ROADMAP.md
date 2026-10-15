@@ -231,15 +231,15 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Hardware decode/encode paths are discovered and used with software fallback where needed.*
 
-- [ ] Hardware decode detection
-- [ ] Hardware video decoding
-- [ ] Hardware H.264 encoding
-- [ ] Hardware H.265 encoding
-- [ ] Hardware AV1 encoding where available
-- [ ] Software fallback on unsupported hardware
-- [ ] Capability reporting to UI
+- [x] Hardware decode detection
+- [x] Hardware video decoding
+- [x] Hardware H.264 encoding
+- [x] Hardware H.265 encoding
+- [x] Hardware AV1 encoding where available
+- [x] Software fallback on unsupported hardware
+- [x] Capability reporting to UI
 
-**Status:** Not started (0/7 verified)
+**Status:** Complete (7/7 verified)
 
 ---
 
@@ -295,7 +295,7 @@ Required groups: 11, 12
 | 8 | Subtitles | Complete (7/7) |
 | 9 | Chapters and metadata | Complete (6/6) |
 | 10 | Encoding control and job reliability | Complete (8/8) |
-| 11 | Hardware acceleration | Not started (0/7) |
+| 11 | Hardware acceleration | Complete (7/7) |
 | 12 | Platform packaging and release | Not started (0/6) |
 
 ## Notes

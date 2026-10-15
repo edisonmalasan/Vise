@@ -228,6 +228,21 @@ pub struct JobSpec {
     pub audio_track_configs: Vec<crate::AudioTrackConfig>,
     #[serde(default)]
     pub audio_track_config: Option<crate::AudioTrackConfig>,
+
+    /// Hardware acceleration options.
+    #[serde(default, alias = "hardware_options", alias = "hw_acceleration")]
+    pub hardware_acceleration: crate::HardwareAcceleration,
+
+    #[serde(default)]
+    pub hardware: Option<crate::HardwareAcceleration>,
+    #[serde(default)]
+    pub hwaccel: Option<crate::HardwareAcceleration>,
+    #[serde(default)]
+    pub hw_accel: Option<crate::HardwareAcceleration>,
+    #[serde(default)]
+    pub acceleration: Option<crate::HardwareAcceleration>,
+    #[serde(default)]
+    pub hwacceleration: Option<crate::HardwareAcceleration>,
 }
 
 impl JobSpec {
@@ -375,6 +390,34 @@ impl JobSpec {
             if o.encoder.is_some() { opts.encoder = o.encoder.clone(); }
             if o.bitrate.is_some() { opts.bitrate = o.bitrate; }
             if o.quality.is_some() { opts.quality = o.quality; }
+        }
+        opts
+    }
+
+    pub fn hardware_acceleration_options(&self) -> crate::HardwareAcceleration {
+        let mut opts = self.hardware_acceleration.clone();
+        for x in [
+            self.hardware.as_ref(),
+            self.hwaccel.as_ref(),
+            self.hw_accel.as_ref(),
+            self.acceleration.as_ref(),
+            self.hwacceleration.as_ref(),
+        ].into_iter().flatten() {
+            if x.enabled {
+                opts.enabled = true;
+            }
+            if x.mode != crate::HardwareMode::Auto || opts.mode == crate::HardwareMode::Auto {
+                // merge only if non-default
+            }
+            opts.decode.enabled |= x.decode.enabled;
+            opts.encode.enabled |= x.encode.enabled;
+            if x.encode.encoder.is_some() {
+                opts.encode.encoder = x.encode.encoder.clone();
+            }
+            if x.decode.hwaccel.is_some() {
+                opts.decode.hwaccel = x.decode.hwaccel.clone();
+            }
+            opts.fallback = opts.fallback || x.fallback;
         }
         opts
     }

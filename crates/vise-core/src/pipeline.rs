@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::{
-    AudioCodec, ContainerFormat, CoreError, FfprobeScanner, JobSpec, SubtitleMode, VideoCodec,
-    VideoProcessingOptions,
+    AudioCodec, ContainerFormat, CoreError, FfprobeScanner, HardwareAcceleration, HardwareCapabilities,
+    JobSpec, SubtitleMode, VideoCodec, VideoProcessingOptions,
 };
 
 /// Baseline transcode planning and execution.
@@ -55,6 +55,22 @@ impl Transcoder {
     }
 
     pub fn transcode_job(&self, spec: &JobSpec) -> Result<TranscodeResult, CoreError> {
+        match self.transcode_job_attempt(spec, true) {
+            Ok(r) => Ok(r),
+            Err(first_err) => {
+                if spec.hardware_acceleration_options().is_enabled() {
+                    match self.transcode_job_attempt(spec, false) {
+                        Ok(r) => Ok(r),
+                        Err(_) => Err(first_err),
+                    }
+                } else {
+                    Err(first_err)
+                }
+            }
+        }
+    }
+
+    fn transcode_job_attempt(&self, spec: &JobSpec, hardware_enabled: bool) -> Result<TranscodeResult, CoreError> {
         let ffmpeg = self.ffmpeg_bin()?;
         let input = PathBuf::from(&spec.input_path);
         if !input.is_file() {
@@ -129,13 +145,35 @@ impl Transcoder {
             }
         }
 
+        let hw_opts = if hardware_enabled {
+            spec.hardware_acceleration_options()
+        } else {
+            HardwareAcceleration::disabled()
+        };
+        let caps = HardwareCapabilities::detect_with(
+            self.ffmpeg
+                .clone()
+                .or_else(|| FfprobeScanner::default().ffmpeg_path().map(PathBuf::from)),
+        );
+        let resolved_encoder = caps.preferred_encoder(video_codec, &hw_opts);
+        let hw_decode = caps.preferred_decoder_arg(&hw_opts);
+
         let mut cmd = Command::new(&ffmpeg);
+        if let Some(dec) = &hw_decode {
+            cmd.arg("-hwaccel").arg(dec);
+            let dev = hw_opts
+                .device
+                .clone()
+                .or_else(|| hw_opts.decode.device.clone());
+            if let Some(dev) = dev {
+                cmd.arg("-hwaccel_device").arg(dev);
+            }
+        }
         cmd.arg("-y").arg("-i").arg(&input);
         if !combined_filter.is_empty() {
             cmd.arg("-vf").arg(&combined_filter);
         }
-        cmd.arg("-c:v").arg(video_encoder(video_codec));
-        if audio_opts.passthrough || audio_opts.copy {
+        cmd.arg("-c:v").arg(&resolved_encoder);        if audio_opts.passthrough || audio_opts.copy {
             cmd.arg("-c:a").arg("copy");
         } else {
             cmd.arg("-c:a").arg(audio_encoder(audio_codec));
@@ -244,7 +282,7 @@ impl Transcoder {
             if !combined_filter.is_empty() {
                 first.arg("-vf").arg(&combined_filter);
             }
-            first.arg("-c:v").arg(video_encoder(video_codec));
+            first.arg("-c:v").arg(&resolved_encoder);
             first.arg("-an");
             first.arg("-pass").arg("1");
             first.arg("-f").arg("null");
