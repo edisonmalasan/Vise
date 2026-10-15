@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/vise-core", "crates/vise-cli"]
+members = ["crates/vise-core", "crates/vise-cli", "apps/vise-desktop/src-tauri"]
 resolver = "2"
 
 [workspace.package]
