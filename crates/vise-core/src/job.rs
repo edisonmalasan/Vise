@@ -1,4 +1,4 @@
-use crate::VideoProcessingOptions;
+use crate::{AudioProcessingOptions, VideoProcessingOptions};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -29,6 +29,8 @@ pub enum AudioCodec {
     Vorbis,
     Flac,
     Mp3,
+    Ac3,
+    Eac3,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -69,6 +71,18 @@ pub struct JobSpec {
     /// Alias for video processing options.
     #[serde(default)]
     pub filters: Option<VideoProcessingOptions>,
+
+    /// Audio processing options applied during encoding.
+    #[serde(default, alias = "audio_filters", alias = "audio_options", alias = "audio")]
+    pub audio_processing: AudioProcessingOptions,
+
+    /// Audio tracks configuration.
+    #[serde(default, alias = "audio_track_list", alias = "audio_tracks_config")]
+    pub audio_tracks: Vec<crate::AudioTrackConfig>,
+    #[serde(default)]
+    pub audio_track_configs: Vec<crate::AudioTrackConfig>,
+    #[serde(default)]
+    pub audio_track_config: Option<crate::AudioTrackConfig>,
 }
 
 impl JobSpec {
@@ -150,6 +164,31 @@ impl JobSpec {
 
     pub fn build_filter_chain(&self) -> String {
         self.video_processing_options().build_filter_chain()
+    }
+    pub fn audio_processing_options(&self) -> AudioProcessingOptions {
+        let mut opts = self.audio_processing.clone();
+        if let Some(o) = &self.audio_track_config {
+            if o.mixdown.is_some() { opts.mixdown = o.mixdown.clone(); }
+            if o.mixdown_enum.is_some() { opts.mixdown_enum = o.mixdown_enum; }
+            if o.sample_rate.is_some() { opts.sample_rate = o.sample_rate; }
+            if o.dither { opts.dither = true; }
+            if o.dither_mode.is_some() { opts.dither_mode = o.dither_mode.clone(); }
+            if o.gain.is_some() { opts.gain = o.gain; }
+            if o.volume.is_some() { opts.volume = o.volume; }
+            if o.delay.is_some() { opts.delay = o.delay; }
+            if o.passthrough { opts.passthrough = true; }
+            if o.channel_count.is_some() { opts.channels = o.channel_count; }
+            if o.encoder.is_some() { opts.encoder = o.encoder.clone(); }
+            if o.bitrate.is_some() { opts.bitrate = o.bitrate; }
+            if o.quality.is_some() { opts.quality = o.quality; }
+        }
+        opts
+    }
+    pub fn build_audio_filter_chain(&self) -> String {
+        self.audio_processing_options().build()
+    }
+    pub fn build_audio_filter(&self) -> String {
+        self.build_audio_filter_chain()
     }
     pub fn build_video_filter(&self) -> String {
         self.build_filter_chain()
