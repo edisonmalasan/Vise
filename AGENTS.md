@@ -91,6 +91,25 @@ Do not create extra ICM stage folders or permanent plan files unless the task be
 3. Make focused commits at logical checkpoints **when commits are authorized**; do not commit automatically without permission.
 4. Use a configured `git` subagent for Git operations **if this harness provides one**. Otherwise, use permitted Git tooling; never assume a subagent exists.
 5. Do not merge until the relevant build/tests pass; report pre-existing warnings and introduce no new errors or warnings.
-6. Do not stage transient agent-generated plans (for example, `docs/superpowers/`) unless the user explicitly wants them versioned. Respect the repository's `.gitignore`.
-7. Do not push, merge, reset, or discard changes without explicit authorization.
+6. Do not push, merge, reset, or discard changes without explicit authorization.
+
+### Branch lifecycle
+
+Before starting any repository-mutating stage:
+
+1. Check `git status`.
+2. Switch to `main`.
+3. Pull the latest `origin/main`.
+4. Create a new branch from the updated `main`.
+5. Immediately push the new branch to `origin` and set upstream tracking.
+6. Only then begin modifying files.
+
+Never leave active repository work only on a local branch.
+
+Recommended pattern:
+
+    git switch main
+    git pull --ff-only origin main
+    git switch -c <branch-name>
+    git push -u origin <branch-name>
 "
