@@ -30,6 +30,11 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - First desktop frontend: Tauri + web UI.
 - Media processing parity with the target 1.11.2 reference architecture is the long-term goal.
 
+## Implementation Notes
+
+- UI-facing work, especially in Group 4 and related preset/settings flows, should use the available design skills: `apple-design` for interaction motion, gestures, sheets, momentum, typography, and reduced-motion behavior; `impeccable` for UI structure, forms, onboarding, empty/error states, accessibility, and polish.
+- These skills are implementation aids, not product milestones or roadmap checkboxes.
+
 ---
 
 ## Group 0 — Project foundation
