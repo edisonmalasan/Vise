@@ -56,18 +56,18 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Supported input media can be scanned and described for title, chapter, track, and preview data.*
 
-- [ ] File source scanning
-- [ ] Media metadata extraction
-- [ ] Title discovery and selection
-- [ ] Chapter discovery
-- [ ] Audio track enumeration
-- [ ] Subtitle track enumeration
-- [ ] Preview frame extraction
-- [ ] Crop detection
-- [ ] DVD source support `(optional)`
-- [ ] Blu-ray source support `(optional)`
+- [x] File source scanning
+- [x] Media metadata extraction
+- [x] Title discovery and selection
+- [x] Chapter discovery
+- [x] Audio track enumeration
+- [x] Subtitle track enumeration
+- [x] Preview frame extraction
+- [x] Crop detection
+- [ ] DVD source support `(optional)` — deferred; see Deferred section
+- [ ] Blu-ray source support `(optional)` — deferred; see Deferred section
 
-**Status:** Not started (0/10 verified)
+**Status:** In progress (8/10 verified; optional DVD/Blu-ray support deferred)
 
 ---
 
@@ -285,7 +285,7 @@ Required groups: 11, 12
 | Group | Milestone | Status |
 |---|---|---|
 | 0 | Project foundation | Complete (6/6) |
-| 1 | Media ingestion | Not started (0/10) |
+| 1 | Media ingestion | In progress (8/10) |
 | 2 | Core transcode baseline | Not started (0/8) |
 | 3 | Command-line interface | Not started (0/6) |
 | 4 | Desktop application shell | Not started (0/7) |

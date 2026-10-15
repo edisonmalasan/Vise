@@ -14,6 +14,9 @@ mod session;
 pub use error::CoreError;
 pub use geometry::*;
 pub use job::{AudioCodec, ContainerFormat, JobSpec, SubtitleMode, VideoCodec};
-pub use media::{MediaBuffer, Packet, TrackKind};
+pub use media::{
+    parse_ffprobe_output, ChapterInfo, CropDetection, FfprobeScanner, FormatInfo, MediaBuffer,
+    MediaScanner, Packet, ScanResult, StreamInfo, TitleInfo, TrackKind,
+};
 pub use progress::{JobState, JobStatus, Progress};
 pub use session::{JobId, Session, SessionSnapshot};
