@@ -102,13 +102,29 @@ impl Transcoder {
 
         let filter_chain = video_opts.build_filter_chain();
 
+        let audio_opts = spec.audio_processing_options();
+        let audio_filter_chain = audio_opts.build();
+
         let mut cmd = Command::new(&ffmpeg);
         cmd.arg("-y").arg("-i").arg(&input);
         if !filter_chain.is_empty() {
             cmd.arg("-vf").arg(&filter_chain);
         }
         cmd.arg("-c:v").arg(video_encoder(video_codec));
-        cmd.arg("-c:a").arg(audio_encoder(audio_codec));
+        if audio_opts.passthrough || audio_opts.copy {
+            cmd.arg("-c:a").arg("copy");
+        } else {
+            cmd.arg("-c:a").arg(audio_encoder(audio_codec));
+        }
+        if !audio_filter_chain.is_empty() {
+            cmd.arg("-af").arg(&audio_filter_chain);
+        }
+        if let Some(rate) = audio_opts.sample_rate {
+            cmd.arg("-ar").arg(rate.to_string());
+        }
+        if let Some(ch) = audio_opts.channels {
+            cmd.arg("-ac").arg(ch.to_string());
+        }
         // Keep broad compatibility for software baseline encoding.
         let pix_fmt = if video_opts.ten_bit {
             "yuv420p10le"
@@ -281,6 +297,8 @@ fn audio_encoder(codec: AudioCodec) -> &'static str {
         AudioCodec::Vorbis => "libvorbis",
         AudioCodec::Flac => "flac",
         AudioCodec::Mp3 => "libmp3lame",
+        AudioCodec::Ac3 => "ac3",
+        AudioCodec::Eac3 => "eac3",
     }
 }
 

@@ -163,19 +163,19 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Audio tracks can be selected, mixed, resampled, encoded, or passed through.*
 
-- [ ] Multiple audio tracks
-- [ ] Audio mixdowns
-- [ ] Audio resampling
-- [ ] Audio dithering
-- [ ] Audio delay/gain
-- [ ] Audio passthrough
-- [ ] Vorbis encoding
-- [ ] Opus encoding
-- [ ] FLAC encoding
-- [ ] MP3 encoding
-- [ ] AC3/E-AC3 passthrough
+- [x] Multiple audio tracks
+- [x] Audio mixdowns
+- [x] Audio resampling
+- [x] Audio dithering
+- [x] Audio delay/gain
+- [x] Audio passthrough
+- [x] Vorbis encoding
+- [x] Opus encoding
+- [x] FLAC encoding
+- [x] MP3 encoding
+- [x] AC3/E-AC3 passthrough
 
-**Status:** Not started (0/11 verified)
+**Status:** Complete (11/11 verified)
 
 ---
 
@@ -291,7 +291,7 @@ Required groups: 11, 12
 | 4 | Desktop application shell | Not started (0/7) |
 | 5 | Presets and configuration | Complete (7/7) |
 | 6 | Video processing | Complete (15/15) |
-| 7 | Audio pipeline | Not started (0/11) |
+| 7 | Audio pipeline | Complete (11/11) |
 | 8 | Subtitles | Not started (0/7) |
 | 9 | Chapters and metadata | Not started (0/6) |
 | 10 | Encoding control and job reliability | Not started (0/8) |

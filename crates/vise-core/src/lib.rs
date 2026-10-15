@@ -4,6 +4,7 @@
 //! packet types, progress/state model, and geometry helpers used by all
 //! frontends. It has no UI dependency.
 
+mod audio;
 mod error;
 mod geometry;
 mod job;
@@ -13,6 +14,7 @@ mod preset;
 mod progress;
 mod session;
 mod video;
+pub use audio::*;
 pub use error::CoreError;
 pub use geometry::*;
 pub use job::{AudioCodec, ContainerFormat, JobSpec, SubtitleMode, VideoCodec};
