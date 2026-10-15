@@ -76,6 +76,22 @@ pub struct JobSpec {
     #[serde(default, alias = "audio_filters", alias = "audio_options", alias = "audio")]
     pub audio_processing: AudioProcessingOptions,
 
+    /// Subtitle processing options applied during encoding.
+    #[serde(default, alias = "subtitle_filters", alias = "subtitle_options", alias = "subtitles_options", alias = "subtitle", alias = "subtitles", alias = "subtitle_processing_options")]
+    pub subtitle_processing: crate::SubtitleProcessingOptions,
+
+    /// Subtitle tracks configuration.
+    #[serde(default, alias = "subtitle_track_list", alias = "subtitle_tracks_config", alias = "subtitle_track", alias = "subtitles_tracks")]
+    pub subtitle_tracks: Vec<crate::SubtitleTrackConfig>,
+    #[serde(default)]
+    pub subtitle_track_configs: Vec<crate::SubtitleTrackConfig>,
+    #[serde(default)]
+    pub subtitle_track_config: Option<crate::SubtitleTrackConfig>,
+
+    /// External subtitle file path.
+    #[serde(default, alias = "subtitles_path", alias = "subtitle_file", alias = "external_subtitle", alias = "subtitle_input")]
+    pub subtitle_path: Option<String>,
+
     /// Audio tracks configuration.
     #[serde(default, alias = "audio_track_list", alias = "audio_tracks_config")]
     pub audio_tracks: Vec<crate::AudioTrackConfig>,
@@ -184,6 +200,32 @@ impl JobSpec {
         }
         opts
     }
+
+    pub fn subtitle_processing_options(&self) -> crate::SubtitleProcessingOptions {
+        let mut opts = self.subtitle_processing.clone();
+        if let Some(t) = &self.subtitle_track_config {
+            if t.source_track_id.is_some() { opts.source_track = t.source_track_id; }
+            if t.burn_in { opts.burn_in = true; }
+            if t.copy { opts.passthrough = true; opts.copy = true; }
+            if t.external_path.is_some() { opts.input_path = t.external_path.clone(); }
+            if t.closed_captions { opts.closed_captions = true; }
+            if t.foreign_scan { opts.foreign_audio_scan = true; }
+            if t.mode.is_some() { opts.mode = t.mode; }
+        }
+        for t in self.subtitle_tracks.iter().chain(self.subtitle_track_configs.iter()) {
+            if opts.source_track.is_none() { opts.source_track = t.source_track_id; }
+        }
+        if let Some(p) = &self.subtitle_path {
+            if opts.input_path.is_none() { opts.input_path = Some(p.clone()); }
+        }
+        if self.subtitle_mode == crate::SubtitleMode::BurnIn { opts.burn_in = true; }
+        if self.subtitle_mode == crate::SubtitleMode::Passthrough { opts.passthrough = true; opts.copy = true; }
+        if self.subtitle_mode == crate::SubtitleMode::None {
+            opts.mode = Some(crate::SubtitleMode::None);
+        }
+        opts
+    }
+
     pub fn build_audio_filter_chain(&self) -> String {
         self.audio_processing_options().build()
     }

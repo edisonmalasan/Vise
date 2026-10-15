@@ -183,15 +183,15 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Text and bitmap subtitles can be passed through or burned in with common format support.*
 
-- [ ] Text subtitle passthrough
-- [ ] Bitmap subtitle passthrough
-- [ ] Subtitle burn-in
-- [ ] SRT to MP4 text conversion
-- [ ] SSA/ASS handling
-- [ ] Closed caption handling
-- [ ] Foreign audio scan
+- [x] Text subtitle passthrough
+- [x] Bitmap subtitle passthrough
+- [x] Subtitle burn-in
+- [x] SRT to MP4 text conversion
+- [x] SSA/ASS handling
+- [x] Closed caption handling
+- [x] Foreign audio scan
 
-**Status:** Not started (0/7 verified)
+**Status:** Complete (7/7 verified)
 
 ---
 
@@ -292,7 +292,7 @@ Required groups: 11, 12
 | 5 | Presets and configuration | Complete (7/7) |
 | 6 | Video processing | Complete (15/15) |
 | 7 | Audio pipeline | Complete (11/11) |
-| 8 | Subtitles | Not started (0/7) |
+| 8 | Subtitles | Complete (7/7) |
 | 9 | Chapters and metadata | Not started (0/6) |
 | 10 | Encoding control and job reliability | Not started (0/8) |
 | 11 | Hardware acceleration | Not started (0/7) |

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::{
-    AudioCodec, ContainerFormat, CoreError, FfprobeScanner, JobSpec, VideoCodec,
+    AudioCodec, ContainerFormat, CoreError, FfprobeScanner, JobSpec, SubtitleMode, VideoCodec,
     VideoProcessingOptions,
 };
 
@@ -105,10 +105,34 @@ impl Transcoder {
         let audio_opts = spec.audio_processing_options();
         let audio_filter_chain = audio_opts.build();
 
+        let sub_opts = spec.subtitle_processing_options();
+        let mut combined_filter = filter_chain.clone();
+        if sub_opts.effective_burn_in() {
+            let burn_path = sub_opts
+                .effective_path()
+                .map(|p| p.to_string())
+                .or_else(|| spec.subtitle_path.clone())
+                .unwrap_or_else(|| input.to_string_lossy().to_string());
+            let burn = if sub_opts.ass_handling
+                || sub_opts.ssa_handling
+                || sub_opts.format == Some(crate::SubtitleFormat::Ass)
+                || sub_opts.format == Some(crate::SubtitleFormat::Ssa)
+            {
+                format!("ass='{}'", burn_path)
+            } else {
+                format!("subtitles='{}'", burn_path)
+            };
+            if combined_filter.is_empty() {
+                combined_filter = burn;
+            } else {
+                combined_filter = format!("{},{}", combined_filter, burn);
+            }
+        }
+
         let mut cmd = Command::new(&ffmpeg);
         cmd.arg("-y").arg("-i").arg(&input);
-        if !filter_chain.is_empty() {
-            cmd.arg("-vf").arg(&filter_chain);
+        if !combined_filter.is_empty() {
+            cmd.arg("-vf").arg(&combined_filter);
         }
         cmd.arg("-c:v").arg(video_encoder(video_codec));
         if audio_opts.passthrough || audio_opts.copy {
@@ -155,6 +179,22 @@ impl Transcoder {
             cmd.arg("-color_trc").arg("smpte2084");
             cmd.arg("-colorspace").arg("bt2020nc");
             cmd.arg("-map_metadata").arg("0");
+        }
+        match spec.subtitle_mode {
+            SubtitleMode::None => {
+                cmd.arg("-sn");
+            }
+            SubtitleMode::BurnIn => {
+                cmd.arg("-sn");
+            }
+            SubtitleMode::Passthrough => {
+                cmd.arg("-map").arg("0");
+                if sub_opts.srt_to_mp4 || matches!(container, ContainerFormat::Mp4) {
+                    cmd.arg("-c:s").arg("mov_text");
+                } else {
+                    cmd.arg("-c:s").arg("copy");
+                }
+            }
         }
         cmd.arg("-shortest");
         cmd.arg(&spec.output_path);
