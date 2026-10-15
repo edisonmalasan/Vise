@@ -199,14 +199,14 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Chapters and media metadata can be copied or edited through the transcode workflow.*
 
-- [ ] Chapter copy
-- [ ] Chapter editing
-- [ ] Metadata copy
-- [ ] Metadata editing
-- [ ] Cover art handling
-- [ ] Attachment handling
+- [x] Chapter copy
+- [x] Chapter editing
+- [x] Metadata copy
+- [x] Metadata editing
+- [x] Cover art handling
+- [x] Attachment handling
 
-**Status:** Not started (0/6 verified)
+**Status:** Complete (6/6 verified)
 
 ---
 
@@ -293,7 +293,7 @@ Required groups: 11, 12
 | 6 | Video processing | Complete (15/15) |
 | 7 | Audio pipeline | Complete (11/11) |
 | 8 | Subtitles | Complete (7/7) |
-| 9 | Chapters and metadata | Not started (0/6) |
+| 9 | Chapters and metadata | Complete (6/6) |
 | 10 | Encoding control and job reliability | Not started (0/8) |
 | 11 | Hardware acceleration | Not started (0/7) |
 | 12 | Platform packaging and release | Not started (0/6) |

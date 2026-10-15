@@ -92,6 +92,44 @@ pub struct JobSpec {
     #[serde(default, alias = "subtitles_path", alias = "subtitle_file", alias = "external_subtitle", alias = "subtitle_input")]
     pub subtitle_path: Option<String>,
 
+    /// Chapter processing options.
+    #[serde(default, alias = "chapter_options", alias = "chapters", alias = "chapter", alias = "chapter_processing_options", alias = "chapters_options")]
+    pub chapter_processing: crate::ChapterProcessingOptions,
+
+    /// Alias for chapter processing options.
+    #[serde(default)]
+    pub chapters_processing: Option<crate::ChapterProcessingOptions>,
+
+    /// Metadata processing options.
+    #[serde(default, alias = "metadata", alias = "metadata_processing_options", alias = "tags")]
+    pub metadata_processing: crate::MetadataProcessingOptions,
+
+    /// Alias for metadata processing options.
+    #[serde(default)]
+    pub metadata_options: Option<crate::MetadataProcessingOptions>,
+
+    /// Top-level chapter copy/editing toggles.
+    #[serde(default)]
+    pub chapter_copy: bool,
+    #[serde(default)]
+    pub chapter_edit: bool,
+    #[serde(default)]
+    pub chapter_editing: bool,
+
+    /// Top-level metadata copy/editing toggles.
+    #[serde(default)]
+    pub metadata_copy: bool,
+    #[serde(default)]
+    pub metadata_edit: bool,
+    #[serde(default)]
+    pub metadata_editing: bool,
+
+    /// Cover art and attachment handling toggles.
+    #[serde(default, alias = "cover_art")]
+    pub cover_art_handling: bool,
+    #[serde(default, alias = "attachment")]
+    pub attachment_handling: bool,
+
     /// Audio tracks configuration.
     #[serde(default, alias = "audio_track_list", alias = "audio_tracks_config")]
     pub audio_tracks: Vec<crate::AudioTrackConfig>,
@@ -223,6 +261,40 @@ impl JobSpec {
         if self.subtitle_mode == crate::SubtitleMode::None {
             opts.mode = Some(crate::SubtitleMode::None);
         }
+        opts
+    }
+
+    pub fn chapter_processing_options(&self) -> crate::ChapterProcessingOptions {
+        let mut opts = self.chapter_processing.clone();
+        if let Some(c) = &self.chapters_processing {
+            // merge fields
+            if c.copy { opts.copy = true; }
+            if c.edit { opts.edit = true; }
+            if !c.chapters.is_empty() { opts.chapters = c.chapters.clone(); }
+            if c.cover_art { opts.cover_art = true; }
+            if c.attachments { opts.attachments = true; }
+        }
+        if self.chapter_copy { opts.copy = true; opts.chapter_copy = true; }
+        if self.chapter_edit { opts.edit = true; opts.chapter_edit = true; }
+        if self.chapter_editing { opts.chapter_editing = true; opts.edit = true; }
+        if self.cover_art_handling { opts.cover_art = true; }
+        if self.attachment_handling { opts.attachments = true; opts.attachment_copy = true; }
+        opts
+    }
+
+    pub fn metadata_processing_options(&self) -> crate::MetadataProcessingOptions {
+        let mut opts = self.metadata_processing.clone();
+        if let Some(m) = &self.metadata_options {
+            if m.copy { opts.copy = true; }
+            if m.edit { opts.edit = true; }
+            if m.title.is_some() { opts.title = m.title.clone(); }
+            if !m.metadata.is_empty() { opts.metadata = m.metadata.clone(); }
+        }
+        if self.metadata_copy { opts.copy = true; opts.metadata_copy = true; }
+        if self.metadata_edit { opts.edit = true; opts.metadata_edit = true; }
+        if self.metadata_editing { opts.metadata_editing = true; opts.edit = true; }
+        if self.cover_art_handling { opts.cover_art = true; }
+        if self.attachment_handling { opts.attachments = true; opts.attachment_copy = true; }
         opts
     }
 

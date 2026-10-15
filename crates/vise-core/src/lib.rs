@@ -5,10 +5,12 @@
 //! frontends. It has no UI dependency.
 
 mod audio;
+mod chapter;
 mod error;
 mod geometry;
 mod job;
 mod media;
+mod metadata;
 mod pipeline;
 mod preset;
 mod progress;
@@ -16,9 +18,11 @@ mod session;
 mod subtitle;
 mod video;
 pub use audio::*;
+pub use chapter::*;
 pub use error::CoreError;
 pub use geometry::*;
 pub use job::{AudioCodec, ContainerFormat, JobSpec, SubtitleMode, VideoCodec};
+pub use metadata::*;
 pub use subtitle::*;
 pub use media::{
     parse_ffprobe_output, ChapterInfo, CropDetection, FfprobeScanner, FormatInfo, MediaBuffer,

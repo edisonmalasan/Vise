@@ -170,6 +170,9 @@ impl Transcoder {
         {
             cmd.arg("-vsync").arg("vfr");
         }
+        let chapter_opts = spec.chapter_processing_options();
+        let metadata_opts = spec.metadata_processing_options();
+
         if container == ContainerFormat::Mp4 {
             cmd.arg("-movflags").arg("+faststart");
         }
@@ -196,6 +199,14 @@ impl Transcoder {
                 }
             }
         }
+        // Chapter/metadata copy-edit handling through ffmpeg arguments.
+        for arg in chapter_opts.build_ffmpeg_args() {
+            cmd.arg(arg);
+        }
+        for arg in metadata_opts.build_metadata_args() {
+            cmd.arg(arg);
+        }
+
         cmd.arg("-shortest");
         cmd.arg(&spec.output_path);
 
