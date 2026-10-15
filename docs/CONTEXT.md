@@ -15,8 +15,7 @@
 |---|---|
 | Goals, features, and progress | `docs/ROADMAP.md` |
 | Current application behavior | No application source exists yet; inspect `docs/ROADMAP.md` for intended behavior |
-| Technical design and key boundaries | `re/docs/` reverse-engineering notes in a local-only workspace (behavioral/structural reference only); `docs/ROADMAP.md` architecture decisions |
-| Reverse-engineering workspace | `re/` (gitignored) contains local reference material; it is not tracked project source |
+| Technical design and key boundaries | `re/docs/` reverse-engineering notes (behavioral/structural reference only); `docs/ROADMAP.md` architecture decisions |
 | Build and test commands | Root `AGENTS.md` (none currently configured) |
 | Important existing dependencies | No runtime dependencies; Graphify output in `graphify-out/` is derived analysis |
 | Reusable lessons from other projects | Central Obsidian vault, when configured |
