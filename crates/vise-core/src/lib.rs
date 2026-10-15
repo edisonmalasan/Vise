@@ -9,9 +9,9 @@ mod geometry;
 mod job;
 mod media;
 mod pipeline;
+mod preset;
 mod progress;
 mod session;
-
 pub use error::CoreError;
 pub use geometry::*;
 pub use job::{AudioCodec, ContainerFormat, JobSpec, SubtitleMode, VideoCodec};
@@ -20,5 +20,6 @@ pub use media::{
     MediaScanner, Packet, ScanResult, StreamInfo, TitleInfo, TrackKind,
 };
 pub use pipeline::{transcode, transcode_file, TranscodeResult, Transcoder};
+pub use preset::*;
 pub use progress::{JobState, JobStatus, Progress};
 pub use session::{JobId, Session, SessionSnapshot};
