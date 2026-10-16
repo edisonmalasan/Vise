@@ -796,11 +796,11 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
    * list but disabled, and a control that cannot be used at all is disabled with
    * its reason underneath. Nothing is ever shown closed with no explanation.
    */
-  function applyChoice(control, onChange) {
+  function applyChoice(control, onChange, node, hintNode) {
     if (!control) {
       return;
     }
-    var select = el(control.id);
+    var select = node || el(control.id);
     if (!select) {
       return;
     }
@@ -817,7 +817,8 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     setHint(
       control.id + "Hint",
       control.available ? control.hint : control.reason,
-      control.available ? "" : "blocked"
+      control.available ? "" : "blocked",
+      hintNode
     );
     select.onchange = function () {
       onChange(select.value);
@@ -826,11 +827,11 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
 
   /* Fill a number field. The typed text is never rewritten while the field has
      focus, so the caret does not jump while somebody is typing. */
-  function applyNumber(field, onChange) {
+  function applyNumber(field, onChange, node, hintNode) {
     if (!field) {
       return;
     }
-    var input = el(field.id);
+    var input = node || el(field.id);
     if (!input) {
       return;
     }
@@ -845,7 +846,8 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     setHint(
       field.id + "Hint",
       hint || (field.unit ? "Measured in " + field.unit + "." : ""),
-      field.valid ? "" : field.available ? "error" : "blocked"
+      field.valid ? "" : field.available ? "error" : "blocked",
+      hintNode
     );
     input.setAttribute("aria-invalid", field.valid ? "false" : "true");
     if (field.available) {
@@ -857,11 +859,11 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     }
   }
 
-  function applyText(field, onChange) {
+  function applyText(field, onChange, node, hintNode) {
     if (!field) {
       return;
     }
-    var input = el(field.id);
+    var input = node || el(field.id);
     if (!input) {
       return;
     }
@@ -873,7 +875,12 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     if (!field.valid && field.problem) {
       hint = field.problem;
     }
-    setHint(field.id + "Hint", hint, field.valid ? "" : field.available ? "error" : "blocked");
+    setHint(
+      field.id + "Hint",
+      hint,
+      field.valid ? "" : field.available ? "error" : "blocked",
+      hintNode
+    );
     if (onChange) {
       input.onchange = function () {
         onChange(input.value);
@@ -881,11 +888,11 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     }
   }
 
-  function applyToggle(toggle, onChange) {
+  function applyToggle(toggle, onChange, node, hintNode) {
     if (!toggle) {
       return;
     }
-    var input = el(toggle.id);
+    var input = node || el(toggle.id);
     if (!input) {
       return;
     }
@@ -894,23 +901,26 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     setHint(
       toggle.id + "Hint",
       toggle.available ? toggle.hint : toggle.reason,
-      toggle.available ? "" : "blocked"
+      toggle.available ? "" : "blocked",
+      hintNode
     );
     input.onchange = function () {
       onChange(input.checked);
     };
   }
 
-  function setHint(id, text, tone) {
-    var node = el(id);
-    if (!node) {
+  /* The hint under a control, either looked up by the identifier the view model
+     carries or handed over by a builder that made the node itself. */
+  function setHint(id, text, tone, node) {
+    var target = node || el(id);
+    if (!target) {
       return;
     }
-    setText(node, text || "");
+    setText(target, text || "");
     if (tone) {
-      node.dataset.tone = tone;
+      target.dataset.tone = tone;
     } else {
-      delete node.dataset.tone;
+      delete target.dataset.tone;
     }
   }
 
@@ -1211,7 +1221,11 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     return card;
   }
 
-  /* A labelled control with its hint underneath, whatever kind it is. */
+  /* A labelled control with its hint underneath, whatever kind it is.
+   *
+   * The nodes are built here and wired here: a control that is not in the
+   * document yet cannot be found by identifier, so the wiring is handed the
+   * nodes rather than looking them up. */
   function controlGroup(control, onChange) {
     var field = document.createElement("div");
     field.className = "field";
@@ -1220,23 +1234,24 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     label.htmlFor = control.id;
     field.appendChild(label);
 
+    var hint = document.createElement("span");
+    hint.className = "hint";
+    hint.id = control.id + "Hint";
+    field.appendChild(hint);
+
     if (control.options) {
       var select = document.createElement("select");
       select.id = control.id;
-      field.appendChild(select);
-      applyChoice(control, onChange);
+      field.insertBefore(select, hint);
+      applyChoice(control, onChange, select, hint);
     } else {
       var input = document.createElement("input");
       input.type = "text";
       input.id = control.id;
       input.inputMode = control.unit === "fps" ? "decimal" : "numeric";
-      field.appendChild(input);
-      applyNumber(control, onChange);
+      field.insertBefore(input, hint);
+      applyNumber(control, onChange, input, hint);
     }
-    var hint = document.createElement("span");
-    hint.className = "hint";
-    hint.id = control.id + "Hint";
-    field.appendChild(hint);
     return field;
   }
 
