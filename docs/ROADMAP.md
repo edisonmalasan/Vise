@@ -7,6 +7,11 @@ A feature-by-feature build guide. This describes **what** is built and **in what
 Last updated: 2026-10-16  
 Target parity: reference transcoder architecture at version 1.11.2 and its user-facing capability set.
 
+> **Scope expansion (2026-10-16):** Groups 13–20 were added after a reverse-engineering
+> capture of the shipped reference build (see `re/docs/17-rea-shipped-binary-capture.md`
+> through `re/docs/22-rea-feature-parity-matrix.md`). The clone goal is **feature parity
+> with a deliberately better interface**, not a minimal subset.
+
 ## Status Rules
 
 - `[ ]` = not yet verified as complete. `[x]` = implemented **and verified**.
@@ -222,8 +227,10 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [x] Job retry and failure reporting
 - [x] Queue persistence across app restarts
 - [x] Cancel behavior without corrupting output
+- [ ] Job validation before pipeline start (mux, codec, filter and audio-layout compatibility)
+- [ ] Engine crash isolation (a worker failure fails only its job)
 
-**Status:** Complete (8/8 verified)
+**Status:** In progress (8/10 verified; validation and crash isolation pending)
 
 ---
 
@@ -260,6 +267,141 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 ---
 
+## Group 13 — Worker process and JSON IPC
+
+*Outcome: Encoding and scanning run in a background worker exposed over a loopback, token-authenticated JSON API, independent of the UI process.*
+
+- [ ] Worker process lifecycle (start, handshake, monitor parent, shutdown)
+- [ ] Loopback HTTP listener with token authentication
+- [ ] JSON init contract
+- [ ] JSON scan contract (start, poll progress, titles, main title)
+- [ ] JSON encode contract (start, pause, resume, stop, poll progress)
+- [ ] JSON preview contract
+- [ ] JSON logging contract (all messages, messages from index, reset)
+- [ ] Worker crash detection and automatic restart
+- [ ] Portable-mode disable switch for process isolation
+
+**Status:** Not started (0/9 verified)
+
+## Group 14 — Desktop parity with reference product
+
+*Outcome: The desktop application exposes every reference surface with an improved, consistent interface.*
+
+- [ ] Summary tab parity
+- [ ] Dimensions tab parity (crop modes, scale, anamorphic, resolution limits, flip/rotate)
+- [ ] Filters tab parity (all filters, presets, tunes)
+- [ ] Video tab parity (encoder, rate control, quality, profile, tune, level, colour range, framerate mode)
+- [ ] Audio tab parity (per-track behaviour, defaults, mixdown, DRC, dither, delay, naming)
+- [ ] Subtitles tab parity (behaviour, burn-in behaviour, import, search)
+- [ ] Chapters tab parity
+- [ ] Metadata tab parity
+- [ ] Queue window and queue selection window parity
+- [ ] Activity/log window parity
+- [ ] Static preview window parity
+- [ ] Source selection control parity (source menu, scan modes)
+- [ ] Point-to-point range and angle selection parity
+- [ ] Error view, copy-error, countdown alert
+- [ ] About view
+- [ ] Preset add/manage views parity
+- [ ] Right-to-left layout support
+- [ ] Theme selection (system/light/dark)
+
+**Status:** Not started (0/18 verified)
+
+## Group 15 — Preferences surface
+
+*Outcome: Users can configure the application through the full preferences surface.*
+
+- [ ] General preferences tab
+- [ ] Output preferences tab (folders, overwrite, autonaming collision)
+- [ ] Advanced preferences tab (process isolation, log level, priority)
+- [ ] Hardware preferences tab (encoder availability, decode device)
+- [ ] Updates preferences tab (check frequency, channel)
+- [ ] When-done preferences tab
+- [ ] Reset-to-defaults flow
+- [ ] Settings persistence and migration
+
+**Status:** Not started (0/8 verified)
+
+## Group 16 — Preset catalog and versioning
+
+*Outcome: Built-in and user presets match the reference catalog and support versioning, migration, and exchange.*
+
+- [ ] Built-in preset catalog with all six categories (General, Web, Devices, Matroska, Hardware, Professional)
+- [ ] General quality families (Very Fast / Fast / HQ / Super HQ at 480p30, 576p25, 720p30, 1080p30, 2160p60 4K, HEVC and AV1 variants)
+- [ ] Web presets (Creator 720p60-2160p60, Social 10 MB / 25 MB with duration caps)
+- [ ] Device presets (Amazon Fire, Android, Apple, Chromecast, Playstation, Roku, Xbox)
+- [ ] Matroska presets (H.264, H.265, VP9, AV1)
+- [ ] Hardware presets (QSV, NVENC, VCN, Media Foundation, VideoToolbox)
+- [ ] Professional presets (ProRes, DNxHR, FFV1 preservation)
+- [ ] Preset schema with explicit version triple and migration
+- [ ] Preset clean/normalize operation
+- [ ] Preset import/export round-trip
+- [ ] Preset clone and reorder operations
+- [ ] Hardware-dependent preset availability resolution with software fallback
+- [ ] Preset descriptions with device compatibility guidance
+
+**Status:** Not started (0/13 verified)
+
+## Group 17 — System integration
+
+*Outcome: The application integrates with the desktop the way the reference product does.*
+
+- [ ] System tray icon and menus
+- [ ] Windows toast notifications on completion/failure
+- [ ] Power management (prevent sleep during encode)
+- [ ] Pre/post encode actions
+- [ ] Automatic update checking with appcast support
+- [ ] Portable mode via portable.ini
+- [ ] Queue persistence and recovery after restart
+- [ ] Disk-space-aware queue pause behavior
+- [ ] Process priority and NUMA awareness
+
+**Status:** Not started (0/9 verified)
+
+## Group 18 — Localization
+
+*Outcome: The user interface is available in the reference language set and switches at runtime.*
+
+- [ ] UI language selection
+- [ ] Runtime language switching
+- [ ] Translation resource pipeline
+- [ ] Right-to-left locale handling
+- [ ] Localized preset descriptions
+- [ ] Locale fallback behavior
+
+**Status:** Not started (0/6 verified)
+
+## Group 19 — Media depth
+
+*Outcome: Media handling reaches the reference product's coverage in the areas still missing.*
+
+- [ ] DVD source support `(optional)`
+- [ ] Blu-ray source support `(optional)`
+- [ ] Deblock filter
+- [ ] Lossless FFV1/PCM/FLAC MKV modes
+- [ ] Dolby Vision profile and RPU handling
+- [ ] HDR10+ dynamic metadata
+- [ ] MP4 behaviors (web optimized, iPod 5G, common metadata passthrough)
+- [ ] Chapter import from CSV, TXT, and XML
+- [ ] Cover art and attachment handling with container restrictions
+- [ ] Foreign audio scan parity
+
+**Status:** Not started (0/10 verified)
+
+## Group 20 — Diagnostics and developer tools
+
+*Outcome: Support and debugging workflows match the reference product's operational tooling.*
+
+- [ ] Per-encode log files and log rotation
+- [ ] Activity log streaming to the UI
+- [ ] Quality sweep tool for the queue
+- [ ] Queue result data extraction tool
+- [ ] Hardware capability report export
+- [ ] Reproducible diagnostic bundle export
+
+**Status:** Not started (0/6 verified)
+
 ## Deferred / Future Work
 
 *List intentionally postponed outcomes, with their reason or target release when known. Do not mark them complete.*
@@ -282,6 +424,15 @@ Required groups: 6, 7, 8, 9
 ### Milestone 4 - Performance and platform parity
 Required groups: 11, 12
 
+### Milestone 5 - Reference-product parity
+Required groups: 13, 14, 15, 16
+
+### Milestone 6 - Desktop polish and operations
+Required groups: 17, 18, 20
+
+### Milestone 7 - Media depth
+Required groups: 19
+
 ## Status Summary
 
 | Group | Milestone | Status |
@@ -290,15 +441,23 @@ Required groups: 11, 12
 | 1 | Media ingestion | In progress (8/10) |
 | 2 | Core transcode baseline | Complete (8/8) |
 | 3 | Command-line interface | Complete (6/6) |
-| 4 | Desktop application shell | Complete (7/7) |
-| 5 | Presets and configuration | Complete (7/7) |
+| 4 | Desktop application shell | Complete (7/7) — scaffold only; full parity in Group 14 |
+| 5 | Presets and configuration | Complete (7/7) — catalog parity in Group 16 |
 | 6 | Video processing | Complete (15/15) |
 | 7 | Audio pipeline | Complete (11/11) |
 | 8 | Subtitles | Complete (7/7) |
 | 9 | Chapters and metadata | Complete (6/6) |
-| 10 | Encoding control and job reliability | Complete (8/8) |
+| 10 | Encoding control and job reliability | In progress (8/10) |
 | 11 | Hardware acceleration | Complete (7/7) |
 | 12 | Platform packaging and release | In progress (3/8) |
+| 13 | Worker process and JSON IPC | Not started (0/9) |
+| 14 | Desktop parity with reference product | Not started (0/18) |
+| 15 | Preferences surface | Not started (0/8) |
+| 16 | Preset catalog and versioning | Not started (0/13) |
+| 17 | System integration | Not started (0/9) |
+| 18 | Localization | Not started (0/6) |
+| 19 | Media depth | Not started (0/10) |
+| 20 | Diagnostics and developer tools | Not started (0/6) |
 
 ## Notes
 
