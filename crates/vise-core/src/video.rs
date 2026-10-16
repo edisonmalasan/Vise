@@ -254,11 +254,21 @@ impl VideoProcessingOptions {
             filters.push("yadif".to_string());
         }
 
-        if self.denoise || self.denoise_strength.is_some() {
+        if let Some(strength) = self.denoise_strength.filter(|s| *s > 0) {
+            // One strength for the whole filter: spatial smoothing for luma and
+            // chroma, with the temporal terms kept a little higher so noise does
+            // not shimmer between frames.
+            let temporal = strength * 3 / 2;
+            filters.push(format!(
+                "hqdn3d={strength}:{strength}:{temporal}:{temporal}"
+            ));
+        } else if self.denoise {
             filters.push("hqdn3d".to_string());
         }
 
-        if self.sharpen || self.sharpen_amount.is_some() {
+        if let Some(amount) = self.sharpen_amount.filter(|a| *a != 0.0) {
+            filters.push(format!("unsharp=5:5:{amount}:5:5:0"));
+        } else if self.sharpen {
             filters.push("unsharp".to_string());
         }
 

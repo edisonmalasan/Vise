@@ -128,6 +128,31 @@ fn encoder_options_render_in_a_stable_order_and_skip_blanks() {
 }
 
 #[test]
+fn a_named_strength_reaches_the_filter_it_names() {
+    let denoise = VideoProcessingOptions {
+        denoise_strength: Some(6),
+        sharpen_amount: Some(0.7),
+        ..Default::default()
+    };
+    let chain = denoise.build_filter_chain();
+    assert!(chain.contains("hqdn3d=6:6:9:9"), "{chain}");
+    assert!(chain.contains("unsharp=5:5:0.7:5:5:0"), "{chain}");
+
+    // A strength of zero means "no setting", so the plain filter is used.
+    let plain = VideoProcessingOptions {
+        denoise: true,
+        sharpen: true,
+        denoise_strength: Some(0),
+        sharpen_amount: Some(0.0),
+        ..Default::default()
+    };
+    let chain = plain.build_filter_chain();
+    assert!(chain.contains("hqdn3d"), "{chain}");
+    assert!(chain.contains("unsharp"), "{chain}");
+    assert!(!chain.contains('='), "{chain}");
+}
+
+#[test]
 fn transcode_with_video_processing() {
     let dir = std::env::temp_dir().join("vise-video-processing");
     let _ = std::fs::create_dir_all(&dir);

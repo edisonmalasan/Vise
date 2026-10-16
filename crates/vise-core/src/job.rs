@@ -610,6 +610,9 @@ impl JobSpec {
             if opts.source_track.is_none() {
                 opts.source_track = t.source_track_id;
             }
+            if t.forced_only {
+                opts.forced_only = true;
+            }
         }
         if let Some(p) = &self.subtitle_path {
             if opts.input_path.is_none() {

@@ -219,6 +219,10 @@ pub struct SubtitleTrackConfig {
 
     #[serde(default, alias = "foreign_audio_scan", alias = "foreign_scan")]
     pub foreign_scan: bool,
+
+    /// Keep only the parts the source marked as forced dialogue.
+    #[serde(default, alias = "forced")]
+    pub forced_only: bool,
 }
 
 pub type SubtitleTrack = SubtitleTrackConfig;
