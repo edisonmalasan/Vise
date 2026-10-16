@@ -820,6 +820,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       control.available ? "" : "blocked",
       hintNode
     );
+    describe(select, hintNode || el(control.id + "Hint"));
     select.onchange = function () {
       onChange(select.value);
     };
@@ -850,6 +851,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       hintNode
     );
     input.setAttribute("aria-invalid", field.valid ? "false" : "true");
+    describe(input, hintNode || el(field.id + "Hint"));
     if (field.available) {
       input.onchange = function () {
         onChange(input.value);
@@ -881,6 +883,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       field.valid ? "" : field.available ? "error" : "blocked",
       hintNode
     );
+    describe(input, hintNode || el(field.id + "Hint"));
     if (onChange) {
       input.onchange = function () {
         onChange(input.value);
@@ -904,9 +907,24 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       toggle.available ? "" : "blocked",
       hintNode
     );
+    describe(input, hintNode || el(toggle.id + "Hint"));
     input.onchange = function () {
       onChange(input.checked);
     };
+  }
+
+  /* Point a control at the hint that explains it.
+   *
+     The reason a control is closed sits in the hint under it, which is the
+     right thing for somebody who can see it. Without this the same text is
+     never announced, so the explanation only exists for people who do not need
+     it. Every control here already knows its hint, so the link is made once
+     instead of being repeated in the markup. */
+  function describe(control, hint) {
+    if (!control || !hint || !hint.id) {
+      return;
+    }
+    control.setAttribute("aria-describedby", hint.id);
   }
 
   /* The hint under a control, either looked up by the identifier the view model
