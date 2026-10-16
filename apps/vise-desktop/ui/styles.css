@@ -360,6 +360,330 @@ button.quiet:hover:not(:disabled) {
   flex-direction: column;
 }
 
+/* Tab set ------------------------------------------------------------------ */
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The strip scrolls sideways rather than wrapping, so switching tabs never
+   pushes the panel below it down the page. */
+.tablist {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.tablist [role="tab"] {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  color: var(--muted);
+  margin-bottom: -1px;
+  padding: 8px 14px;
+  white-space: nowrap;
+}
+
+.tablist [role="tab"]:hover:not([disabled]) {
+  background: var(--surface-sunken);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.tablist [role="tab"][aria-selected="true"] {
+  background: var(--surface-sunken);
+  border-color: var(--border);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* A tab that needs something fixed says so with a dot rather than a colour
+   alone, so the state survives a colour-blind reader and a dark window. */
+.tablist [role="tab"][data-attention="true"]::after {
+  background: var(--warning);
+  border-radius: 50%;
+  content: "";
+  display: inline-block;
+  height: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+  width: 6px;
+}
+
+/* Every panel sits in the same grid cell, so the area keeps its height while
+   tabs change and the queue row below never moves. */
+.tabpanels {
+  display: grid;
+  min-height: 380px;
+}
+
+.tabpanel {
+  align-content: start;
+  display: grid;
+  gap: 12px;
+  grid-area: 1 / 1;
+}
+
+.tabpanel > * {
+  min-width: 0;
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+}
+
+.grid.two {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.grid.three {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.grid.four {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.field .label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.field .value {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.field .hint,
+.hint.blocked {
+  margin-top: 4px;
+}
+
+/* A hint under a control is either the plain explanation or the reason the
+   control is closed; the second is tinted so the two are never confused. */
+.hint[data-tone="blocked"] {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.hint[data-tone="error"] {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+input[disabled],
+select[disabled] {
+  background: var(--surface-sunken);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+/* Switch rows ----------------------------------------------------------- */
+
+label.switch {
+  align-items: start;
+  align-self: start;
+  background: var(--surface-sunken);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 400;
+  gap: 8px;
+  letter-spacing: 0;
+  margin-bottom: 0;
+  padding: 8px 10px;
+}
+
+label.switch:hover {
+  border-color: var(--border-strong);
+}
+
+label.switch:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+label.switch .text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+label.switch .facts {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.flags {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.flags legend {
+  grid-column: 1 / -1;
+}
+
+.flags .hint {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* Filter rows ------------------------------------------------------------ */
+
+.filters {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.filter-row {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.filter-row[data-enabled="false"] .filter-row-body {
+  opacity: 0.65;
+}
+
+.filter-row[data-available="false"] {
+  border-style: dashed;
+}
+
+.filter-row-head {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.filter-row-head .title {
+  font-weight: 600;
+}
+
+.filter-row-head input {
+  margin-top: 3px;
+}
+
+.filter-row .hint {
+  margin: 0;
+}
+
+.filter-row-body {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+/* Audio and subtitle rules ------------------------------------------------ */
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rule-set {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.rule-set > h3 {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  margin: 0;
+}
+
+.rule-set .rule-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.rule-set .rule-flags {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.own-rules {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Chapter markers --------------------------------------------------------- */
+
+.markers {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.marker {
+  align-items: start;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.marker .marker-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.marker .marker-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+}
+
+.marker .marker-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.queue-row {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
 /* Status ----------------------------------------------------------------- */
 
 .status {
@@ -485,5 +809,6 @@ td.controls {
 @media (prefers-reduced-motion: reduce) {
   * {
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
