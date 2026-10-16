@@ -187,7 +187,7 @@ fn init_command() -> InitCommand {
 /// The window owns validation: an unusable option is refused with a reason
 /// instead of being forwarded to the worker and failing there.
 #[derive(Debug, Clone, Deserialize, Default)]
-#[serde(default)]
+#[serde(rename_all = "camelCase", default)]
 struct ScanOptions {
     /// Preview images to extract per title. Zero asks for none, which is what
     /// the window wants until the preview surface is in use.
@@ -236,6 +236,7 @@ fn parse_duration(text: Option<&str>, label: &str) -> Result<TimeSpan, String> {
 
 /// Progress of the current scan, as the interface polls it.
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ScanStatusViewModel {
     phase: ScanPhase,
     phase_name: String,
@@ -247,13 +248,14 @@ struct ScanStatusViewModel {
 
 impl ScanStatusViewModel {
     fn of(flow: &ScanFlow) -> Self {
+        let view = flow.view_model();
         Self {
             phase: flow.phase(),
             phase_name: flow.phase().as_str().to_string(),
             running: flow.is_running(),
-            progress: Some(flow.view_model().progress.unwrap_or_default()),
-            title_count: flow.view_model().titles.len(),
-            problem: flow.view_model().problem,
+            progress: view.progress,
+            title_count: view.titles.len(),
+            problem: view.problem,
         }
     }
 }
@@ -415,7 +417,7 @@ fn choose_title(state: State<'_, SharedState>, index: u32) -> Result<SelectionVi
 /// keeps the mode already in force, which lets the point pickers work without
 /// the page having to track the mode itself.
 #[derive(Debug, Clone, Deserialize, Default)]
-#[serde(default)]
+#[serde(rename_all = "camelCase", default)]
 struct RangeChoice {
     mode: String,
     start_seconds: Option<f64>,
@@ -924,4 +926,165 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    //! The contract between the page and these commands.
+    //!
+    //! The page sends plain JSON and reads plain JSON. These tests pin both
+    //! directions so a rename on either side fails here rather than in the
+    //! window.
+
+    use super::*;
+
+    fn idle_flow() -> ScanFlow {
+        ScanFlow::default()
+    }
+
+    #[test]
+    fn duration_options_are_validated_before_they_reach_the_worker() {
+        assert_eq!(
+            parse_duration(None, "shortest").expect("none"),
+            TimeSpan::ZERO
+        );
+        assert_eq!(
+            parse_duration(Some("  "), "shortest").expect("blank"),
+            TimeSpan::ZERO
+        );
+        assert_eq!(
+            parse_duration(Some("00:00:30"), "longest")
+                .expect("valid")
+                .to_string(),
+            "00:00:30"
+        );
+        let error = parse_duration(Some("99:99:99"), "shortest").expect_err("invalid");
+        assert!(error.contains("shortest title duration"), "{error}");
+        assert!(error.contains("99:99:99"), "{error}");
+    }
+
+    #[test]
+    fn scan_options_build_the_worker_command() {
+        let options: ScanOptions = serde_json::from_str(
+            r#"{"previewCount":99,"minDuration":"","maxDuration":"00:10:00",
+                "keepDuplicateTitles":true,"fileExclusions":[" sample.mkv ","  "]}"#,
+        )
+        .expect("options");
+        let command = options
+            .to_command(vec!["C:\\media\\clips".to_string()])
+            .expect("command");
+        assert_eq!(command.paths, vec!["C:\\media\\clips".to_string()]);
+        assert_eq!(command.preview_count, 32, "clamped to something sane");
+        assert_eq!(
+            command.min_duration,
+            TimeSpan::ZERO,
+            "an empty value means no limit"
+        );
+        assert_eq!(command.max_duration.to_string(), "00:10:00");
+        assert!(command.initialise_command.keep_duplicate_titles);
+        assert_eq!(command.file_exclusion_list, vec!["sample.mkv".to_string()]);
+    }
+
+    #[test]
+    fn scan_options_default_to_no_previews_and_no_limits() {
+        let options: ScanOptions = serde_json::from_str("{}").expect("empty options");
+        let command = options
+            .to_command(vec!["in.mkv".to_string()])
+            .expect("command");
+        assert_eq!(command.preview_count, 0);
+        assert!(command.file_exclusion_list.is_empty());
+        assert_eq!(command.title_index, 0, "zero asks for every title");
+    }
+
+    #[test]
+    fn the_page_sends_scan_options_the_command_accepts() {
+        let payload = r#"{"previewCount":0,"minDuration":"","maxDuration":"",
+            "keepDuplicateTitles":false,"fileExclusions":[]}"#;
+        let options: ScanOptions = serde_json::from_str(payload).expect("camel case options");
+        assert_eq!(options.preview_count, Some(0));
+        assert!(!options.keep_duplicate_titles);
+        assert!(options.file_exclusions.is_empty());
+    }
+
+    #[test]
+    fn a_range_choice_arrives_as_point_to_point_with_its_points() {
+        let payload = r#"{"mode":"point_to_point","startSeconds":90.0,
+            "endSeconds":120.0,"angle":2}"#;
+        let choice: RangeChoice = serde_json::from_str(payload).expect("choice");
+        assert_eq!(choice.mode, "point_to_point");
+        assert_eq!(choice.start_seconds, Some(90.0));
+        assert_eq!(choice.end_seconds, Some(120.0));
+        assert_eq!(choice.angle, Some(2));
+
+        let selection = RangeSelection::default()
+            .with_mode_name(&choice.mode)
+            .expect("mode");
+        assert_eq!(selection.mode, viewmodel::RangeMode::PointToPoint);
+
+        // An empty mode keeps the mode already in force, which is how the point
+        // pickers work without the page tracking the mode.
+        let blank: RangeChoice = serde_json::from_str(r#"{"mode":""}"#).expect("blank");
+        assert!(blank.mode.trim().is_empty());
+    }
+
+    #[test]
+    fn an_unknown_range_mode_is_refused_with_a_reason() {
+        let error = RangeSelection::default()
+            .with_mode_name("sideways")
+            .expect_err("unknown mode");
+        assert!(error.contains("sideways"), "{error}");
+    }
+
+    #[test]
+    fn a_track_choice_arrives_as_track_numbers() {
+        let payload = r#"{"audio":[2,1],"subtitle":[1]}"#;
+        let input: TrackSelectionInput = serde_json::from_str(payload).expect("tracks");
+        assert_eq!(input.audio, vec![2, 1]);
+        assert_eq!(input.subtitle, vec![1]);
+        // Numbers outside the title are dropped before they are stored.
+        let reconciled = input.reconcile(&vise_ipc::contract::ScanTitle {
+            audio_list: vec![vise_ipc::contract::ScanAudioTrack {
+                track_number: 1,
+                ..Default::default()
+            }],
+            subtitle_list: vec![vise_ipc::contract::ScanSubtitleTrack {
+                track_number: 1,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        assert_eq!(reconciled.audio, vec![1]);
+        assert_eq!(reconciled.subtitle, vec![1]);
+    }
+
+    #[test]
+    fn scan_status_serialises_for_the_page() {
+        let status = ScanStatusViewModel::of(&idle_flow());
+        let json = serde_json::to_value(&status).expect("status");
+        assert_eq!(json["phase"], "idle");
+        assert_eq!(json["phaseName"], "idle");
+        assert_eq!(json["running"], false);
+        assert_eq!(json["titleCount"], 0);
+        assert!(json["progress"]["percent"].is_number());
+    }
+
+    #[test]
+    fn a_dropped_path_list_is_answered_with_accepted_and_refused_entries() {
+        let dir = std::env::temp_dir().join("vise-desktop-drop");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("dir");
+        std::fs::write(dir.join("movie.mkv"), b"x").expect("file");
+
+        let report = inspect_sources(vec![
+            String::new(),
+            dir.join("movie.mkv").to_string_lossy().to_string(),
+            dir.join("gone.mkv").to_string_lossy().to_string(),
+        ])
+        .expect("report");
+        assert_eq!(report.accepted.len(), 1);
+        assert_eq!(report.rejected.len(), 2);
+        let json = serde_json::to_value(&report).expect("serialise");
+        assert_eq!(json["accepted"][0]["kind"], "file");
+        assert!(!json["rejected"][0]["reason"].as_str().unwrap().is_empty());
+    }
 }

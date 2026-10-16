@@ -186,6 +186,8 @@ pub struct TrackViewModel {
     pub codec: String,
     /// Codec and shape, such as `E-AC3 · 5.1`.
     pub detail: String,
+    /// Track number and language, such as `Audio 1 · English (eng)`.
+    pub summary: String,
     /// Track number, language, and codec on one line.
     pub label: String,
     /// Whether the user chose this track.
@@ -454,6 +456,20 @@ fn language_label(language: &str, code: &str) -> String {
     }
 }
 
+/// Track number and language without repeating the code twice.
+///
+/// A scan often reports the language as the bare code, in which case
+/// `eng (eng)` says nothing twice.
+fn track_heading(kind: &str, number: u32, language: &str, code: &str) -> String {
+    let language = language_label(language, code);
+    let code = code.trim();
+    if code.is_empty() || language.eq_ignore_ascii_case(code) || code.eq_ignore_ascii_case("und") {
+        format!("{kind} {number} · {language}")
+    } else {
+        format!("{kind} {number} · {language} ({code})")
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Projections
 // ---------------------------------------------------------------------------
@@ -566,13 +582,8 @@ pub fn audio_track_view(track: &ScanAudioTrack, selected: &[u32]) -> TrackViewMo
         format_sample_rate(track.sample_rate),
         format_bit_rate(track.bit_rate)
     );
-    let label = format!(
-        "Audio {} · {} ({}) · {}",
-        track.track_number,
-        language,
-        track.language_code.trim(),
-        detail
-    );
+    let summary = track_heading("Audio", track.track_number, &language, &track.language_code);
+    let label = format!("{summary} · {detail}");
     TrackViewModel {
         kind: TrackKindTag::Audio,
         number: track.track_number,
@@ -580,6 +591,7 @@ pub fn audio_track_view(track: &ScanAudioTrack, selected: &[u32]) -> TrackViewMo
         language_code: track.language_code.trim().to_string(),
         codec,
         detail,
+        summary,
         label,
         selected: selected.contains(&track.track_number),
     }
@@ -597,13 +609,13 @@ pub fn subtitle_track_view(track: &ScanSubtitleTrack, selected: &[u32]) -> Track
     if !track.description.trim().is_empty() {
         detail = format!("{codec} · {}", track.description.trim());
     }
-    let label = format!(
-        "Subtitle {} · {} ({}) · {}",
+    let summary = track_heading(
+        "Subtitle",
         track.track_number,
-        language,
-        track.language_code.trim(),
-        detail
+        &language,
+        &track.language_code,
     );
+    let label = format!("{summary} · {detail}");
     TrackViewModel {
         kind: TrackKindTag::Subtitle,
         number: track.track_number,
@@ -611,6 +623,7 @@ pub fn subtitle_track_view(track: &ScanSubtitleTrack, selected: &[u32]) -> Track
         language_code: track.language_code.trim().to_string(),
         codec,
         detail,
+        summary,
         label,
         selected: selected.contains(&track.track_number),
     }
@@ -750,7 +763,7 @@ pub fn range_view(title: &ScanTitle, selection: &RangeSelection) -> RangeViewMod
     if duration > 0.0
         && points
             .last()
-            .is_none_or(|point| (point.seconds - duration).abs() >= 0.001)
+            .map_or(true, |point| (point.seconds - duration).abs() >= 0.001)
     {
         points.push(RangePointViewModel {
             seconds: duration,
@@ -1066,15 +1079,40 @@ mod tests {
             tracks.audio[0].label,
             "Audio 1 · English (eng) · eac3 · 5.1 · 48 kHz · 640 kb/s"
         );
+        assert_eq!(tracks.audio[0].summary, "Audio 1 · English (eng)");
         assert!(!tracks.audio[0].selected);
         assert!(tracks.audio[1].selected);
         assert_eq!(tracks.audio[2].language, "Undetermined");
+        assert_eq!(
+            tracks.audio[2].summary, "Audio 3 · Undetermined",
+            "an unknown language is named once, not twice"
+        );
         assert_eq!(tracks.audio[2].detail, "eac3 · 5.1 · 48 kHz · 640 kb/s");
         assert_eq!(
             tracks.subtitle[1].label,
             "Subtitle 2 · Forced (eng) · subrip · Forced only"
         );
         assert_eq!(tracks.selected_audio, vec![2]);
+    }
+
+    #[test]
+    fn a_language_reported_as_its_own_code_is_not_shown_twice() {
+        // A scan that reports the bare code should read as "eng", not
+        // "eng (eng)".
+        let bare = ScanAudioTrack {
+            track_number: 4,
+            codec_name: "opus".into(),
+            channel_count: 2,
+            channel_layout: "stereo".into(),
+            sample_rate: 48_000,
+            bit_rate: 128_000,
+            language: "jpn".into(),
+            language_code: "jpn".into(),
+            description: String::new(),
+        };
+        let view = audio_track_view(&bare, &[]);
+        assert_eq!(view.summary, "Audio 4 · jpn");
+        assert!(view.label.starts_with("Audio 4 · jpn · opus"));
     }
 
     #[test]

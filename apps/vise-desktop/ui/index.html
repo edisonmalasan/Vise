@@ -4,219 +4,190 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Vise Transcoder</title>
-<style>
-  :root {
-    --bg: #f5f6f8;
-    --surface: #ffffff;
-    --text: #1e1e24;
-    --muted: #6b7280;
-    --accent: #2563eb;
-    --border: #e5e7eb;
-    --danger: #dc2626;
-    --success: #16a34a;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
-  body { padding: 24px; }
-  h1 { font-size: 22px; margin: 0 0 16px; letter-spacing: -0.2px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
-  .card h2 { margin: 0 0 12px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
-  input, select, button { font: inherit; }
-  input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
-  button { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; transition: background 120ms ease, transform 120ms ease; }
-  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-  button.danger { color: var(--danger); border-color: #fecaca; }
-  button:active { transform: scale(0.98); }
-  .row { display: flex; gap: 8px; align-items: end; }
-  .row > * { flex: 1; }
-  .empty { color: var(--muted); font-size: 13px; padding: 12px 0; text-align: center; }
-  ul { list-style: none; padding: 0; margin: 0; }
-  li { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; font-size: 13px; }
-  .title { display: flex; justify-content: space-between; align-items: center; }
-  .progress { height: 6px; background: #e5e7eb; border-radius: 999px; overflow: hidden; margin-top: 6px; }
-  .progress > div { height: 100%; background: var(--accent); width: 0%; transition: width 200ms ease; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--border); }
-  .logs { max-height: 220px; overflow: auto; font-family: Consolas, monospace; font-size: 12px; background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 10px; }
-  .logs div { margin-bottom: 4px; white-space: pre-wrap; }
-  @media (prefers-reduced-motion: reduce) { button { transition: none; } .progress > div { transition: none; } }
-  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-</style>
+<link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+<header class="masthead">
   <h1>Vise Transcoder</h1>
-  <div class="grid">
-    <section class="card">
-      <h2>Source</h2>
-      <label for="srcPath">Input file path</label>
+  <p>Pick a source, scan it, then choose the title, range, angle, and tracks to encode.</p>
+</header>
+
+<main class="layout">
+  <section class="card" aria-labelledby="sourceHeading">
+    <div class="card-head">
+      <h2 id="sourceHeading">Source</h2>
+      <button type="button" class="quiet" id="clearSourceBtn">Forget source</button>
+    </div>
+
+    <div class="dropzone" id="dropzone" data-dragging="false">
+      <strong>Drop a file or folder here</strong>
+      <span class="hint" id="dropHint">Or type the full path below and open it.</span>
+    </div>
+
+    <div class="row">
+      <div class="grow">
+        <label for="pathInput">Source path</label>
+        <input type="text" id="pathInput" spellcheck="false" autocomplete="off"
+               placeholder="C:\media\movie.mkv" aria-describedby="pathHint" />
+      </div>
+      <button type="button" id="openBtn">Open</button>
+      <button type="button" class="primary" id="scanBtn" disabled>Scan</button>
+    </div>
+    <span class="hint" id="pathHint">A file is probed directly; a folder is scanned file by file.</span>
+
+    <div class="source-current" id="sourceCurrent" hidden>
+      <span class="chip" id="sourceKind"></span>
+      <span class="name" id="sourceName"></span>
+      <span class="location" id="sourceLocation"></span>
+    </div>
+
+    <div class="status" role="status" aria-live="polite" aria-atomic="true">
+      <div class="status-line" id="scanStatus">No source scanned yet.</div>
+      <div class="progress" id="scanProgress" hidden><div id="scanProgressFill"></div></div>
+      <div class="notice" id="scanNotice" data-tone="muted" hidden></div>
+    </div>
+
+    <fieldset>
+      <legend>Recent sources</legend>
+      <ul class="list" id="recentList"></ul>
       <div class="row">
-        <input id="srcPath" placeholder="C:\media\source.mkv" />
-        <button class="primary" id="scanBtn">Scan</button>
+        <button type="button" class="quiet" id="clearRecentsBtn">Clear recent sources</button>
       </div>
-      <div id="scanInfo" class="empty">No source scanned.</div>
-      <h2 style="margin-top:12px">Titles</h2>
-      <ul id="titles"></ul>
-      <h2 style="margin-top:12px">Tracks</h2>
-      <ul id="tracks"></ul>
-    </section>
+    </fieldset>
+  </section>
 
-    <section class="card">
-      <h2>New Job</h2>
-      <label for="inPath">Input path</label>
-      <input id="inPath" />
-      <label for="outPath">Output path</label>
-      <input id="outPath" placeholder="C:\media\out.mp4" />
-      <div class="row">
-        <div>
-          <label for="container">Container</label>
-          <select id="container"><option value="mp4">MP4</option><option value="mkv">MKV</option><option value="webm">WebM</option></select>
-        </div>
-        <div>
-          <label for="video">Video</label>
-          <select id="video"><option value="h264">H.264</option><option value="h265">H.265</option><option value="av1">AV1</option><option value="vp9">VP9</option></select>
-        </div>
-        <div>
-          <label for="audio">Audio</label>
-          <select id="audio"><option value="aac">AAC</option><option value="opus">Opus</option><option value="vorbis">Vorbis</option><option value="flac">FLAC</option><option value="mp3">MP3</option></select>
-        </div>
+  <section class="card" aria-labelledby="titleHeading">
+    <div class="card-head">
+      <h2 id="titleHeading">Titles</h2>
+      <span class="hint" id="titleCount"></span>
+    </div>
+    <ul class="list" id="titleList"></ul>
+    <div class="empty" id="titleEmpty">Scan a source to see the titles it contains.</div>
+  </section>
+
+  <section class="card" aria-labelledby="rangeHeading">
+    <div class="card-head">
+      <h2 id="rangeHeading">Range and angle</h2>
+      <span class="hint" id="rangeSummary"></span>
+    </div>
+
+    <fieldset>
+      <legend>Range</legend>
+      <div class="list" id="rangeModeList"></div>
+    </fieldset>
+
+    <div class="row" id="pointRow" hidden>
+      <div class="grow">
+        <label for="startPoint">Start point</label>
+        <select id="startPoint"></select>
       </div>
-      <label for="titleIdx">Title index (optional)</label>
-      <input id="titleIdx" placeholder="0" />
-      <div style="margin-top:12px">
-        <button class="primary" id="addJobBtn">Add to queue</button>
+      <div class="grow">
+        <label for="endPoint">End point</label>
+        <select id="endPoint"></select>
       </div>
-    </section>
+    </div>
 
-    <section class="card" style="grid-column: 1 / -1;">
-      <h2>Job Queue</h2>
-      <table>
-        <thead><tr><th>ID</th><th>Input</th><th>State</th><th>Progress</th><th>Message</th><th>Controls</th></tr></thead>
-        <tbody id="queue"></tbody>
-      </table>
-      <div id="queueEmpty" class="empty">Queue is empty.</div>
-    </section>
+    <div class="row" id="angleRow" hidden>
+      <div class="grow">
+        <label for="angleSelect">Angle</label>
+        <select id="angleSelect"></select>
+      </div>
+    </div>
 
-    <section class="card" style="grid-column: 1 / -1;">
-      <h2>Logs</h2>
-      <div class="logs" id="logs"><div>No logs yet.</div></div>
-      <div style="margin-top:8px"><button id="clearLogsBtn">Clear logs</button></div>
-    </section>
-  </div>
+    <div class="notice" id="rangeNotice" data-tone="error" hidden></div>
 
-<script>
-  const invoke = window.__TAURI__ ? window.__TAURI__.core.invoke : async () => { throw new Error("Tauri IPC unavailable"); };
+    <fieldset>
+      <legend>Chapters</legend>
+      <ul class="list" id="chapterList"></ul>
+      <div class="empty" id="chapterEmpty">Chapters appear once a title with chapters is chosen.</div>
+    </fieldset>
+  </section>
 
-  async function scan() {
-    const path = document.getElementById('srcPath').value.trim();
-    if (!path) return;
-    try {
-      const res = await invoke('scan_source', { path });
-      const info = document.getElementById('scanInfo');
-      info.textContent = `Format: ${res.format?.format_name || 'unknown'}; streams ${res.streams.length}; titles ${res.titles.length}; chapters ${res.chapters.length}`;
-      const titles = document.getElementById('titles');
-      titles.innerHTML = '';
-      res.titles.forEach((t, i) => {
-        const li = document.createElement('li');
-        li.innerHTML = `<div class="title"><span>Title ${t.index ?? i} · ${t.duration_seconds ? t.duration_seconds.toFixed(1) + 's' : 'unknown'} · ${t.chapters.length} chapters</span><button data-title="${t.index ?? i}">Use</button></div>`;
-        titles.appendChild(li);
-      });
-      titles.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
-        document.getElementById('titleIdx').value = b.dataset.title;
-        document.getElementById('inPath').value = path;
-      }));
-      const tracks = document.getElementById('tracks');
-      tracks.innerHTML = '';
-      res.streams.forEach((s) => {
-        const li = document.createElement('li');
-        li.textContent = `#${s.index} ${s.kind ?? ''} ${s.codec || ''} ${s.width ? s.width + 'x' + s.height : ''} ${s.language || ''}`.trim();
-        tracks.appendChild(li);
-      });
-      if (!res.streams.length) tracks.innerHTML = '<li class="empty">No tracks.</li>';
-      document.getElementById('inPath').value = path;
-    } catch (e) {
-      document.getElementById('scanInfo').textContent = 'Scan failed: ' + e;
-    }
-  }
+  <section class="card" aria-labelledby="trackHeading">
+    <div class="card-head">
+      <h2 id="trackHeading">Tracks</h2>
+      <span class="hint" id="trackSummary"></span>
+    </div>
 
-  async function addJob() {
-    const spec = {
-      input_path: document.getElementById('inPath').value.trim(),
-      output_path: document.getElementById('outPath').value.trim(),
-      container: document.getElementById('container').value,
-      video_codec: document.getElementById('video').value,
-      audio_codec: document.getElementById('audio').value,
-      subtitle_mode: 'passthrough',
-      title_index: document.getElementById('titleIdx').value ? Number(document.getElementById('titleIdx').value) : null,
-      crop: null,
-      scale_to: null,
-      quality: null,
-    };
-    try {
-      await invoke('add_job', { spec });
-      await refreshQueue();
-    } catch (e) { alert('Add job failed: ' + e); }
-  }
+    <fieldset>
+      <legend>Audio</legend>
+      <div id="audioList"></div>
+      <div class="empty" id="audioEmpty">Audio tracks appear once a title is chosen.</div>
+    </fieldset>
 
-  async function refreshQueue() {
-    try {
-      const jobs = await invoke('list_jobs');
-      const tbody = document.getElementById('queue');
-      tbody.innerHTML = '';
-      jobs.forEach(job => {
-        const tr = document.createElement('tr');
-        const pct = Math.round((job.status.progress.fraction || 0) * 100);
-        tr.innerHTML = `
-          <td>${job.id}</td>
-          <td title="${job.spec.input_path}">${job.spec.input_path.split(/[\\\\/]/).pop()}</td>
-          <td>${job.status.state}</td>
-          <td><div class="progress"><div style="width:${pct}%"></div></div> ${pct}%</td>
-          <td>${job.status.message || ''}</td>
-          <td>
-            <button data-act="run" data-id="${job.id}">Run</button>
-            <button data-act="pause" data-id="${job.id}">Pause</button>
-            <button data-act="resume" data-id="${job.id}">Resume</button>
-            <button data-act="cancel" data-id="${job.id}">Cancel</button>
-            <button data-act="remove" data-id="${job.id}">Remove</button>
-          </td>`;
-        tbody.appendChild(tr);
-      });
-      document.getElementById('queueEmpty').style.display = jobs.length ? 'none' : 'block';
-      tbody.querySelectorAll('button').forEach(b => b.addEventListener('click', async () => {
-        const id = Number(b.dataset.id);
-        const act = b.dataset.act;
-        try {
-          if (act === 'run') await invoke('run_job', { id });
-          if (act === 'pause') await invoke('pause_job', { id });
-          if (act === 'resume') await invoke('resume_job', { id });
-          if (act === 'cancel') await invoke('cancel_job', { id });
-          if (act === 'remove') await invoke('remove_job', { id });
-          await refreshQueue();
-        } catch (e) { alert(act + ' failed: ' + e); }
-      }));
-    } catch (e) { console.error(e); }
-  }
+    <fieldset>
+      <legend>Subtitles</legend>
+      <div id="subtitleList"></div>
+      <div class="empty" id="subtitleEmpty">This title carries no subtitle tracks.</div>
+    </fieldset>
+  </section>
 
-  async function refreshLogs() {
-    try {
-      const ls = await invoke('logs');
-      const el = document.getElementById('logs');
-      if (!ls.length) { el.innerHTML = '<div>No logs yet.</div>'; return; }
-      el.innerHTML = ls.map(l => `<div>${escapeHtml(l)}</div>`).join('');
-      el.scrollTop = el.scrollHeight;
-    } catch (e) {}
-  }
-  function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  <section class="card full" aria-labelledby="jobHeading">
+    <div class="card-head">
+      <h2 id="jobHeading">New job</h2>
+    </div>
+    <div class="row">
+      <div class="grow">
+        <label for="outPath">Output path</label>
+        <input type="text" id="outPath" spellcheck="false" autocomplete="off"
+               placeholder="C:\media\out.mp4" />
+      </div>
+      <div>
+        <label for="container">Container</label>
+        <select id="container">
+          <option value="mp4">MP4</option>
+          <option value="mkv">MKV</option>
+          <option value="webm">WebM</option>
+        </select>
+      </div>
+      <div>
+        <label for="video">Video</label>
+        <select id="video">
+          <option value="h264">H.264</option>
+          <option value="h265">H.265</option>
+          <option value="av1">AV1</option>
+          <option value="vp9">VP9</option>
+        </select>
+      </div>
+      <div>
+        <label for="audioCodec">Audio</label>
+        <select id="audioCodec">
+          <option value="aac">AAC</option>
+          <option value="opus">Opus</option>
+          <option value="vorbis">Vorbis</option>
+          <option value="flac">FLAC</option>
+          <option value="mp3">MP3</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
+      <span class="hint" id="queueHint">Scan a source and choose a title first.</span>
+    </div>
+  </section>
 
-  document.getElementById('scanBtn').addEventListener('click', scan);
-  document.getElementById('addJobBtn').addEventListener('click', addJob);
-  document.getElementById('clearLogsBtn').addEventListener('click', async () => { await invoke('clear_logs'); await refreshLogs(); });
+  <section class="card full" aria-labelledby="queueHeading">
+    <div class="card-head">
+      <h2 id="queueHeading">Queue</h2>
+    </div>
+    <table>
+      <thead>
+        <tr><th scope="col">Input</th><th scope="col">State</th><th scope="col">Progress</th><th scope="col">Message</th><th scope="col">Controls</th></tr>
+      </thead>
+      <tbody id="queueBody"></tbody>
+    </table>
+    <div class="empty" id="queueEmpty">The queue is empty.</div>
+  </section>
 
-  setInterval(refreshQueue, 1500);
-  setInterval(refreshLogs, 1500);
-  refreshQueue();
-  refreshLogs();
-</script>
+  <section class="card full" aria-labelledby="logHeading">
+    <div class="card-head">
+      <h2 id="logHeading">Activity</h2>
+      <button type="button" class="quiet" id="clearLogsBtn">Clear</button>
+    </div>
+    <div class="logs" id="logList"></div>
+  </section>
+</main>
+
+<script src="app.js"></script>
 </body>
 </html>

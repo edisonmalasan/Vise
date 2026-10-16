@@ -574,8 +574,14 @@ mod tests {
         assert_eq!(view.selected_title_index, 2, "the main feature is chosen");
         assert_eq!(view.titles.len(), 2);
         assert_eq!(view.tracks.audio.len(), 2);
-        assert_eq!(view.tracks.audio[0].selected, true);
-        assert!(view.tracks.subtitle[0].selected == false);
+        assert!(
+            view.tracks.audio[0].selected,
+            "the first audio track is chosen by default"
+        );
+        assert!(
+            !view.tracks.subtitle[0].selected,
+            "no subtitle track is chosen by default"
+        );
         assert_eq!(view.range.expect("range").mode, RangeMode::Whole);
     }
 
@@ -633,9 +639,8 @@ mod tests {
             RangeMode::Whole,
             "the range was reset"
         );
-        assert_eq!(
-            flow.view_model().range.expect("range").has_angles,
-            false,
+        assert!(
+            !flow.view_model().range.expect("range").has_angles,
             "title 1 reports a single angle"
         );
 
