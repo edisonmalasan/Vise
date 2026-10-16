@@ -298,15 +298,15 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [ ] Queue window and queue selection window parity
 - [ ] Activity/log window parity
 - [ ] Static preview window parity
-- [ ] Source selection control parity (source menu, scan modes)
-- [ ] Point-to-point range and angle selection parity
+- [x] Source selection control parity (source menu, scan modes)
+- [x] Point-to-point range and angle selection parity
 - [ ] Error view, copy-error, countdown alert
 - [ ] About view
 - [ ] Preset add/manage views parity
 - [ ] Right-to-left layout support
 - [ ] Theme selection (system/light/dark)
 
-**Status:** Not started (0/18 verified)
+**Status:** In progress (2/18 verified; `apps/vise-desktop` drives the worker from a validated file or folder picker with drag-and-drop and recent sources, shows scan progress without blocking the window, lists the scanned titles with their facts, and resolves range, angle, and track selection in the window so what the page renders is covered by unit tests. Angle selection is wired to the contract's `angle_count`, which this build never reports above one until optical-disc sources arrive, so the control stays hidden until then.)
 
 ## Group 15 — Preferences surface
 
@@ -451,7 +451,7 @@ Required groups: 19
 | 11 | Hardware acceleration | Complete (7/7) |
 | 12 | Platform packaging and release | In progress (3/8) |
 | 13 | Worker process and JSON IPC | Complete (9/9) |
-| 14 | Desktop parity with reference product | Not started (0/18) |
+| 14 | Desktop parity with reference product | In progress (2/18) |
 | 15 | Preferences surface | Not started (0/8) |
 | 16 | Preset catalog and versioning | Not started (0/13) |
 | 17 | System integration | Not started (0/9) |
