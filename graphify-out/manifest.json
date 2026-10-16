@@ -96,14 +96,14 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/gen/schemas/desktop-schema.json": {
-    "mtime": 1792091634.2065601,
-    "seen": 1792098136.5664427,
+    "mtime": 1792118905.590552,
+    "seen": 1792166960.2934527,
     "ast_hash": "8b78b7a2d929d3c4fa9c101013451faf",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/gen/schemas/windows-schema.json": {
-    "mtime": 1792091634.2077677,
-    "seen": 1792098136.5664437,
+    "mtime": 1792118905.5921566,
+    "seen": 1792166960.2934573,
     "ast_hash": "8b78b7a2d929d3c4fa9c101013451faf",
     "semantic_hash": ""
   },
@@ -582,9 +582,9 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1792098128.6109297,
-    "seen": 1792098136.5667522,
-    "ast_hash": "dbde4383a2c6c80f0916cbc6241e63c2",
+    "mtime": 1792166899.7046955,
+    "seen": 1792166960.3080885,
+    "ast_hash": "9627c7858c64f7cee49fdb0375d0f60f",
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
@@ -624,15 +624,27 @@
     "semantic_hash": ""
   },
   "docs/ROADMAP.md": {
-    "mtime": 1792094458.3692,
-    "seen": 1792098136.5667603,
-    "ast_hash": "68ef9748cd2eeb5fafe0ae472fef950e",
+    "mtime": 1792166660.6696942,
+    "seen": 1792166960.3095553,
+    "ast_hash": "4a1747f7040ac840b8e405afc4210827",
     "semantic_hash": ""
   },
   "docs/release-notes-template.md": {
     "mtime": 1792091410.9948566,
     "seen": 1792098136.5667613,
     "ast_hash": "2e52cac8dc89188fb478c9a7f966a641",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1792118896.8269165,
+    "seen": 1792166960.3082888,
+    "ast_hash": "b2a5288d69fb88dff0fdff12a744dbf7",
+    "semantic_hash": ""
+  },
+  "docs/SETUP.md": {
+    "mtime": 1792118899.456667,
+    "seen": 1792166960.3095589,
+    "ast_hash": "514c2e4a8c49fc21748637b8f03b2a40",
     "semantic_hash": ""
   }
 }
