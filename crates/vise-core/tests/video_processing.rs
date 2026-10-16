@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use vise_core::{FrameRateMode, Transcoder, VideoProcessingOptions};
+use vise_core::{
+    ColourRange, FlipMode, FrameRateMode, Transcoder, VideoEncodingOptions, VideoProcessingOptions,
+};
 
 fn tool(name: &str) -> PathBuf {
     vise_core::FfprobeScanner::default()
@@ -68,6 +70,86 @@ fn filter_chain_contains_features() {
     assert!(chain.contains("chromanr"), "{chain}");
     assert!(chain.contains("format=yuv420p10le"), "{chain}");
     assert!(chain.contains("fps=30"), "{chain}");
+}
+
+#[test]
+fn flip_is_a_separate_choice_from_rotation() {
+    let options = VideoProcessingOptions {
+        flip: Some(FlipMode::Horizontal),
+        ..Default::default()
+    };
+    let chain = options.build_filter_chain();
+    assert_eq!(chain, "hflip", "{chain}");
+
+    let both = VideoProcessingOptions {
+        rotate: Some(90),
+        flip: Some(FlipMode::Both),
+        ..Default::default()
+    };
+    let chain = both.build_filter_chain();
+    assert!(chain.contains("transpose=1"), "{chain}");
+    assert!(chain.contains("hflip,vflip"), "{chain}");
+
+    let none = VideoProcessingOptions {
+        flip: Some(FlipMode::None),
+        ..Default::default()
+    };
+    assert_eq!(none.build_filter_chain(), "");
+    assert_eq!(FlipMode::Vertical.as_str(), "vertical");
+}
+
+#[test]
+fn encoder_options_render_in_a_stable_order_and_skip_blanks() {
+    let options = VideoEncodingOptions {
+        preset: Some("slow".into()),
+        profile: Some(" high ".into()),
+        tune: Some("   ".into()),
+        level: Some("4.1".into()),
+        colour_range: Some(ColourRange::Full),
+    };
+    assert_eq!(
+        options.encoder_args(),
+        vec![
+            "-preset",
+            "slow",
+            "-profile:v",
+            "high",
+            "-level",
+            "4.1",
+            "-color_range",
+            "pc"
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>()
+    );
+    assert!(VideoEncodingOptions::default().is_empty());
+    assert!(!options.is_empty());
+}
+
+#[test]
+fn a_named_strength_reaches_the_filter_it_names() {
+    let denoise = VideoProcessingOptions {
+        denoise_strength: Some(6),
+        sharpen_amount: Some(0.7),
+        ..Default::default()
+    };
+    let chain = denoise.build_filter_chain();
+    assert!(chain.contains("hqdn3d=6:6:9:9"), "{chain}");
+    assert!(chain.contains("unsharp=5:5:0.7:5:5:0"), "{chain}");
+
+    // A strength of zero means "no setting", so the plain filter is used.
+    let plain = VideoProcessingOptions {
+        denoise: true,
+        sharpen: true,
+        denoise_strength: Some(0),
+        sharpen_amount: Some(0.0),
+        ..Default::default()
+    };
+    let chain = plain.build_filter_chain();
+    assert!(chain.contains("hqdn3d"), "{chain}");
+    assert!(chain.contains("unsharp"), "{chain}");
+    assert!(!chain.contains('='), "{chain}");
 }
 
 #[test]

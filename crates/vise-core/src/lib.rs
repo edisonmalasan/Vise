@@ -24,7 +24,9 @@ pub use chapter::*;
 pub use error::CoreError;
 pub use geometry::*;
 pub use hardware::*;
-pub use job::{AudioCodec, ContainerFormat, EncodingMode, JobSpec, SubtitleMode, VideoCodec};
+pub use job::{
+    AudioCodec, ContainerFormat, EncodingMode, JobSpec, OutputOptions, SubtitleMode, VideoCodec,
+};
 pub use media::{
     parse_ffprobe_output, ChapterInfo, CropDetection, FfprobeScanner, FormatInfo, MediaBuffer,
     MediaScanner, Packet, ScanResult, StreamInfo, TitleInfo, TrackKind,

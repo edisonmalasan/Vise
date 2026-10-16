@@ -168,6 +168,19 @@ impl WorkerClient {
         stream
             .read_to_end(&mut raw)
             .map_err(|e| ClientError::Unreachable(format!("read failed: {e}")))?;
+
+        // A worker that accepted the connection and then stopped, without
+        // writing a reply, closes the socket instead of resetting it. The read
+        // succeeds with nothing in it. That is the worker being gone, not a
+        // malformed reply, and the supervisor only restarts on `Unreachable`,
+        // so reporting it as a protocol error would leave a dead worker in
+        // place after a shutdown or a crash.
+        if raw.is_empty() {
+            return Err(ClientError::Unreachable(format!(
+                "{address}: closed the connection without replying"
+            )));
+        }
+
         HttpResponse::parse(&raw).map_err(|e| ClientError::Protocol(e.to_string()))
     }
 }
@@ -307,6 +320,42 @@ mod tests {
         let client = WorkerClient::new(45999, "t");
         assert_eq!(client.address().ip().to_string(), "127.0.0.1");
         assert_eq!(client.address().port(), 45999);
+    }
+
+    #[test]
+    fn a_worker_that_closes_without_replying_counts_as_gone() {
+        use std::net::TcpListener;
+
+        // Stands in for a worker that accepted the request and then stopped
+        // before writing anything, which is how a shutdown or a crash looks
+        // when it happens mid-request.
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            // Drain the whole request first. Closing while the request is still
+            // unread would reset the connection instead of hanging up cleanly,
+            // and the client would report a reset rather than an empty reply.
+            let _ = stream.set_read_timeout(Some(Duration::from_millis(250)));
+            let mut buffer = [0_u8; 1024];
+            while let Ok(read) = stream.read(&mut buffer) {
+                if read == 0 {
+                    break;
+                }
+            }
+            // A clean FIN, so the client's read finishes with no bytes rather
+            // than with an error.
+            let _ = stream.shutdown(std::net::Shutdown::Write);
+            std::thread::sleep(Duration::from_millis(100));
+        });
+
+        let client = WorkerClient::new(port, "token").with_timeout(Duration::from_secs(5));
+        let err = client.is_token_set().expect_err("must fail");
+        server.join().expect("server thread");
+        assert!(
+            err.is_worker_gone(),
+            "an empty reply means the worker went away: {err}"
+        );
     }
 
     #[test]

@@ -18,6 +18,126 @@ pub enum FrameRateMode {
     Auto,
 }
 
+/// Which way a frame is mirrored.
+///
+/// Rotation and mirroring are separate choices in the interface: a user who
+/// wants a sideways phone video often wants it turned, not mirrored, so neither
+/// value implies the other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum FlipMode {
+    /// Leave the frame as it is.
+    #[default]
+    None,
+    /// Mirror left to right.
+    Horizontal,
+    /// Mirror top to bottom.
+    Vertical,
+    /// Mirror both ways.
+    Both,
+}
+
+impl FlipMode {
+    /// Stable identifier used by the interface layer.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Horizontal => "horizontal",
+            Self::Vertical => "vertical",
+            Self::Both => "both",
+        }
+    }
+
+    /// The filter chain fragment this choice produces.
+    pub fn filter(&self) -> Option<&'static str> {
+        match self {
+            Self::None => None,
+            Self::Horizontal => Some("hflip"),
+            Self::Vertical => Some("vflip"),
+            Self::Both => Some("hflip,vflip"),
+        }
+    }
+}
+
+/// Colour range the encoder should signal and fill.
+///
+/// Video decoded outside a colour-tagged range assumes limited range, so a
+/// full-range source stays washed out unless the job says otherwise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ColourRange {
+    /// Television range, 16-235.
+    #[default]
+    Limited,
+    /// Full range, 0-255.
+    Full,
+}
+
+impl ColourRange {
+    /// The encoder argument value for this range.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Limited => "tv",
+            Self::Full => "pc",
+        }
+    }
+}
+
+/// Encoder-side choices that are passed to the video encoder rather than
+/// applied as filters.
+///
+/// Preset, profile, tune, level, and colour range change how frames are coded,
+/// not what is in them, so they travel beside the filter model instead of
+/// inside it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct VideoEncodingOptions {
+    /// Encoder speed preset, such as `slow` or `veryfast`.
+    pub preset: Option<String>,
+    /// Coding profile, such as `high` or `main`.
+    pub profile: Option<String>,
+    /// Content tune, such as `film` or `animation`.
+    pub tune: Option<String>,
+    /// Coding level, such as `4.1`.
+    pub level: Option<String>,
+    /// Colour range to signal and fill.
+    pub colour_range: Option<ColourRange>,
+}
+
+impl VideoEncodingOptions {
+    /// Whether this job asks for anything at all.
+    pub fn is_empty(&self) -> bool {
+        self.preset.is_none()
+            && self.profile.is_none()
+            && self.tune.is_none()
+            && self.level.is_none()
+            && self.colour_range.is_none()
+    }
+
+    /// Encoder arguments for these options, in a stable order.
+    ///
+    /// An empty or blank value is skipped rather than forwarded, because an
+    /// empty `-profile:v` would make the encoder refuse the whole job.
+    pub fn encoder_args(&self) -> Vec<String> {
+        let mut args: Vec<String> = Vec::new();
+        let mut push_value = |flag: &str, value: &Option<String>| {
+            if let Some(value) = value.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
+                args.push(flag.to_string());
+                args.push(value.to_string());
+            }
+        };
+        push_value("-preset", &self.preset);
+        push_value("-profile:v", &self.profile);
+        push_value("-tune", &self.tune);
+        push_value("-level", &self.level);
+        if let Some(range) = self.colour_range {
+            args.push("-color_range".to_string());
+            args.push(range.as_str().to_string());
+        }
+        args
+    }
+}
+
 /// Serializable options model for video processing.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct VideoProcessingOptions {
@@ -49,6 +169,8 @@ pub struct VideoProcessingOptions {
     pub rotate: Option<i32>,
     #[serde(default, alias = "rotate_degrees")]
     pub rotate_degrees: Option<i32>,
+    #[serde(default, alias = "flip_mode", alias = "mirror")]
+    pub flip: Option<FlipMode>,
     #[serde(default)]
     pub pad: Option<(u32, u32)>,
     #[serde(default, alias = "pad_to")]
@@ -132,11 +254,21 @@ impl VideoProcessingOptions {
             filters.push("yadif".to_string());
         }
 
-        if self.denoise || self.denoise_strength.is_some() {
+        if let Some(strength) = self.denoise_strength.filter(|s| *s > 0) {
+            // One strength for the whole filter: spatial smoothing for luma and
+            // chroma, with the temporal terms kept a little higher so noise does
+            // not shimmer between frames.
+            let temporal = strength * 3 / 2;
+            filters.push(format!(
+                "hqdn3d={strength}:{strength}:{temporal}:{temporal}"
+            ));
+        } else if self.denoise {
             filters.push("hqdn3d".to_string());
         }
 
-        if self.sharpen || self.sharpen_amount.is_some() {
+        if let Some(amount) = self.sharpen_amount.filter(|a| *a != 0.0) {
+            filters.push(format!("unsharp=5:5:{amount}:5:5:0"));
+        } else if self.sharpen {
             filters.push("unsharp".to_string());
         }
 
@@ -148,6 +280,10 @@ impl VideoProcessingOptions {
                 _ => format!("rotate={deg}*PI/180"),
             };
             filters.push(f);
+        }
+
+        if let Some(flip) = self.flip.and_then(|flip| flip.filter()) {
+            filters.push(flip.to_string());
         }
 
         if let Some((w, h)) = self.effective_scale() {

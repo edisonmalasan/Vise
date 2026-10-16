@@ -27,10 +27,16 @@ use vise_ipc::{WorkerClient, WorkerConfig, WorkerSupervisor};
 
 mod scanflow;
 mod sources;
+mod tabs;
 mod viewmodel;
 
 use scanflow::{scan_in_process, ScanFlow};
 use sources::{RecentSources, SourceDropReport, SourceViewModel};
+use tabs::{
+    AudioDefaultsInput, AudioTrackInput, ChaptersInput, DimensionsInput, FilterInput, MarkerInput,
+    SubtitleTrackInput, SubtitlesInput, SummaryInput, TabSetViewModel, TabSettings, TitleFacts,
+    VideoInput,
+};
 use viewmodel::{
     RangeSelection, ScanPhase, ScanProgressViewModel, SelectionViewModel, TrackSelectionInput,
 };
@@ -88,6 +94,8 @@ struct DesktopState {
     backend: Option<Backend>,
     /// The source surface: source, scan, titles, and the current selection.
     flow: ScanFlow,
+    /// The configuration tab set.
+    tabs: TabSettings,
     /// Sources the user opened recently.
     recents: RecentSources,
     /// Where the recent source list is persisted.
@@ -458,7 +466,10 @@ fn choose_tracks(
     input: TrackSelectionInput,
 ) -> Result<SelectionViewModel, String> {
     let mut guard = state.lock().map_err(|e| e.to_string())?;
-    guard.flow.set_tracks(input)?;
+    guard.flow.set_tracks(input.clone())?;
+    // The tab set keeps the same choice, so the audio and subtitle tabs start
+    // with the tracks the source area has already chosen.
+    guard.tabs.choose_tracks(&input.audio, &input.subtitle);
     Ok(guard.flow.view_model())
 }
 
@@ -482,6 +493,179 @@ fn extract_preview(
 }
 
 // ---------------------------------------------------------------------------
+// Configuration tabs
+// ---------------------------------------------------------------------------
+
+/// The facts the tabs read for the chosen title.
+fn title_facts(guard: &DesktopState) -> TitleFacts {
+    TitleFacts::of(guard.flow.current_title())
+}
+
+/// Every tab, as the page renders it.
+///
+/// The tab set is brought in line with the chosen title first, so a title with
+/// different tracks never leaves the previous title's per-track rows behind.
+#[tauri::command]
+fn tab_set(state: State<'_, SharedState>) -> Result<TabSetViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    Ok(guard.tabs.view(&facts))
+}
+
+/// Apply a change to one tab and hand back every tab.
+///
+/// Each command does the same three things: read the change, let the window
+/// check it, and return the whole set. Returning the whole set is what keeps the
+/// page honest — it never has to work out which other tabs the change affected.
+macro_rules! tab_command {
+    ($name:ident, $input:ty, |$tabs:ident, $change:ident| $body:expr) => {
+        #[tauri::command]
+        fn $name(state: State<'_, SharedState>, change: $input) -> Result<TabSetViewModel, String> {
+            let mut guard = state.lock().map_err(|e| e.to_string())?;
+            let facts = title_facts(&guard);
+            guard.tabs.sync_with_title(&facts);
+            {
+                let $tabs = &mut guard.tabs;
+                let $change = change;
+                $body?;
+            }
+            Ok(guard.tabs.view(&facts))
+        }
+    };
+}
+
+tab_command!(set_summary, SummaryInput, |tabs, change| {
+    change.apply(&mut tabs.summary)
+});
+
+tab_command!(set_dimensions, DimensionsInput, |tabs, change| {
+    change.apply(&mut tabs.dimensions)
+});
+
+tab_command!(set_filter, FilterInput, |tabs, change| {
+    change.apply(&mut tabs.filters)
+});
+
+tab_command!(set_video, VideoInput, |tabs, change| {
+    change.apply(&mut tabs.video)
+});
+
+tab_command!(set_subtitles, SubtitlesInput, |tabs, change| {
+    change.apply(&mut tabs.subtitles)
+});
+
+tab_command!(set_chapters, ChaptersInput, |tabs, change| {
+    change.apply(&mut tabs.chapters)
+});
+
+tab_command!(change_marker, MarkerInput, |tabs, change| {
+    change.apply(&mut tabs.chapters)
+});
+
+/// Apply a change to the audio rules every track starts from.
+#[tauri::command]
+fn set_audio_defaults(
+    state: State<'_, SharedState>,
+    change: AudioDefaultsInput,
+) -> Result<TabSetViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    let container = guard.tabs.summary.container.clone();
+    change.apply(&mut guard.tabs.audio.defaults, &container)?;
+    Ok(guard.tabs.view(&facts))
+}
+
+/// Apply a change to one audio track.
+#[tauri::command]
+fn set_audio_track(
+    state: State<'_, SharedState>,
+    change: AudioTrackInput,
+) -> Result<TabSetViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    let container = guard.tabs.summary.container.clone();
+    change.apply(&mut guard.tabs.audio, &container)?;
+    Ok(guard.tabs.view(&facts))
+}
+
+/// Apply a change to one subtitle track.
+#[tauri::command]
+fn set_subtitle_track(
+    state: State<'_, SharedState>,
+    change: SubtitleTrackInput,
+) -> Result<TabSetViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    change.apply(&mut guard.tabs.subtitles)?;
+    Ok(guard.tabs.view(&facts))
+}
+
+/// Show one tab.
+///
+/// The page keeps its own notion of which panel is open, but the window records
+/// it so the next launch opens where the user left off.
+#[tauri::command]
+fn set_active_tab(state: State<'_, SharedState>, tab: String) -> Result<TabSetViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    if !guard.tabs.is_tab(&tab) {
+        return Err(format!("'{}' is not a tab this build offers.", tab.trim()));
+    }
+    guard.tabs.active = tab.trim().to_ascii_lowercase();
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    Ok(guard.tabs.view(&facts))
+}
+
+/// Add an external subtitle file to the output.
+///
+/// An empty path clears the imported file, which is how the page offers a way out
+/// without a second command.
+#[tauri::command]
+fn import_subtitles(
+    state: State<'_, SharedState>,
+    path: String,
+) -> Result<TabSetViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        guard.tabs.subtitles.external_path.clear();
+        guard.tabs.subtitles.external_name.clear();
+    } else {
+        let source = sources::resolve_source(trimmed)
+            .map_err(|e| format!("That subtitle file could not be used: {}", e.message()))?;
+        if source.kind != sources::SourceKind::File {
+            return Err("Choose a subtitle file rather than a folder.".to_string());
+        }
+        if !subtitle_extension(&source.name) {
+            return Err(format!(
+                "'{}' does not look like a subtitle file.",
+                source.name
+            ));
+        }
+        guard.tabs.subtitles.external_path = source.path.clone();
+        guard.tabs.subtitles.external_name = source.name.clone();
+    }
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    Ok(guard.tabs.view(&facts))
+}
+
+/// Whether a file name looks like a subtitle file this build can read.
+fn subtitle_extension(name: &str) -> bool {
+    let Some((_, extension)) = name.rsplit_once('.') else {
+        return false;
+    };
+    matches!(
+        extension.trim().to_ascii_lowercase().as_str(),
+        "srt" | "ass" | "ssa" | "vtt" | "webvtt" | "sub" | "smi" | "txt" | "ttml" | "dfxp" | "mpl2"
+    )
+}
+
+// ---------------------------------------------------------------------------
 // Queue
 // ---------------------------------------------------------------------------
 
@@ -495,47 +679,43 @@ fn add_job(state: State<'_, SharedState>, spec: JobSpec) -> Result<JobId, String
 
 /// Queue the current source selection.
 ///
-/// The page names the output and the encoders; the window applies the title and
-/// track choice it already validated, so a job cannot be queued against a title
-/// the user did not select.
+/// The page names the output file and nothing else: the window builds the job
+/// from the tab settings it already validated, so a queued job cannot disagree
+/// with what the tabs showed, and it cannot be queued against a title the user
+/// did not select.
 #[tauri::command]
-fn queue_selection(state: State<'_, SharedState>, spec: JobSpec) -> Result<JobId, String> {
+fn queue_selection(state: State<'_, SharedState>, output_path: String) -> Result<JobId, String> {
     let mut guard = state.lock().map_err(|e| e.to_string())?;
     let selection = guard.flow.view_model();
     if !selection.is_usable() {
         return Err("Scan a source and choose a title before queueing a job.".to_string());
+    }
+    let output_path = output_path.trim();
+    if output_path.is_empty() {
+        return Err("Choose where the finished file should be written.".to_string());
     }
     let source = guard
         .flow
         .source()
         .map(|source| source.path.clone())
         .ok_or_else(|| "Choose a file or folder to scan.".to_string())?;
-    let tracks = guard.flow.tracks();
     let title_index = guard
         .flow
         .current_title()
         .map(|title| title.index)
         .ok_or_else(|| "Choose a title before queueing a job.".to_string())?;
 
-    let mut spec = spec;
-    spec.input_path = source;
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    let tabs = guard.tabs.view(&facts);
+    if !tabs.can_queue {
+        return Err(format!(
+            "Fix these before queueing: {}",
+            tabs.problems.join(" ")
+        ));
+    }
+    let mut spec = guard.tabs.to_job_spec(&source, output_path, &facts)?;
     spec.title_index = Some(selection.selected_title_index);
-    spec.audio_tracks = tracks
-        .audio
-        .iter()
-        .map(|number| vise_core::AudioTrackConfig {
-            source_track_id: Some(*number),
-            ..Default::default()
-        })
-        .collect();
-    spec.subtitle_tracks = tracks
-        .subtitle
-        .iter()
-        .map(|number| vise_core::SubtitleTrackConfig {
-            source_track_id: Some(*number),
-            ..Default::default()
-        })
-        .collect();
 
     let id = guard.session.add_job(spec);
     guard
@@ -895,6 +1075,7 @@ fn main() {
         backend: Some(build_backend()),
         recents,
         settings_path,
+        tabs: TabSettings::new(),
         ..DesktopState::default()
     }));
     tauri::Builder::default()
@@ -913,6 +1094,19 @@ fn main() {
             choose_range,
             choose_tracks,
             extract_preview,
+            tab_set,
+            set_active_tab,
+            set_summary,
+            set_dimensions,
+            set_filter,
+            set_video,
+            set_audio_defaults,
+            set_audio_track,
+            set_subtitles,
+            set_subtitle_track,
+            set_chapters,
+            change_marker,
+            import_subtitles,
             add_job,
             queue_selection,
             list_jobs,
@@ -937,6 +1131,7 @@ mod tests {
     //! window.
 
     use super::*;
+    use tabs::{SummarySettings, VideoSettings};
 
     fn idle_flow() -> ScanFlow {
         ScanFlow::default()
@@ -1086,5 +1281,78 @@ mod tests {
         let json = serde_json::to_value(&report).expect("serialise");
         assert_eq!(json["accepted"][0]["kind"], "file");
         assert!(!json["rejected"][0]["reason"].as_str().unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_tab_set_arrives_as_one_object_the_page_can_render() {
+        let settings = TabSettings::new();
+        let view = settings.view(&TitleFacts::default());
+        let json = serde_json::to_value(&view).expect("serialise");
+        assert_eq!(json["tabs"].as_array().map(|tabs| tabs.len()), Some(7));
+        assert_eq!(json["tabs"][0]["id"], "summary");
+        assert_eq!(json["active"], "summary");
+        assert_eq!(json["source"]["chosen"], false);
+        assert!(json["summary"]["container"]["options"].is_array());
+        assert!(json["dimensions"]["cropMode"]["selected"].is_string());
+        assert!(json["filters"]["rows"].is_array());
+        assert_eq!(json["video"]["rateControl"]["selected"], "quality");
+        assert!(json["audio"]["tracks"].is_array());
+        assert!(json["subtitles"]["behaviour"]["options"].is_array());
+        assert!(json["chapters"]["mode"]["options"].is_array());
+        assert!(json["problems"].is_array());
+    }
+
+    #[test]
+    fn a_tab_change_arrives_as_camel_case_the_command_accepts() {
+        let payload = r#"{"container":"mkv","videoCodec":"vp9","audioCodec":"opus",
+            "webOptimized":false,"ipodCompatible":false,"alignAudioVideo":true,
+            "passthroughMetadata":false}"#;
+        let change: SummaryInput = serde_json::from_str(payload).expect("camel case change");
+        let mut settings = SummarySettings::default();
+        change.apply(&mut settings).expect("apply");
+        assert_eq!(settings.container, "mkv");
+        assert_eq!(settings.video_codec, "vp9");
+        assert!(!settings.web_optimized);
+        assert!(settings.align_audio_video);
+
+        let video = r#"{"encoder":"av1","rateControl":"bitrate","bitrate":"4000",
+            "twoPass":true,"preset":"slow","colourRange":"full"}"#;
+        let change: VideoInput = serde_json::from_str(video).expect("video change");
+        let mut video_settings = VideoSettings::default();
+        change.apply(&mut video_settings).expect("video");
+        assert_eq!(video_settings.encoder, "av1");
+        assert_eq!(video_settings.bitrate.text, "4000");
+        assert!(video_settings.two_pass);
+        assert_eq!(video_settings.colour_range, "full");
+
+        let filter = r#"{"filter":"denoise","enabled":true,"choice":"custom","value":"7"}"#;
+        let change: tabs::FilterInput = serde_json::from_str(filter).expect("filter change");
+        let mut filters = tabs::FilterSettings::default();
+        change.apply(&mut filters).expect("filter");
+        assert!(filters.denoise);
+        assert_eq!(filters.denoise_value(), Some(7));
+
+        let marker = r#"{"action":"add","name":"Extra","start":"10","end":"20"}"#;
+        let change: MarkerInput = serde_json::from_str(marker).expect("marker change");
+        let mut chapters = tabs::ChapterSettings::default();
+        change.apply(&mut chapters).expect("marker");
+        assert_eq!(chapters.markers.len(), 1);
+        assert_eq!(chapters.markers[0].name, "Extra");
+    }
+
+    #[test]
+    fn only_subtitle_files_are_accepted_for_import() {
+        assert!(subtitle_extension("extra.srt"));
+        assert!(subtitle_extension("captions.ASS"));
+        assert!(subtitle_extension("subs.webvtt"));
+        assert!(!subtitle_extension("movie.mkv"));
+        assert!(!subtitle_extension("subtitles"));
+    }
+
+    #[test]
+    fn a_tab_the_build_does_not_offer_is_refused_by_name() {
+        let settings = TabSettings::new();
+        assert!(settings.is_tab("chapters"));
+        assert!(!settings.is_tab("metadata"));
     }
 }

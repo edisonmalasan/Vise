@@ -281,19 +281,19 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [x] Worker crash detection and automatic restart
 - [x] Portable-mode disable switch for process isolation
 
-**Status:** Complete (9/9 verified; `crates/vise-worker` serves the API, `crates/vise-ipc` provides the client, supervisor, and portable-mode switch, and the desktop shell drives the worker instead of the pipeline)
+**Status:** Complete (9/9 verified; `crates/vise-worker` serves the API, `crates/vise-ipc` provides the client, supervisor, and portable-mode switch, and the desktop shell drives the worker instead of the pipeline. A worker that stops mid-request is recognised as gone whether it resets the connection or hangs up cleanly without replying, so the supervisor restarts it in both cases)
 
 ## Group 14 — Desktop parity with reference product
 
 *Outcome: The desktop application exposes every reference surface with an improved, consistent interface.*
 
-- [ ] Summary tab parity
-- [ ] Dimensions tab parity (crop modes, scale, anamorphic, resolution limits, flip/rotate)
-- [ ] Filters tab parity (all filters, presets, tunes)
-- [ ] Video tab parity (encoder, rate control, quality, profile, tune, level, colour range, framerate mode)
-- [ ] Audio tab parity (per-track behaviour, defaults, mixdown, DRC, dither, delay, naming)
-- [ ] Subtitles tab parity (behaviour, burn-in behaviour, import, search)
-- [ ] Chapters tab parity
+- [x] Summary tab parity
+- [x] Dimensions tab parity (crop modes, scale, anamorphic, resolution limits, flip/rotate)
+- [x] Filters tab parity (all filters, presets, tunes)
+- [x] Video tab parity (encoder, rate control, quality, profile, tune, level, colour range, framerate mode)
+- [x] Audio tab parity (per-track behaviour, defaults, mixdown, DRC, dither, delay, naming)
+- [x] Subtitles tab parity (behaviour, burn-in behaviour, import, search)
+- [x] Chapters tab parity
 - [ ] Metadata tab parity
 - [ ] Queue window and queue selection window parity
 - [ ] Activity/log window parity
@@ -306,7 +306,7 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [ ] Right-to-left layout support
 - [ ] Theme selection (system/light/dark)
 
-**Status:** In progress (2/18 verified; `apps/vise-desktop` drives the worker from a validated file or folder picker with drag-and-drop and recent sources, shows scan progress without blocking the window, lists the scanned titles with their facts, and resolves range, angle, and track selection in the window so what the page renders is covered by unit tests. Angle selection is wired to the contract's `angle_count`, which this build never reports above one until optical-disc sources arrive, so the control stays hidden until then.)
+**Status:** In progress (9/18 verified; `apps/vise-desktop` drives the worker from a validated file or folder picker with drag-and-drop and recent sources, shows scan progress without blocking the window, lists the scanned titles with their facts, and resolves range, angle, and track selection in the window so what the page renders is covered by unit tests. Angle selection is wired to the contract's `angle_count`, which this build never reports above one until optical-disc sources arrive, so the control stays hidden until then. The seven configuration tabs are built as Rust view models that carry their own availability and reason, and one settings set drives both the tabs and the job specification, so a queued job cannot disagree with what the tabs showed. Fields the job model lacked were added and honoured in the resolved plan: output framing flags, encoder preset/profile/tune/level, colour range, mirroring, and per-track forced-dialogue selection. Controls the worker contract has no field for are shown closed with the reason instead of being accepted and ignored: the deblock filter, which is a media-depth item, and the MP4-only output flags outside an MP4. Anamorphic scaling and per-chapter inclusion are resolved from the frame size and the marker list rather than stored as separate fields, so they cannot fall out of step with the geometry they describe.)
 
 ## Group 15 — Preferences surface
 
@@ -451,7 +451,7 @@ Required groups: 19
 | 11 | Hardware acceleration | Complete (7/7) |
 | 12 | Platform packaging and release | In progress (3/8) |
 | 13 | Worker process and JSON IPC | Complete (9/9) |
-| 14 | Desktop parity with reference product | In progress (2/18) |
+| 14 | Desktop parity with reference product | In progress (9/18) |
 | 15 | Preferences surface | Not started (0/8) |
 | 16 | Preset catalog and versioning | Not started (0/13) |
 | 17 | System integration | Not started (0/9) |

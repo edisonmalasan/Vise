@@ -9,7 +9,7 @@
 <body>
 <header class="masthead">
   <h1>Vise Transcoder</h1>
-  <p>Pick a source, scan it, then choose the title, range, angle, and tracks to encode.</p>
+  <p>Pick a source, scan it, choose the title, range, angle, and tracks, then set the output up on the tabs below.</p>
 </header>
 
 <main class="layout">
@@ -122,46 +122,281 @@
     </fieldset>
   </section>
 
-  <section class="card full" aria-labelledby="jobHeading">
+  <section class="card full" aria-labelledby="settingsHeading">
     <div class="card-head">
-      <h2 id="jobHeading">New job</h2>
+      <h2 id="settingsHeading">Output settings</h2>
+      <span class="hint" id="tabSource">Choose a title to configure the output.</span>
     </div>
-    <div class="row">
-      <div class="grow">
-        <label for="outPath">Output path</label>
-        <input type="text" id="outPath" spellcheck="false" autocomplete="off"
-               placeholder="C:\media\out.mp4" />
+
+    <div class="tabs">
+      <div class="tablist" role="tablist" aria-label="Output settings" id="tabList"></div>
+      <div class="notice" id="tabProblems" data-tone="error" role="status" aria-live="polite" hidden></div>
+
+      <div class="tabpanels" id="tabPanels">
+        <!-- Summary ---------------------------------------------------------- -->
+        <div class="tabpanel" role="tabpanel" id="panel-summary" aria-labelledby="tab-summary" tabindex="0">
+          <div class="grid two">
+            <div class="field">
+              <label for="summaryContainer">Container</label>
+              <select id="summaryContainer"></select>
+              <span class="hint" id="summaryContainerHint"></span>
+            </div>
+            <div class="field">
+              <label for="summaryVideoCodec">Video codec</label>
+              <select id="summaryVideoCodec"></select>
+              <span class="hint" id="summaryVideoCodecHint"></span>
+            </div>
+            <div class="field">
+              <label for="summaryAudioCodec">Audio codec</label>
+              <select id="summaryAudioCodec"></select>
+              <span class="hint" id="summaryAudioCodecHint"></span>
+            </div>
+            <div class="field read-out">
+              <span class="label">Format</span>
+              <span class="value" id="summaryFormat"></span>
+            </div>
+            <div class="field read-out">
+              <span class="label">Quality</span>
+              <span class="value" id="summaryQuality"></span>
+            </div>
+          </div>
+          <fieldset class="flags">
+            <legend>Output flags</legend>
+            <label class="switch" for="summaryWebOptimized">
+              <input type="checkbox" id="summaryWebOptimized" />
+              <span class="text"><span>Web optimised</span><span class="facts" id="summaryWebOptimizedHint"></span></span>
+            </label>
+            <label class="switch" for="summaryIpodCompatible">
+              <input type="checkbox" id="summaryIpodCompatible" />
+              <span class="text"><span>Older portable players</span><span class="facts" id="summaryIpodCompatibleHint"></span></span>
+            </label>
+            <label class="switch" for="summaryAlignAudioVideo">
+              <input type="checkbox" id="summaryAlignAudioVideo" />
+              <span class="text"><span>Align audio and video</span><span class="facts" id="summaryAlignAudioVideoHint"></span></span>
+            </label>
+            <label class="switch" for="summaryPassthroughMetadata">
+              <input type="checkbox" id="summaryPassthroughMetadata" />
+              <span class="text"><span>Keep the source tags</span><span class="facts" id="summaryPassthroughMetadataHint"></span></span>
+            </label>
+            <p class="hint" id="summaryFlagLabel"></p>
+          </fieldset>
+        </div>
+
+        <!-- Dimensions ------------------------------------------------------- -->
+        <div class="tabpanel" role="tabpanel" id="panel-dimensions" aria-labelledby="tab-dimensions" tabindex="0" hidden>
+          <div class="grid two">
+            <div class="field">
+              <label for="cropMode">Crop</label>
+              <select id="cropMode"></select>
+              <span class="hint" id="cropModeHint"></span>
+            </div>
+            <div class="field">
+              <label for="scaleMode">Scaling</label>
+              <select id="scaleMode"></select>
+              <span class="hint" id="scaleModeHint"></span>
+            </div>
+          </div>
+          <fieldset>
+            <legend>Crop rectangle</legend>
+            <div class="grid four">
+              <div class="field"><label for="cropX">Left</label><input type="text" id="cropX" inputmode="numeric" /><span class="hint" id="cropXHint"></span></div>
+              <div class="field"><label for="cropY">Top</label><input type="text" id="cropY" inputmode="numeric" /><span class="hint" id="cropYHint"></span></div>
+              <div class="field"><label for="cropWidth">Width</label><input type="text" id="cropWidth" inputmode="numeric" /><span class="hint" id="cropWidthHint"></span></div>
+              <div class="field"><label for="cropHeight">Height</label><input type="text" id="cropHeight" inputmode="numeric" /><span class="hint" id="cropHeightHint"></span></div>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Output size</legend>
+            <div class="grid four">
+              <div class="field"><label for="scaleWidth">Width</label><input type="text" id="scaleWidth" inputmode="numeric" /><span class="hint" id="scaleWidthHint"></span></div>
+              <div class="field"><label for="scaleHeight">Height</label><input type="text" id="scaleHeight" inputmode="numeric" /><span class="hint" id="scaleHeightHint"></span></div>
+              <div class="field"><label for="maxWidth">Largest width</label><input type="text" id="maxWidth" inputmode="numeric" /><span class="hint" id="maxWidthHint"></span></div>
+              <div class="field"><label for="maxHeight">Largest height</label><input type="text" id="maxHeight" inputmode="numeric" /><span class="hint" id="maxHeightHint"></span></div>
+            </div>
+            <div class="field">
+              <label for="aspectRatio">Shape</label>
+              <input type="text" id="aspectRatio" spellcheck="false" placeholder="16:9" />
+              <span class="hint" id="aspectRatioHint"></span>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Orientation</legend>
+            <div class="grid two">
+              <div class="field">
+                <label for="rotate">Turn</label>
+                <select id="rotate"></select>
+                <span class="hint" id="rotateHint"></span>
+              </div>
+              <div class="field">
+                <label for="flip">Mirror</label>
+                <select id="flip"></select>
+                <span class="hint" id="flipHint"></span>
+              </div>
+            </div>
+            <p class="hint" id="dimensionsSummary"></p>
+          </fieldset>
+        </div>
+
+        <!-- Filters --------------------------------------------------------- -->
+        <div class="tabpanel" role="tabpanel" id="panel-filters" aria-labelledby="tab-filters" tabindex="0" hidden>
+          <div class="filters" id="filterRows"></div>
+          <p class="hint" id="filtersSummary"></p>
+        </div>
+
+        <!-- Video ----------------------------------------------------------- -->
+        <div class="tabpanel" role="tabpanel" id="panel-video" aria-labelledby="tab-video" tabindex="0" hidden>
+          <div class="grid three">
+            <div class="field">
+              <label for="videoEncoder">Encoder</label>
+              <select id="videoEncoder"></select>
+              <span class="hint" id="videoEncoderHint"></span>
+            </div>
+            <div class="field">
+              <label for="rateControl">Rate control</label>
+              <select id="rateControl"></select>
+              <span class="hint" id="rateControlHint"></span>
+            </div>
+            <div class="field">
+              <label for="frameRateMode">Frame rate</label>
+              <select id="frameRateMode"></select>
+              <span class="hint" id="frameRateModeHint"></span>
+            </div>
+            <div class="field">
+              <label for="videoQuality">Quality</label>
+              <input type="text" id="videoQuality" inputmode="numeric" />
+              <span class="hint" id="videoQualityHint"></span>
+            </div>
+            <div class="field">
+              <label for="videoBitrate">Bit rate</label>
+              <input type="text" id="videoBitrate" inputmode="numeric" />
+              <span class="hint" id="videoBitrateHint"></span>
+            </div>
+            <div class="field">
+              <label for="videoTargetSize">File size</label>
+              <input type="text" id="videoTargetSize" inputmode="numeric" />
+              <span class="hint" id="videoTargetSizeHint"></span>
+            </div>
+            <div class="field">
+              <label for="frameRate">Frames per second</label>
+              <input type="text" id="frameRate" inputmode="numeric" />
+              <span class="hint" id="frameRateHint"></span>
+            </div>
+            <div class="field">
+              <label for="colourRange">Colour range</label>
+              <select id="colourRange"></select>
+              <span class="hint" id="colourRangeHint"></span>
+            </div>
+          </div>
+          <fieldset class="flags">
+            <legend>Rate control</legend>
+            <label class="switch" for="twoPass">
+              <input type="checkbox" id="twoPass" />
+              <span class="text"><span>Two-pass encode</span><span class="facts" id="twoPassHint"></span></span>
+            </label>
+            <label class="switch" for="lossless">
+              <input type="checkbox" id="lossless" />
+              <span class="text"><span>Lossless</span><span class="facts" id="losslessHint"></span></span>
+            </label>
+          </fieldset>
+          <fieldset>
+            <legend>Encoder</legend>
+            <div class="grid two">
+              <div class="field"><label for="encoderPreset">Preset</label><select id="encoderPreset"></select><span class="hint" id="encoderPresetHint"></span></div>
+              <div class="field"><label for="encoderProfile">Profile</label><select id="encoderProfile"></select><span class="hint" id="encoderProfileHint"></span></div>
+              <div class="field"><label for="encoderTune">Tune</label><select id="encoderTune"></select><span class="hint" id="encoderTuneHint"></span></div>
+              <div class="field"><label for="encoderLevel">Level</label><select id="encoderLevel"></select><span class="hint" id="encoderLevelHint"></span></div>
+            </div>
+            <p class="hint" id="videoPlan"></p>
+          </fieldset>
+        </div>
+
+        <!-- Audio ----------------------------------------------------------- -->
+        <div class="tabpanel" role="tabpanel" id="panel-audio" aria-labelledby="tab-audio" tabindex="0" hidden>
+          <div class="rules" id="audioDefaults"></div>
+          <h3>Tracks</h3>
+          <div class="rules" id="audioTracks"></div>
+          <div class="empty" id="audioTabEmpty" hidden>This title carries no audio tracks.</div>
+          <p class="hint" id="audioSummary"></p>
+        </div>
+
+        <!-- Subtitles ------------------------------------------------------- -->
+        <div class="tabpanel" role="tabpanel" id="panel-subtitles" aria-labelledby="tab-subtitles" tabindex="0" hidden>
+          <div class="grid two">
+            <div class="field">
+              <label for="subtitleBehaviour">Subtitles</label>
+              <select id="subtitleBehaviour"></select>
+              <span class="hint" id="subtitleBehaviourHint"></span>
+            </div>
+            <div class="field">
+              <label for="subtitleSearch">Find a language</label>
+              <input type="text" id="subtitleSearch" spellcheck="false" placeholder="English" />
+              <span class="hint" id="subtitleSearchHint"></span>
+            </div>
+          </div>
+          <fieldset class="flags">
+            <legend>All tracks</legend>
+            <label class="switch" for="forcedOnly">
+              <input type="checkbox" id="forcedOnly" />
+              <span class="text"><span>Forced dialogue only</span><span class="facts" id="forcedOnlyHint"></span></span>
+            </label>
+          </fieldset>
+          <fieldset>
+            <legend>Imported file</legend>
+            <div class="row">
+              <div class="grow">
+                <label for="externalSubtitle">Subtitle file path</label>
+                <input type="text" id="externalSubtitle" spellcheck="false" autocomplete="off"
+                       placeholder="C:\media\extra.srt" aria-describedby="externalSubtitleHint" />
+              </div>
+              <button type="button" id="importSubtitlesBtn">Import</button>
+              <button type="button" class="quiet" id="forgetSubtitlesBtn">Forget</button>
+            </div>
+            <span class="hint" id="externalSubtitleHint"></span>
+          </fieldset>
+          <fieldset>
+            <legend>Tracks</legend>
+            <div id="subtitleTracks"></div>
+            <div class="empty" id="subtitleTabEmpty" hidden>This title carries no subtitle tracks.</div>
+            <p class="hint" id="subtitlesSummary"></p>
+          </fieldset>
+        </div>
+
+        <!-- Chapters -------------------------------------------------------- -->
+        <div class="tabpanel" role="tabpanel" id="panel-chapters" aria-labelledby="tab-chapters" tabindex="0" hidden>
+          <div class="field">
+            <label for="chapterMode">Chapters</label>
+            <select id="chapterMode"></select>
+            <span class="hint" id="chapterModeHint"></span>
+          </div>
+          <div class="markers" id="chapterMarkers"></div>
+          <div class="empty" id="chapterTabEmpty" hidden>No chapter markers.</div>
+          <div class="row">
+            <div class="grow">
+              <label for="markerStart">New marker start</label>
+              <input type="text" id="markerStart" inputmode="numeric" placeholder="0" />
+            </div>
+            <div class="grow">
+              <label for="markerEnd">New marker end</label>
+              <input type="text" id="markerEnd" inputmode="numeric" placeholder="0" />
+            </div>
+            <div class="grow">
+              <label for="markerName">Name</label>
+              <input type="text" id="markerName" spellcheck="false" placeholder="Chapter name" />
+            </div>
+            <button type="button" id="addMarkerBtn">Add marker</button>
+          </div>
+          <p class="hint" id="chaptersSummary"></p>
+        </div>
       </div>
-      <div>
-        <label for="container">Container</label>
-        <select id="container">
-          <option value="mp4">MP4</option>
-          <option value="mkv">MKV</option>
-          <option value="webm">WebM</option>
-        </select>
+
+      <div class="row queue-row">
+        <div class="grow">
+          <label for="outPath">Output path</label>
+          <input type="text" id="outPath" spellcheck="false" autocomplete="off"
+                 placeholder="C:\media\out.mp4" />
+        </div>
+        <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
       </div>
-      <div>
-        <label for="video">Video</label>
-        <select id="video">
-          <option value="h264">H.264</option>
-          <option value="h265">H.265</option>
-          <option value="av1">AV1</option>
-          <option value="vp9">VP9</option>
-        </select>
-      </div>
-      <div>
-        <label for="audioCodec">Audio</label>
-        <select id="audioCodec">
-          <option value="aac">AAC</option>
-          <option value="opus">Opus</option>
-          <option value="vorbis">Vorbis</option>
-          <option value="flac">FLAC</option>
-          <option value="mp3">MP3</option>
-        </select>
-      </div>
-    </div>
-    <div class="row">
-      <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
       <span class="hint" id="queueHint">Scan a source and choose a title first.</span>
     </div>
   </section>
