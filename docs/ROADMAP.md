@@ -250,11 +250,13 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [ ] Windows build and installer
 - [ ] macOS build and app bundle
 - [ ] Linux build and package
+- [ ] Bundle FFmpeg and ffprobe with release builds
+- [ ] Prefer bundled media tooling before PATH discovery
 - [x] Versioned release notes
 - [x] Reproducible build process
 - [x] Update delivery mechanism `(optional)`
 
-**Status:** In progress (3/6 verified; platform installers pending)
+**Status:** In progress (3/8 verified; platform installers and bundled media tooling pending)
 
 ---
 
@@ -296,7 +298,7 @@ Required groups: 11, 12
 | 9 | Chapters and metadata | Complete (6/6) |
 | 10 | Encoding control and job reliability | Complete (8/8) |
 | 11 | Hardware acceleration | Complete (7/7) |
-| 12 | Platform packaging and release | Not started (0/6) |
+| 12 | Platform packaging and release | In progress (3/8) |
 
 ## Notes
 
