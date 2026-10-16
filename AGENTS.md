@@ -89,5 +89,4 @@ Do not create extra ICM stage folders or permanent plan files unless the task be
 3. Make focused commits at logical checkpoints **when commits are authorized**; do not commit automatically without permission.
 4. Use a configured `git` subagent for Git operations **if this harness provides one**. Otherwise, use permitted Git tooling; never assume a subagent exists.
 5. Do not merge until the relevant build/tests pass; report pre-existing warnings and introduce no new errors or warnings.
-6. Do not stage transient agent-generated plans (for example, `docs/superpowers/`) unless the user explicitly wants them versioned. Respect the repository's `.gitignore`.
-7. Do not push, merge, reset, or discard changes without explicit authorization.
+6. Do not stage transient agent-generated plans unless the user explicitly wants them versioned. Respect the repository's `.gitignore`.
