@@ -86,9 +86,36 @@ Do not create extra ICM stage folders or permanent plan files unless the task be
 
 ## Git Workflow
 
-1. **Never commit directly to `main` or another protected default branch.** Use a task branch when committing.
-2. Branch names: `feat/`, `fix/`, `chore/`, or `docs/` followed by a short slug.
-3. Make focused commits at logical checkpoints **when commits are authorized**; do not commit automatically without permission.
-4. Use a configured `git` subagent for Git operations **if this harness provides one**. Otherwise, use permitted Git tooling; never assume a subagent exists.
-5. Do not merge until the relevant build/tests pass; report pre-existing warnings and introduce no new errors or warnings.
-6. Do not stage transient agent-generated plans unless the user explicitly wants them versioned. Respect the repository's `.gitignore`.
+1. **Never commit directly to `main`.** Use task branches prefixed with `feat/`, `fix/`, `chore/`, `docs/`, or `refactor/`.
+2. Before modifying files, check `git status`, switch to `main`, pull the latest `origin/main`, create a task branch, and push it with upstream tracking.
+3. Commit at logical checkpoints and push changes to the remote.
+4. Use the `git` subagent when available; otherwise, use permitted Git tools.
+5. After implementation, run relevant tests, resolve issues, and **merge verified work into `main`**. Follow required CI checks and branch protections.
+6. Never discard existing changes, force-push, or commit temporary agent-generated plans unless explicitly authorized.
+7. **Do not consider a task complete until it is verified, merged, and reflected in `docs/ROADMAP.md`.**
+
+### Branch Lifecycle
+
+```bash
+git status
+git switch main
+git pull --ff-only origin main
+git switch -c <branch-name>
+git push -u origin <branch-name>
+```
+
+If the working tree is dirty or Git operations are blocked, resolve safely without overwriting existing work.
+
+---
+
+## Autonomous Orchestration Mode
+
+_Activate only when the user explicitly requests autonomous roadmap execution._
+
+1. **Orchestrator:** Read `docs/CONTEXT.md` and `docs/ROADMAP.md`, select the next eligible task, manage Git operations, and verify completion.
+2. **Subagent:** Spawn **one implementation-and-testing subagent** per task when supported. Otherwise, perform the work directly.
+3. **Execution:** Create branch → Implement → Test → Commit → Push → Merge → Update roadmap. (REPEAT with next task)
+4. **Continuity:** Automatically proceed to the next eligible roadmap task. **Do not stop after one feature or merge.**
+5. **Blockers:** Attempt safe recovery. Pause only for unresolved errors, missing requirements, permissions, required approvals, or unsafe operations. Continue independent tasks when possible.
+6. **Completion:** Stop when all authorized tasks are finished, remaining tasks are deferred or blocked, or the user stops execution.
+7. **Knowledge:** Update relevant documentation, preserve reusable lessons in Obsidian, and refresh Graphify after significant changes.
