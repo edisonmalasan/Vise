@@ -281,7 +281,7 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [x] Worker crash detection and automatic restart
 - [x] Portable-mode disable switch for process isolation
 
-**Status:** Complete (9/9 verified; `crates/vise-worker` serves the API, `crates/vise-ipc` provides the client, supervisor, and portable-mode switch, and the desktop shell drives the worker instead of the pipeline)
+**Status:** Complete (9/9 verified; `crates/vise-worker` serves the API, `crates/vise-ipc` provides the client, supervisor, and portable-mode switch, and the desktop shell drives the worker instead of the pipeline. A worker that stops mid-request is recognised as gone whether it resets the connection or hangs up cleanly without replying, so the supervisor restarts it in both cases)
 
 ## Group 14 — Desktop parity with reference product
 
