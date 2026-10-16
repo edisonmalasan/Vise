@@ -1,0 +1,21 @@
+[package]
+name = "vise-worker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Background worker process exposing the Vise JSON API on loopback."
+
+[[bin]]
+name = "vise-worker"
+path = "src/main.rs"
+
+[lib]
+name = "vise_worker"
+path = "src/lib.rs"
+
+[dependencies]
+vise-core = { path = "../vise-core" }
+vise-ipc = { path = "../vise-ipc" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

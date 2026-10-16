@@ -42,7 +42,15 @@ impl std::fmt::Display for AudioMixdown {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct AudioProcessingOptions {
     /// Source audio track index to process.
-    #[serde(default, alias = "track", alias = "source_track", alias = "audio_track", alias = "track_index", alias = "source_track_id", alias = "track_id")]
+    #[serde(
+        default,
+        alias = "track",
+        alias = "source_track",
+        alias = "audio_track",
+        alias = "track_index",
+        alias = "source_track_id",
+        alias = "track_id"
+    )]
     pub source_track: Option<u32>,
 
     /// Source audio tracks when processing several outputs.
@@ -66,7 +74,13 @@ pub struct AudioProcessingOptions {
     pub layout: Option<String>,
 
     /// Target sample rate in Hz.
-    #[serde(default, alias = "resample_rate", alias = "sample_rate_out", alias = "output_sample_rate", alias = "rate")]
+    #[serde(
+        default,
+        alias = "resample_rate",
+        alias = "sample_rate_out",
+        alias = "output_sample_rate",
+        alias = "rate"
+    )]
     pub sample_rate: Option<u32>,
 
     /// Enable triangular/selected dithering.
@@ -147,7 +161,12 @@ impl AudioProcessingOptions {
         self.sample_rate
     }
     fn dither_enabled(&self) -> bool {
-        self.dither || self.dither_mode.as_ref().map(|s| !s.is_empty() && s != "none").unwrap_or(false)
+        self.dither
+            || self
+                .dither_mode
+                .as_ref()
+                .map(|s| !s.is_empty() && s != "none")
+                .unwrap_or(false)
     }
 
     pub fn build_filter_chain(&self) -> String {
@@ -174,7 +193,10 @@ impl AudioProcessingOptions {
             };
             filters.push(format!("aresample={rate}:dither_method={dither}"));
         } else if self.dither_enabled() {
-            let dither = self.dither_mode.clone().unwrap_or_else(|| "triangular".to_string());
+            let dither = self
+                .dither_mode
+                .clone()
+                .unwrap_or_else(|| "triangular".to_string());
             filters.push(format!("adither={dither}"));
             filters.push(format!("dither={dither}"));
         }
@@ -203,14 +225,30 @@ impl AudioProcessingOptions {
     }
 
     // Alias method names.
-    pub fn build_audio_filter(&self) -> String { self.build() }
-    pub fn build_audio_filter_chain(&self) -> String { self.build() }
-    pub fn to_filter_string(&self) -> String { self.build() }
-    pub fn to_ffmpeg(&self) -> String { self.build() }
-    pub fn filter_string(&self) -> String { self.build() }
-    pub fn audio_filter(&self) -> String { self.build() }
-    pub fn ffmpeg_filter(&self) -> String { self.build() }
-    pub fn af(&self) -> String { self.build() }
+    pub fn build_audio_filter(&self) -> String {
+        self.build()
+    }
+    pub fn build_audio_filter_chain(&self) -> String {
+        self.build()
+    }
+    pub fn to_filter_string(&self) -> String {
+        self.build()
+    }
+    pub fn to_ffmpeg(&self) -> String {
+        self.build()
+    }
+    pub fn filter_string(&self) -> String {
+        self.build()
+    }
+    pub fn audio_filter(&self) -> String {
+        self.build()
+    }
+    pub fn ffmpeg_filter(&self) -> String {
+        self.build()
+    }
+    pub fn af(&self) -> String {
+        self.build()
+    }
 }
 
 /// Free-function construction helper.

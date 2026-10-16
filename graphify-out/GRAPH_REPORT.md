@@ -1,17 +1,17 @@
 # Graph Report - Vise  (2026-10-17)
 
 ## Corpus Check
-- 106 files · ~180,897 words
+- 130 files · ~208,542 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 10 file(s) not represented in the graph (top: .toml 5, (none) 3, .cmd 1)
 
 ## Summary
-- 1981 nodes · 4252 edges · 128 communities (111 shown, 17 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 83 edges (avg confidence: 0.86)
+- 2749 nodes · 6077 edges · 145 communities (127 shown, 18 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 90 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `96e31b74`
+- Built from commit: `1028d3f9`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -26,36 +26,36 @@
 - Multimodal Feedback (motion + sound + haptics)
 - Rubber-banding (soft boundaries)
 - Spatial Consistency (symmetric paths, anchored origins)
-- initPageChat
-- connectSSE
+- syncPageChatFocus
+- refreshParamsPanel
 - modern-screenshot.umd.js
 - hardware.rs
 - SubtitleProcessingOptions
 - MetadataProcessingOptions
 - el
-- setLiveState
-- actOnAgentTarget
+- connectSSE
+- handleManualEditActivity
 - applyEditing
 - AudioProcessingOptions
 - media.rs
-- showToast
-- Session
-- SKILL.md
-- showBar
+- validation.rs
+- src-tauri/src/main.rs
+- new-work.md
+- ScanSlot
 - vise-core/src/preset.rs
 - live.md
 - CoreError
 - Vise Transcoder — Roadmap
-- Responsive Design
+- adapt.md
 - pipeline.rs
 - onboard.md
 - createLiveBrowserDomHelpers
-- Operate mode depth (and Read notes)
+- SKILL.md
 - The Toolkit
-- captureElementToBlob
-- EncodingMode
-- createLiveBrowserSessionState
+- onAnnotDown
 - JobSpec
+- createLiveBrowserSessionState
+- server.rs
 - FfprobeScanner
 - VideoProcessingOptions
 - renderDesignVisual
@@ -64,11 +64,11 @@
 - presets.rs
 - AudioCodec
 - Generate Report
-- restoreSessionWithoutWrapper
+- showToast
 - doctor.md
 - New visual work
 - optimize.md
-- mountSvelteComponentVariant
+- injectSvelteComponentsFromManifest
 - ops.rs
 - geometry.rs
 - Impeccable Asset Producer
@@ -77,8 +77,8 @@
 - critique.md
 - Simplify the Design
 - Hardening Dimensions
-- src/cli.rs
-- resolveLiveInjectionAnchor
+- WorkerClient
+- timespan.rs
 - initGlobalBar
 - AGENTS.md
 - clarify.md
@@ -87,26 +87,26 @@
 - document.md
 - polish.md
 - quieter.md
-- handleInsertCreate
+- tick
 - subtitles.rs
 - Init flow
-- SubtitleFormat
+- supervisor.rs
 - transcode_baseline.rs
-- media_ingestion.rs
+- path
 - Common Cognitive Load Violations
 - iOS platform
 - Shape
-- startVoice
-- audio_processing.rs
-- init
-- deserialize
+- portable.rs
+- command
+- platform.rs
+- super
 - Android platform
 - colorize.md
 - Persona-Based Design Testing
 - Extract Flow
 - package.json
-- syncAgentPollingUi
-- pathbuf
+- worker_api.rs
+- LogService
 - Generate Report
 - Cognitive Load Assessment
 - Impeccable Finish Reviewer
@@ -118,7 +118,7 @@
 - BuiltInPreset
 - Project Context
 - Reproducible Build Process
-- Adaptation Strategies
+- contract.rs
 - Impeccable Documenter
 - Region map
 - enableInlineEdit
@@ -126,65 +126,81 @@
 - Operate
 - Persuade and Experience
 - Read
-- Command guidance
+- WorkerSupervisor
 - Changelog
-- MediaBuffer
-- subtitle.rs
+- router.rs
+- Route
 - Vise Desktop (placeholder)
 - vise-cli/src/main.rs
 - vise-core
 - crate::Transcoder
-- SubtitleCodec
-- steerFocusLog
-- unlockSteerChat
-- handleMouseMove
+- http.rs
+- api.rs
+- WorkerRuntime
+- EncodeService
 - Local Setup
 - Vise Transcoder
+- encode.rs
+- vise-worker/src/lib.rs
+- scan.rs
+- actOnAgentTarget
+- runtime.rs
+- client.rs
+- TokenGuard
+- vise-worker/src/main.rs
+- AudioMixdown
+- token.rs
+- vise-ipc/src/lib.rs
+- route.rs
+- Responsive Design
+- Operate mode depth (and Read notes)
+- media_ingestion.rs
+- command_result_omits_empty_error
 
 ## God Nodes (most connected - your core abstractions)
-1. `CoreError` - 96 edges
-2. `JobSpec` - 52 edges
-3. `Session` - 36 edges
-4. `connectSSE()` - 34 edges
-5. `setLiveState()` - 33 edges
-6. `resumeSession()` - 33 edges
-7. `showToast()` - 31 edges
-8. `initGlobalBar()` - 30 edges
-9. `Vise Transcoder — Roadmap` - 30 edges
-10. `el()` - 29 edges
+1. `CoreError` - 99 edges
+2. `JobSpec` - 72 edges
+3. `WorkerClient` - 46 edges
+4. `WorkerRuntime` - 44 edges
+5. `ClientError` - 40 edges
+6. `Session` - 36 edges
+7. `connectSSE()` - 34 edges
+8. `Route` - 34 edges
+9. `setLiveState()` - 33 edges
+10. `resumeSession()` - 33 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Step 2: Act by severity` --references--> `init()`  [INFERRED]
   .agents/skills/impeccable/reference/doctor.md → .agents/skills/impeccable/scripts/live-browser.js
 - `What this owns, and what it does not` --references--> `init()`  [INFERRED]
   .agents/skills/impeccable/reference/doctor.md → .agents/skills/impeccable/scripts/live-browser.js
-- `Init flow` --references--> `init()`  [INFERRED]
-  .agents/skills/impeccable/reference/init.md → .agents/skills/impeccable/scripts/live-browser.js
 - `Commands` --references--> `init()`  [INFERRED]
   .agents/skills/impeccable/SKILL.md → .agents/skills/impeccable/scripts/live-browser.js
-- `scan_source()` --references--> `ScanResult`  [EXTRACTED]
-  apps/vise-desktop/src-tauri/src/main.rs → crates/vise-core/src/media.rs
+- `Init flow` --references--> `init()`  [INFERRED]
+  .agents/skills/impeccable/reference/init.md → .agents/skills/impeccable/scripts/live-browser.js
+- `Backend` --references--> `WorkerSupervisor`  [EXTRACTED]
+  apps/vise-desktop/src-tauri/src/main.rs → crates/vise-ipc/src/supervisor.rs
 
 ## Import Cycles
 - 2-file cycle: `crates/vise-cli/src/cli.rs -> crates/vise-cli/src/ops.rs -> crates/vise-cli/src/cli.rs`
 
-## Communities (128 total, 17 thin omitted)
+## Communities (145 total, 18 thin omitted)
 
 ### Community 0 - "Apple Design Skill"
 Cohesion: 0.21
 Nodes (13): Apple Design Skill, Damping Ratio, Direct Manipulation (1:1 tracking), Four Human Needs (safety/predictability, understanding, achievement, joy), Interruptibility, Momentum Projection, Pointer Events / setPointerCapture, Reduced Motion & Accessibility (+5 more)
 
 ### Community 1 - "live-browser.js"
-Cohesion: 0.05
-Nodes (69): applyLiveBarPreference(), applyParamValue(), applyPlaceholderDimensions(), applyPlaceholderSizingStyles(), bindEditBadgeProxy(), buildParamsPanel(), buildPlaceholderResizeHandles(), buildSavingRow() (+61 more)
+Cohesion: 0.03
+Nodes (108): applyGlobalBarLabelState(), applyLiveBarPreference(), averageRgb01(), bindEditBadgeProxy(), bufferToBase64(), buildInsertPlaceholderSnapshotFromDom(), buildPickedAnchorSnapshot(), buildSvelteExpressionTextMap() (+100 more)
 
-### Community 10 - "initPageChat"
-Cohesion: 0.28
-Nodes (16): applyGlobalBarLabelState(), armPageChatForTyping(), collapsePageChat(), expandPageChat(), focusPageChatInput(), focusSteerChat(), globalBarModeToggles(), initPageChat() (+8 more)
+### Community 10 - "syncPageChatFocus"
+Cohesion: 0.09
+Nodes (51): armPageChatForTyping(), attachSteerFocusDebug(), attachSteerFocusGuard(), buildSteerProcessingDots(), buildSteerQueueHint(), clearSteerAwaitTimer(), clearSteerFocusRecoverTimer(), collapsePageChat() (+43 more)
 
-### Community 11 - "connectSSE"
-Cohesion: 0.13
-Nodes (43): abortSvelteComponentInjection(), applyParamDefaults(), clearSession(), closedClipPath(), completeParameterGenerationIfReady(), completeParameterPublication(), completeSourceInjection(), connectSSE() (+35 more)
+### Community 11 - "refreshParamsPanel"
+Cohesion: 0.15
+Nodes (20): applyParamDefaults(), applyParamValue(), buildParamsPanel(), closedClipPath(), formatRangeValue(), getMountedSvelteComponentAnchor(), getVisibleVariantEl(), hideParamsPanel() (+12 more)
 
 ### Community 12 - "modern-screenshot.umd.js"
 Cohesion: 0.09
@@ -195,56 +211,56 @@ Cohesion: 0.06
 Nodes (33): detect(), detect_capabilities(), detect_hardware(), detect_hardware_capabilities(), hardware_capabilities(), HardwareAcceleration, HardwareApi, Amf (+25 more)
 
 ### Community 14 - "SubtitleProcessingOptions"
-Cohesion: 0.22
-Nodes (4): build_subtitle_filter(), build_subtitle_filter_chain(), build_subtitles(), SubtitleProcessingOptions
+Cohesion: 0.05
+Nodes (35): SubtitleMode, BurnIn, None, Passthrough, build_subtitle_filter(), build_subtitle_filter_chain(), build_subtitles(), subtitle_codec_for() (+27 more)
 
 ### Community 15 - "MetadataProcessingOptions"
-Cohesion: 0.07
-Nodes (19): build_chapter_filter(), build_chapter_filter_chain(), build_chapters(), Chapter, ChapterMode, Copy, Edit, None (+11 more)
+Cohesion: 0.05
+Nodes (25): build_chapter_filter(), build_chapter_filter_chain(), build_chapters(), Chapter, ChapterMode, Copy, Edit, None (+17 more)
 
 ### Community 16 - "el"
-Cohesion: 0.11
-Nodes (37): bindConfigureCountPillTooltip(), bindConfigureInlineControlHover(), bindConfigureModifierPillHover(), buildConfigureActionControl(), buildConfigureCountControl(), buildConfigureRow(), buildConfigureSubmitButton(), buildConfigureTrailingCluster() (+29 more)
+Cohesion: 0.07
+Nodes (57): actionLabel(), applyConfigureBarChrome(), bindConfigureCountPillTooltip(), bindConfigureInlineControlHover(), bindConfigureModifierPillHover(), buildConfigureActionControl(), buildConfigureCountControl(), buildConfigureRow() (+49 more)
 
-### Community 17 - "setLiveState"
-Cohesion: 0.16
-Nodes (40): beginNewLiveConfiguration(), buildPickedAnchorSnapshot(), cancelEditing(), cancelEditingToPicking(), cancelInsertConfigure(), cleanupAcceptedSession(), clearAnnotations(), clearInsertPicking() (+32 more)
+### Community 17 - "connectSSE"
+Cohesion: 0.10
+Nodes (71): abortSvelteComponentInjection(), beginNewLiveConfiguration(), cancelEditing(), cancelEditingToPicking(), cancelInsertConfigure(), captureAndEmit(), cleanup(), cleanupAcceptedSession() (+63 more)
 
-### Community 18 - "actOnAgentTarget"
-Cohesion: 0.11
-Nodes (41): actOnAgentTarget(), agentTargetBusyReason(), agentTargetOverlayGone(), agentTargetTaken(), claimAgentTarget(), claimAndActOnAgentTarget(), clearStoredManualApplyState(), declineAgentTargetBusy() (+33 more)
+### Community 18 - "handleManualEditActivity"
+Cohesion: 0.17
+Nodes (26): clearStoredManualApplyState(), fetchPendingCount(), handleManualEditActivity(), hidePendingApplyDock(), manualApplyLoadingText(), manualApplyStateKey(), manualEditEventForCurrentPage(), numberOrNull() (+18 more)
 
 ### Community 19 - "applyEditing"
-Cohesion: 0.10
-Nodes (29): addManualContextText(), applyEditing(), buildLocatorForLeaf(), canRestoreManualEditElement(), collectManualContextPieces(), walk(), contextElementForManualEdit(), copyEditContainerContext() (+21 more)
+Cohesion: 0.08
+Nodes (36): addManualContextText(), applyEditing(), buildLocatorForLeaf(), canRestoreManualEditElement(), collectManualContextPieces(), walk(), contextElementForManualEdit(), copyEditContainerContext() (+28 more)
 
 ### Community 20 - "AudioProcessingOptions"
-Cohesion: 0.10
-Nodes (16): AudioMixdown, Auto, Dolby, Mono, Stereo, Surround51, Surround71, AudioMode (+8 more)
+Cohesion: 0.23
+Nodes (4): AudioProcessingOptions, build_audio_filter(), build_audio_filter_chain(), build_filter_chain()
 
 ### Community 21 - "media.rs"
-Cohesion: 0.12
-Nodes (22): ChapterInfo, convert_chapter(), convert_format(), convert_stream(), FfprobeChapter, FfprobeFormat, FfprobeResponse, FfprobeStream (+14 more)
-
-### Community 22 - "showToast"
 Cohesion: 0.09
-Nodes (37): abandonForeignSession(), abandonSupersededGo(), cleanup(), clearHandled(), clearMountErrorCard(), clearScrollY(), copyToClipboard(), discardedWrappers() (+29 more)
+Nodes (20): convert_chapter(), convert_format(), convert_stream(), extract_preview(), extract_preview_with(), FfprobeChapter, FfprobeFormat, FfprobeResponse (+12 more)
 
-### Community 23 - "Session"
-Cohesion: 0.07
-Nodes (26): add_job(), cancel_job(), clear_logs(), DesktopState, list_jobs(), logs(), pause_job(), push_log() (+18 more)
+### Community 22 - "validation.rs"
+Cohesion: 0.13
+Nodes (35): ChapterInfo, ScanResult, TitleInfo, accepts_a_well_formed_job(), container_audio_support(), container_video_support(), ensure_valid(), extension_container() (+27 more)
 
-### Community 24 - "SKILL.md"
-Cohesion: 0.11
-Nodes (19): Assess Adaptation Challenge, Implement & Verify, Recommended Actions, Craft (deprecated alias), Apply, Live-mode signature params, Set the spatial thesis, Two isolated assessments (+11 more)
+### Community 23 - "src-tauri/src/main.rs"
+Cohesion: 0.06
+Nodes (47): add_job(), Backend, InProcess, Worker, build_backend(), cancel_job(), chapters_to_ui(), clear_logs() (+39 more)
 
-### Community 25 - "showBar"
-Cohesion: 0.16
-Nodes (19): actionLabel(), applyConfigureBarChrome(), buildConfirmedRow(), buildCyclingRow(), buildDots(), buildGeneratingRow(), cycleVariant(), cyclingCounterText() (+11 more)
+### Community 24 - "new-work.md"
+Cohesion: 0.13
+Nodes (14): Recommended Actions, Craft (deprecated alias), Apply, Live-mode signature params, Set the spatial thesis, Two isolated assessments, Verify, Visitor mode (+6 more)
+
+### Community 25 - "ScanSlot"
+Cohesion: 0.08
+Nodes (13): ScanProgress, WorkState, ScanDone, Unknown, WorkDone, Working, expands_directories_and_filters_names(), is_excluded() (+5 more)
 
 ### Community 26 - "vise-core/src/preset.rs"
-Cohesion: 0.18
-Nodes (24): apply(), apply_preset(), create_preset(), create_user_preset(), edit_preset(), edit_user_preset(), export_preset(), export_preset_file() (+16 more)
+Cohesion: 0.19
+Nodes (22): apply(), apply_preset(), create_preset(), create_user_preset(), edit_preset(), edit_user_preset(), export_preset(), export_preset_file() (+14 more)
 
 ### Community 27 - "live.md"
 Cohesion: 0.07
@@ -258,45 +274,49 @@ Nodes (13): CoreError, CommandFailed, Invalid, InvalidMedia, Io, JobNotFound, Mi
 Cohesion: 0.05
 Nodes (37): Architecture decision snapshot, Deferred / Future Work, Group 0 — Project foundation, Group 10 — Encoding control and job reliability, Group 11 — Hardware acceleration, Group 12 - Platform packaging and release, Group 13 — Worker process and JSON IPC, Group 14 — Desktop parity with reference product (+29 more)
 
-### Community 30 - "Responsive Design"
+### Community 30 - "adapt.md"
 Cohesion: 0.08
-Nodes (25): Assess Adaptation Challenge, Breakpoints: Content-Driven, Content Adaptation, Desktop Adaptation (Mobile → Desktop), Detect Input Method, Not Just Screen Size, Email Adaptation (Web → Email), Implement Adaptations, Layout Adaptation Patterns (+17 more)
+Nodes (22): Assess Adaptation Challenge, Content Adaptation, Desktop Adaptation (Mobile → Desktop), Email Adaptation (Web → Email), Implement Adaptations, Layout Adaptation Techniques, Mobile Adaptation (Desktop → Mobile), Adaptation Strategies (+14 more)
 
 ### Community 31 - "pipeline.rs"
-Cohesion: 0.13
-Nodes (12): ContainerFormat, Mkv, Mp4, Webm, audio_encoder(), infer_container(), merge_video_options(), parse_codecs() (+4 more)
+Cohesion: 0.11
+Nodes (15): ContainerFormat, Mkv, Mp4, Webm, audio_encoder(), infer_container(), merge_video_options(), parse_codecs() (+7 more)
 
 ### Community 32 - "onboard.md"
 Cohesion: 0.09
 Nodes (22): Assess Onboarding Needs, Context Over Ceremony, Contextual Help, Design Onboarding Experiences, Documentation & Help, Empty State Design, Feature Discovery & Adoption, Guided Tours & Walkthroughs (+14 more)
 
 ### Community 33 - "createLiveBrowserDomHelpers"
-Cohesion: 0.13
-Nodes (17): createLiveBrowserDomHelpers(), cloneWithoutChrome(), cssId(), liveUiRoot(), makeFrozenAnchor(), own(), pickable(), raiseHitModal() (+9 more)
+Cohesion: 0.16
+Nodes (13): createLiveBrowserDomHelpers(), cloneWithoutChrome(), cssId(), liveUiRoot(), makeFrozenAnchor(), raiseHitModal(), rectIsUsableAnchor(), syncTopLayerHost() (+5 more)
 
-### Community 34 - "Operate mode depth (and Read notes)"
-Cohesion: 0.10
-Nodes (18): Craft floor, Refuse, Verify, Constraints, Failure modes, Flow, $impeccable hooks, Routing (+10 more)
+### Community 34 - "SKILL.md"
+Cohesion: 0.08
+Nodes (21): Before you finish, Scope is sovereign, The amplification, The skeleton test, Why it reads flat, Craft floor, Refuse, Verify (+13 more)
 
 ### Community 35 - "The Toolkit"
 Cohesion: 0.10
 Nodes (20): Animate complex properties, Assess What "Extraordinary" Means Here, For data-heavy interfaces, For functional UI, For performance-critical UI, For visual/marketing surfaces, Implement with Discipline, Interact with the device (+12 more)
 
-### Community 36 - "captureElementToBlob"
-Cohesion: 0.08
-Nodes (36): averageRgb01(), beginEditPin(), bufferToBase64(), buildAnnotationsForCapture(), buildPinElement(), cancelEditingPin(), captureChromeNodes(), captureElementFromRenderedAncestor() (+28 more)
+### Community 36 - "onAnnotDown"
+Cohesion: 0.20
+Nodes (17): beginEditPin(), buildAnnotationsForCapture(), buildPinElement(), cancelEditingPin(), clampPlaceholderSize(), finalizeEditingPin(), initAnnotOverlay(), localCoords() (+9 more)
 
-### Community 38 - "EncodingMode"
-Cohesion: 0.09
-Nodes (17): EncodingMode, Abr, AverageBitrate, AverageBitrateMode, ConstantQuality, ConstantQualityMode, Cq, Crf (+9 more)
+### Community 38 - "JobSpec"
+Cohesion: 0.08
+Nodes (18): EncodingMode, Abr, AverageBitrate, AverageBitrateMode, ConstantQuality, ConstantQualityMode, Cq, Crf (+10 more)
 
 ### Community 39 - "createLiveBrowserSessionState"
 Cohesion: 0.22
 Nodes (15): createLiveBrowserSessionState(), clearHandled(), clearScrollY(), clearSession(), isHandled(), loadSession(), markHandled(), nextCheckpointRevision() (+7 more)
 
+### Community 40 - "server.rs"
+Cohesion: 0.09
+Nodes (12): BIND_ADDRESS, bind_listener(), binds_loopback_only_and_reports_its_port(), falls_back_when_the_requested_port_is_busy(), handle_connection(), handshake_is_published_when_configured(), publish_handshake_is_a_no_op_without_a_path(), ServerError (+4 more)
+
 ### Community 41 - "FfprobeScanner"
 Cohesion: 0.19
-Nodes (7): CropDetection, detect_crop(), detect_crop_with(), extract_preview(), extract_preview_with(), FfprobeScanner, find_tool()
+Nodes (6): CropDetection, detect_crop(), detect_crop_with(), FfprobeScanner, find_tool(), scan()
 
 ### Community 42 - "VideoProcessingOptions"
 Cohesion: 0.16
@@ -304,7 +324,7 @@ Nodes (6): build_video_filter_chain(), FrameRateMode, Auto, Constant, Variable, 
 
 ### Community 43 - "renderDesignVisual"
 Cohesion: 0.08
-Nodes (35): buildCollapsible(), buildColorModels(), buildListHtml(), buildRadiiModels(), buildTypographyModels(), cssSafe(), designEmptyMessage(), escapeHtml() (+27 more)
+Nodes (34): buildCollapsible(), buildColorModels(), buildListHtml(), buildRadiiModels(), buildTypographyModels(), cssSafe(), designEmptyMessage(), escapeHtml() (+26 more)
 
 ### Community 44 - "animate.md"
 Cohesion: 0.12
@@ -315,24 +335,24 @@ Cohesion: 0.12
 Nodes (16): 1. Read the screenshot (if present), 2. Wrap the element, 3. Load the action's reference, 4. Plan three variants: identity first, then mode, then axes, 5. Apply the freeform prompt (if present), 6. Deliver variants, 7. Parameters (composition-sized, 0-4 per variant), 8. Signal done (+8 more)
 
 ### Community 46 - "presets.rs"
-Cohesion: 0.15
-Nodes (4): roundtrip_import_export(), settings_persistence(), tmp_path(), user_create_edit_delete_persists()
+Cohesion: 0.13
+Nodes (6): import_preset(), import_preset_file(), roundtrip_import_export(), settings_persistence(), tmp_path(), user_create_edit_delete_persists()
 
 ### Community 47 - "AudioCodec"
-Cohesion: 0.13
-Nodes (19): apply(), load(), parse_audio(), parse_container(), parse_video(), Preset, AudioCodec, Aac (+11 more)
+Cohesion: 0.12
+Nodes (21): apply(), load(), parse_audio(), parse_container(), parse_video(), Preset, AudioCodec, Aac (+13 more)
 
 ### Community 48 - "Generate Report"
 Cohesion: 0.13
 Nodes (14): 1. Accessibility (A11y), 2. Performance, 3. Theming, 4. Responsive Design, 5. Implementation Integrity (CRITICAL), Audit Health Score, Detailed Findings by Severity, Diagnostic Scan (+6 more)
 
-### Community 49 - "restoreSessionWithoutWrapper"
-Cohesion: 0.15
-Nodes (20): applySavedSessionMeta(), clampVariantIndex(), findActiveSessionSummary(), findAdoptableServerSession(), findAnyVariantsWrapper(), isFrameworkComponentPreviewMode(), isSessionHandled(), isSvelteComponentManifestPath() (+12 more)
+### Community 49 - "showToast"
+Cohesion: 0.08
+Nodes (41): abandonForeignSession(), abandonSupersededGo(), applySavedSessionMeta(), clampVariantIndex(), commitAcceptedVariantToDom(), copyToClipboard(), discardOrphanedSession(), findActiveSessionSummary() (+33 more)
 
 ### Community 50 - "doctor.md"
-Cohesion: 0.13
-Nodes (12): Before you finish, Scope is sovereign, The amplification, The skeleton test, Why it reads flat, Monorepo notes, Opting out of the boot check, Step 1: Run the pass (+4 more)
+Cohesion: 0.25
+Nodes (7): Monorepo notes, Opting out of the boot check, Step 1: Run the pass, Step 2: Act by severity, Step 3: Deprecated fields are binding, Step 4: Do not overclaim on truth drift, What this owns, and what it does not
 
 ### Community 51 - "New visual work"
 Cohesion: 0.14
@@ -342,13 +362,13 @@ Nodes (14): 1. Decide what is already true, 2. Ask what will change the work, 3.
 Cohesion: 0.14
 Nodes (13): Animation Performance, Assess Performance Issues, Core Web Vitals Optimization, Cumulative Layout Shift (CLS < 0.1), Interaction to Next Paint (INP < 200ms), Largest Contentful Paint (LCP < 2.5s), Loading Performance, Network Optimization (+5 more)
 
-### Community 53 - "mountSvelteComponentVariant"
-Cohesion: 0.12
-Nodes (27): acceptedDomAlreadyClean(), applyOriginalAttrsToSvelteAnchor(), clearHandledWrapperReloadStamp(), commitAcceptedSvelteComponentToDom(), componentModuleCandidates(), deferredRecoverySuperseded(), describeMountFailure(), detectDevServerBase() (+19 more)
+### Community 53 - "injectSvelteComponentsFromManifest"
+Cohesion: 0.10
+Nodes (33): acceptedDomAlreadyClean(), applyOriginalAttrsToSvelteAnchor(), clearHandledWrapperReloadStamp(), commitAcceptedSvelteComponentToDom(), componentModuleCandidates(), deferredRecoverySuperseded(), describeMountFailure(), detectDevServerBase() (+25 more)
 
 ### Community 54 - "ops.rs"
-Cohesion: 0.26
-Nodes (9): BatchArgs, TranscodeArgs, batch_command(), BatchFile, BatchJob, CANCEL_PATH, setup_cancel_handler(), transcode_command() (+1 more)
+Cohesion: 0.13
+Nodes (18): BatchArgs, Cli, Commands, Batch, Presets, Transcode, parse(), PresetCommands (+10 more)
 
 ### Community 55 - "geometry.rs"
 Cohesion: 0.21
@@ -378,17 +398,17 @@ Nodes (11): Assess Current State, Code Simplification, Content Simplification, D
 Cohesion: 0.17
 Nodes (11): Accessibility Resilience, Assess Hardening Needs, Edge Cases & Boundary Conditions, Error Handling, Hardening Dimensions, Input Validation & Sanitization, Internationalization (i18n), Performance Resilience (+3 more)
 
-### Community 62 - "src/cli.rs"
-Cohesion: 0.23
-Nodes (9): Cli, Commands, Batch, Presets, Transcode, parse(), PresetCommands, Inspect (+1 more)
+### Community 62 - "WorkerClient"
+Cohesion: 0.14
+Nodes (10): ClientError, Decode, Protocol, Rejected, Unreachable, encode_body(), RawReply, WorkerClient (+2 more)
 
-### Community 63 - "resolveLiveInjectionAnchor"
-Cohesion: 0.16
-Nodes (19): buildSvelteExpressionTextMap(), buildSveltePropValuesFromLiveElement(), buildSveltePropValuesV2(), cloneWithoutElements(), collectTextNodes(), collectVisibleTexts(), cssEscapeIdent(), elementMatchesOriginalMarkup() (+11 more)
+### Community 63 - "timespan.rs"
+Cohesion: 0.08
+Nodes (18): duration_round_trip(), negative_spans_are_accepted_as_zero(), parse_clock_field(), parses_clock_only_forms(), parses_day_components_and_fractions(), serde_round_trip_and_error_message(), TimeSpan, .ZERO (+10 more)
 
 ### Community 64 - "initGlobalBar"
-Cohesion: 0.20
-Nodes (16): buildDesignHeader(), clearSteerFocusRecoverTimer(), fetchDesignSystem(), hideAgentPollTooltip(), initGlobalBar(), makeIconBtn(), loadDetectScript(), onDetectMessage() (+8 more)
+Cohesion: 0.11
+Nodes (33): agentHasWorkInFlight(), agentStatusText(), barPaletteForTheme(), brandMarkSvg(), buildDesignHeader(), designPanelCss(), detectPageTheme(), ensureAgentPollTooltip() (+25 more)
 
 ### Community 65 - "AGENTS.md"
 Cohesion: 0.18
@@ -418,29 +438,29 @@ Nodes (10): 1. Establish the system, 2. Gather the evidence, 3. Triage, 4. Polis
 Cohesion: 0.18
 Nodes (10): Assess Current State, Color Refinement, Composition Refinement, Motion Reduction, Plan Refinement, Refine the Design, Simplification, Verify Quality (+2 more)
 
-### Community 72 - "handleInsertCreate"
-Cohesion: 0.15
-Nodes (15): buildInsertPlaceholderSnapshotFromDom(), captureAndEmit(), checkpointPayload(), compileShader(), enterRecoveryWaitingForAnchor(), handleInsertCreate(), queueCheckpoint(), resolveScrollLockAnchorTop() (+7 more)
+### Community 72 - "tick"
+Cohesion: 0.16
+Nodes (18): applyPlaceholderDimensions(), applyPlaceholderSizingStyles(), buildPlaceholderResizeHandles(), createInsertPlaceholder(), cursorForPlaceholderEdge(), ensureInsertPlaceholder(), findInsertAnchorInDom(), isInsertGeneratingSession() (+10 more)
 
 ### Community 73 - "subtitles.rs"
-Cohesion: 0.31
+Cohesion: 0.42
 Nodes (6): burn_in_runs(), generate_source(), scanner(), srt_to_mp4_text_conversion(), text_subtitle_passthrough(), tool()
 
 ### Community 74 - "Init flow"
 Cohesion: 0.20
 Nodes (10): Completion gate, Init flow, Step 1: Load current state, Step 2: Explore the project, Step 3: Interview for product truth, Step 4: Write PRODUCT.md, Step 5: Record workflow defaults, Step 6: Wrap up or resume (+2 more)
 
-### Community 75 - "SubtitleFormat"
-Cohesion: 0.12
-Nodes (15): SubtitleFormat, Ass, Auto, ClosedCaption, Dvb, Dvd, MovText, Pgs (+7 more)
+### Community 75 - "supervisor.rs"
+Cohesion: 0.10
+Nodes (18): DEFAULT_HANDSHAKE_TIMEOUT, ENV_HANDSHAKE, ENV_PARENT_PID, ENV_PORT, ENV_TOKEN, Handshake, handshake_files_round_trip(), pipe_is_closed() (+10 more)
 
 ### Community 76 - "transcode_baseline.rs"
 Cohesion: 0.40
 Nodes (7): end_to_end_job_spec(), generate_source(), scanner(), tool(), transcode_to_mkv(), transcode_to_mp4(), transcode_to_webm()
 
-### Community 77 - "media_ingestion.rs"
-Cohesion: 0.18
-Nodes (11): batch_transcode(), ffmpeg(), preset_transcode(), single_transcode(), source(), crop_detection_runs_on_generated_media(), generate_basic_media(), generate_chaptered_media() (+3 more)
+### Community 77 - "path"
+Cohesion: 0.33
+Nodes (5): batch_transcode(), ffmpeg(), preset_transcode(), single_transcode(), source()
 
 ### Community 78 - "Common Cognitive Load Violations"
 Cohesion: 0.22
@@ -454,21 +474,17 @@ Nodes (9): Color & materials, Components & controls, iOS platform, Layout & stru
 Cohesion: 0.22
 Nodes (8): Cadence, Confirm and stop, Phase 1: Discovery interview, Phase 2: Resolve the design direction, Phase 3: Write the brief, Round 1: purpose, people, and outcome, Round 2: material, behavior, and boundaries, Shape
 
-### Community 81 - "startVoice"
-Cohesion: 0.27
-Nodes (12): finishVoiceSession(), isEmbeddedPreviewBrowser(), releaseVoiceEngine(), startVoice(), steerSpeechRecognitionCtor(), steerVoiceContext(), steerVoiceErrorMessage(), steerVoiceUnavailableMessage() (+4 more)
+### Community 81 - "portable.rs"
+Cohesion: 0.13
+Nodes (24): default_settings(), discovers_the_file_next_to_the_executable(), isolation_defaults_to_enabled(), load_for(), locate(), normalize_key(), parse_bool(), parse_ini() (+16 more)
 
-### Community 82 - "audio_processing.rs"
-Cohesion: 0.28
-Nodes (3): generate_source(), tool(), transcode_with_audio_processing()
+### Community 82 - "command"
+Cohesion: 0.17
+Nodes (6): generate_source(), tool(), transcode_with_audio_processing(), generate_source(), tool(), transcode_with_video_processing()
 
-### Community 83 - "init"
-Cohesion: 0.21
-Nodes (14): barPaletteForTheme(), buildSteerProcessingDots(), designPanelCss(), detectPageTheme(), init(), initActionPicker(), initBar(), initDesignPanel() (+6 more)
-
-### Community 84 - "deserialize"
-Cohesion: 0.21
-Nodes (6): no_update_when_same(), ReleaseInfo, update_available_when_latest_newer(), UpdateManifest, version_less_than(), VISE_VERSION
+### Community 83 - "platform.rs"
+Cohesion: 0.14
+Nodes (20): parent_is_alive(), ascii(), CloseHandle(), ControlError, Failed, NotFound, Unsupported, GetModuleHandleW() (+12 more)
 
 ### Community 85 - "Android platform"
 Cohesion: 0.25
@@ -490,13 +506,13 @@ Nodes (7): Extract Flow, Step 1: Discover the Design System, Step 2: Identify Pa
 Cohesion: 0.25
 Nodes (7): name, private, scripts, build, dev, tauri:build, version
 
-### Community 90 - "syncAgentPollingUi"
-Cohesion: 0.21
-Nodes (12): agentHasWorkInFlight(), agentStatusText(), brandMarkSvg(), buildSteerQueueHint(), ensureAgentPollTooltip(), fetchAgentPollingStatus(), showAgentPollTooltip(), startAgentStatusPoll() (+4 more)
+### Community 90 - "worker_api.rs"
+Cohesion: 0.13
+Nodes (21): a_worker_that_dies_without_being_asked_is_detected_and_replaced(), encode_contract_rejects_an_invalid_job(), encode_contract_runs_pauses_resumes_and_stops(), encode_contract_stops_a_running_job(), generate_source(), handshake_reports_a_generated_token_and_an_ephemeral_port(), init_command(), logging_contract_reads_and_resets() (+13 more)
 
-### Community 91 - "pathbuf"
-Cohesion: 0.32
-Nodes (3): generate_source(), tool(), transcode_with_video_processing()
+### Community 91 - "LogService"
+Cohesion: 0.11
+Nodes (13): LogLevel, Debug, Error, Info, Warning, LogMessage, LogMessagesFromIndex, drops_oldest_entries_and_reports_truncation() (+5 more)
 
 ### Community 92 - "Generate Report"
 Cohesion: 0.29
@@ -542,9 +558,9 @@ Nodes (5): At a Glance, Context Loading Rules, Project Context, Project-Specific
 Cohesion: 0.33
 Nodes (5): Build, Prerequisites, Reproducibility notes, Reproducible Build Process, Verification
 
-### Community 105 - "Adaptation Strategies"
-Cohesion: 0.40
-Nodes (5): Adaptation Strategies, Orientation & foldables, Phone → Tablet (iPad / large screens), Platform → platform (iOS ↔ Android), Web → native (porting a website or web app)
+### Community 105 - "contract.rs"
+Cohesion: 0.09
+Nodes (17): CANCELLED, EncodeCommand, FAILED, init_command_reports_unsupported_switches(), init_command_resolves_disk_log_path(), InitCommand, INVALID, LOG_BUFFER_LIMIT (+9 more)
 
 ### Community 106 - "Impeccable Documenter"
 Cohesion: 0.40
@@ -555,8 +571,8 @@ Cohesion: 0.40
 Nodes (4): Containment, Painted material, Region map, What varies independently
 
 ### Community 108 - "enableInlineEdit"
-Cohesion: 0.40
-Nodes (5): collectEditableTextRows(), visit(), enableInlineEdit(), onInlineInput(), wrapMixedContentTextNodes()
+Cohesion: 0.22
+Nodes (9): collectEditableTextRows(), visit(), own(), pickable(), stopFocusOutIntoChrome(), enableInlineEdit(), layoutFlowChildren(), onInlineInput() (+1 more)
 
 ### Community 109 - "Heuristics Scoring Guide"
 Cohesion: 0.50
@@ -574,37 +590,41 @@ Nodes (3): Comps, Directions, Persuade and Experience
 Cohesion: 0.50
 Nodes (3): Comps, Directions, Read
 
-### Community 113 - "Command guidance"
-Cohesion: 0.50
-Nodes (3): Command guidance, No-argument routing: the context-aware menu, Workflow questions
+### Community 113 - "WorkerSupervisor"
+Cohesion: 0.13
+Nodes (10): SupervisorError, Client, HandshakeTimeout, IsolationDisabled, Shutdown, Spawn, WorkerExited, WorkerMissing (+2 more)
 
 ### Community 114 - "Changelog"
 Cohesion: 0.50
 Nodes (3): Added, Changelog, [Unreleased]
 
-### Community 116 - "subtitle.rs"
-Cohesion: 0.22
-Nodes (6): SubtitleMode, BurnIn, None, Passthrough, subtitle_codec_for(), SubtitleTrackConfig
+### Community 115 - "router.rs"
+Cohesion: 0.17
+Nodes (25): answers_idle_progress_routes(), answers_title_routes_before_a_scan(), answers_token_routes(), control_routes_report_when_nothing_is_running(), get(), get_with_token(), idle_work_done(), logging_routes_read_and_reset_the_buffer() (+17 more)
+
+### Community 116 - "Route"
+Cohesion: 0.08
+Nodes (21): Route, .ALL, GetAllLogMessages, GetLogMessagesFromIndex, GetMainTitle, GetPreview, GetTitles, GetWorkerInfo (+13 more)
 
 ### Community 119 - "vise-core"
-Cohesion: 0.67
-Nodes (3): vise-cli, vise-core, vise-desktop
+Cohesion: 0.60
+Nodes (5): vise-cli, vise-core, vise-desktop, vise-ipc, vise-worker
 
-### Community 122 - "SubtitleCodec"
-Cohesion: 0.18
-Nodes (10): SubtitleCodec, Ass, Copy, DvbSub, DvdSub, MovText, Srt, Ttml (+2 more)
+### Community 122 - "http.rs"
+Cohesion: 0.12
+Nodes (11): find_head_end(), HttpParseError, InvalidContentLength, MalformedHead, MalformedHeader, MalformedRequestLine, TruncatedBody, MAX_BODY_BYTES (+3 more)
 
-### Community 123 - "steerFocusLog"
-Cohesion: 0.33
-Nodes (10): attachSteerFocusDebug(), attachSteerFocusGuard(), focusConfigureInput(), notePagePointerDown(), pageHasHostTextSelection(), scheduleSteerFocusRecover(), shouldFocusSteerChat(), steerFocusDebugEnabled() (+2 more)
+### Community 123 - "api.rs"
+Cohesion: 0.14
+Nodes (15): DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT, describe(), is_success(), is_terminal(), poll_encode_until(), poll_until_stable(), propagates_worker_death() (+7 more)
 
-### Community 124 - "unlockSteerChat"
-Cohesion: 0.31
-Nodes (9): clearSteerAwaitTimer(), pageChatCollapsedWidthPx(), pageChatExpandedWidth(), scheduleSteerAwaitTimeout(), sendSteerCheckpoint(), steerTimeoutMessage(), submitSteerMessage(), syncPageChatExpandedWidth() (+1 more)
+### Community 124 - "WorkerRuntime"
+Cohesion: 0.17
+Nodes (11): HttpRequest, HttpResponse, bad_request(), decode_body(), dispatch(), encode_report(), handle_preview(), handle_start_encode() (+3 more)
 
-### Community 125 - "handleMouseMove"
-Cohesion: 0.33
-Nodes (7): cursorForInsertAxis(), ensureInsertLine(), handleMouseMove(), hideInsertLine(), setPageInteractionCursor(), showInsertLine(), syncPageInteractionCursor()
+### Community 125 - "EncodeService"
+Cohesion: 0.19
+Nodes (4): EncodeControl, EncodeService, lock(), refuses_a_second_concurrent_encode()
 
 ### Community 126 - "Local Setup"
 Cohesion: 0.29
@@ -614,25 +634,85 @@ Nodes (6): 1. Install Rust, 2. Install FFmpeg, 3. Install Visual Studio C++ Buil
 Cohesion: 0.29
 Nodes (6): Build and test, Documentation, Notes, Requirements, Run the CLI, Vise Transcoder
 
+### Community 128 - "encode.rs"
+Cohesion: 0.20
+Nodes (16): EncodeProgress, WorkDone, control_routes_require_a_running_encode(), EncodeSlot, finish(), parse_clock(), parse_progress(), partial_output_path() (+8 more)
+
+### Community 129 - "vise-worker/src/lib.rs"
+Cohesion: 0.14
+Nodes (11): monitor_leaves_a_live_parent_alone(), parent_monitor_ignores_pid_zero(), parent_monitor_terminates_when_the_parent_is_gone(), run(), spawn_parent_monitor(), stdin_is_pipe(), wake_listener(), StartupError (+3 more)
+
+### Community 130 - "scan.rs"
+Cohesion: 0.22
+Nodes (14): StreamInfo, ScanCommand, apply_init(), build_titles(), builds_titles_from_a_scan_result(), command(), default_title(), filters_titles_by_duration_bounds() (+6 more)
+
+### Community 131 - "actOnAgentTarget"
+Cohesion: 0.29
+Nodes (17): actOnAgentTarget(), agentTargetBusyReason(), agentTargetOverlayGone(), agentTargetTaken(), claimAgentTarget(), claimAndActOnAgentTarget(), declineAgentTargetBusy(), declineAgentTargetUnresolvable() (+9 more)
+
+### Community 132 - "runtime.rs"
+Cohesion: 0.21
+Nodes (6): ServerBanner, banner_reports_the_loopback_contract(), init_command_is_recorded_and_logged(), runtime_reports_facts_about_itself(), shutdown_flag_round_trips(), unsupported_init_switches_are_warned_about()
+
+### Community 133 - "client.rs"
+Cohesion: 0.13
+Nodes (4): builds_loopback_addresses_only(), DEFAULT_TIMEOUT, rejects_unreachable_workers_without_panicking(), serialises_command_bodies()
+
+### Community 134 - "TokenGuard"
+Cohesion: 0.17
+Nodes (6): constant_time_eq(), rejection_messages_describe_the_route_and_header(), TokenGuard, TokenRejection, Invalid, Missing
+
+### Community 135 - "vise-worker/src/main.rs"
+Cohesion: 0.18
+Nodes (8): command_line_overrides_the_environment(), main(), Overrides, parse_arguments(), parses_arguments_in_both_forms(), refuses_to_start_without_a_port_and_token(), resolve_settings(), STANDALONE_NOTICE
+
+### Community 136 - "AudioMixdown"
+Cohesion: 0.14
+Nodes (12): AudioMixdown, Auto, Dolby, Mono, Stereo, Surround51, Surround71, AudioMode (+4 more)
+
+### Community 137 - "token.rs"
+Cohesion: 0.21
+Nodes (8): accepts_the_registered_token(), generate_token(), GENERATED_TOKEN_LEN, generated_tokens_are_long_and_unique(), next_counter(), rejects_everything_when_no_token_is_registered(), rejects_missing_and_invalid_tokens(), splitmix64()
+
+### Community 138 - "vise-ipc/src/lib.rs"
+Cohesion: 0.14
+Nodes (3): LOOPBACK_HOST, PROTOCOL_VERSION, WORKER_NAME
+
+### Community 139 - "route.rs"
+Cohesion: 0.21
+Nodes (8): access_denied_message(), every_listed_route_parses_and_needs_a_token_except_the_banner(), messages_are_vise_branded(), parses_every_documented_route(), Unknown, TOKEN_HEADER, UNKNOWN_ROUTE_MESSAGE, unknown_routes_are_flagged()
+
+### Community 140 - "Responsive Design"
+Cohesion: 0.20
+Nodes (10): Breakpoints: Content-Driven, Detect Input Method, Not Just Screen Size, Layout Adaptation Patterns, Mobile-First: Write It Right, Picture Element for Art Direction, Responsive Design, Responsive Images: Get It Right, Safe Areas: Handle the Notch (+2 more)
+
+### Community 141 - "Operate mode depth (and Read notes)"
+Cohesion: 0.22
+Nodes (9): Color, Components, Layout, Motion, Operate mode depth (and Read notes), Product constraints, Product permissions, The product slop test (+1 more)
+
+### Community 142 - "media_ingestion.rs"
+Cohesion: 0.36
+Nodes (6): crop_detection_runs_on_generated_media(), generate_basic_media(), generate_chaptered_media(), preview_extraction_writes_image_file(), scan_generated_media_extracts_video_audio_and_chapters(), tool()
+
 ## Knowledge Gaps
-- **130 isolated node(s):** `vise-desktop`, `vise-cli`, `Transcode`, `Batch`, `Presets` (+125 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 742 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **17 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **178 isolated node(s):** `InProcess`, `vise-cli`, `Transcode`, `Batch`, `Presets` (+173 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 933 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **18 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `init()` connect `init` to `initGlobalBar`, `live-browser.js`, `createLiveBrowserDomHelpers`, `captureElementToBlob`, `live.md`, `Init flow`, `connectSSE`, `setLiveState`, `doctor.md`, `actOnAgentTarget`, `steerFocusLog`, `handleMouseMove`?**
-  _High betweenness centrality (0.181) - this node is a cross-community bridge._
-- **What connects `vise-desktop`, `vise-cli`, `Transcode` to the rest of the system?**
-  _130 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `init()` connect `initGlobalBar` to `live-browser.js`, `SKILL.md`, `onAnnotDown`, `syncPageChatFocus`, `Init flow`, `enableInlineEdit`, `connectSSE`, `doctor.md`, `handleManualEditActivity`, `live.md`?**
+  _High betweenness centrality (0.078) - this node is a cross-community bridge._
+- **What connects `InProcess`, `vise-cli`, `Transcode` to the rest of the system?**
+  _178 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `live-browser.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.04701962236208811 - nodes in this community are weakly interconnected._
-- **Why does `Commands` connect `init` to `SKILL.md`?**
-  _High betweenness centrality (0.072) - this node is a cross-community bridge._
-- **Should `connectSSE` be split into smaller, more focused modules?**
-  _Cohesion score 0.13178294573643412 - nodes in this community are weakly interconnected._
-- **Why does `JobSpec` connect `JobSpec` to `EncodingMode`, `VideoProcessingOptions`, `hardware.rs`, `SubtitleProcessingOptions`, `MetadataProcessingOptions`, `AudioCodec`, `AudioProcessingOptions`, `subtitle.rs`, `Session`, `vise-core/src/preset.rs`, `pipeline.rs`?**
-  _High betweenness centrality (0.034) - this node is a cross-community bridge._
+  _Cohesion score 0.03400093153237075 - nodes in this community are weakly interconnected._
+- **Why does `JobSpec` connect `JobSpec` to `encode.rs`, `AudioMixdown`, `contract.rs`, `VideoProcessingOptions`, `hardware.rs`, `SubtitleProcessingOptions`, `MetadataProcessingOptions`, `AudioCodec`, `AudioProcessingOptions`, `validation.rs`, `src-tauri/src/main.rs`, `vise-core/src/preset.rs`, `EncodeService`, `pipeline.rs`?**
+  _High betweenness centrality (0.058) - this node is a cross-community bridge._
+- **Should `syncPageChatFocus` be split into smaller, more focused modules?**
+  _Cohesion score 0.08549019607843138 - nodes in this community are weakly interconnected._
+- **Why does `Commands` connect `SKILL.md` to `initGlobalBar`?**
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
 - **Should `modern-screenshot.umd.js` be split into smaller, more focused modules?**
   _Cohesion score 0.08897243107769423 - nodes in this community are weakly interconnected._

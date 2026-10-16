@@ -25,15 +25,15 @@ pub use error::CoreError;
 pub use geometry::*;
 pub use hardware::*;
 pub use job::{AudioCodec, ContainerFormat, EncodingMode, JobSpec, SubtitleMode, VideoCodec};
-pub use metadata::*;
-pub use subtitle::*;
 pub use media::{
     parse_ffprobe_output, ChapterInfo, CropDetection, FfprobeScanner, FormatInfo, MediaBuffer,
     MediaScanner, Packet, ScanResult, StreamInfo, TitleInfo, TrackKind,
 };
-pub use pipeline::{transcode, transcode_file, TranscodeResult, Transcoder};
+pub use metadata::*;
+pub use pipeline::{transcode, transcode_file, TranscodePlan, TranscodeResult, Transcoder};
 pub use preset::*;
 pub use progress::{JobState, JobStatus, Progress};
 pub use release::{ReleaseInfo, UpdateManifest, VISE_VERSION};
 pub use session::{Job, JobId, Session, SessionSnapshot};
+pub use subtitle::*;
 pub use video::*;

@@ -4,7 +4,7 @@
 
 A feature-by-feature build guide. This describes **what** is built and **in what order**, not how it is implemented. Features are grouped; a group is only complete when every item in it is checked.
 
-Last updated: 2026-10-16  
+Last updated: 2026-10-17  
 Target parity: reference transcoder architecture at version 1.11.2 and its user-facing capability set.
 
 > **Scope expansion (2026-10-16):** Groups 13–20 were added after a reverse-engineering
@@ -271,17 +271,17 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Encoding and scanning run in a background worker exposed over a loopback, token-authenticated JSON API, independent of the UI process.*
 
-- [ ] Worker process lifecycle (start, handshake, monitor parent, shutdown)
-- [ ] Loopback HTTP listener with token authentication
-- [ ] JSON init contract
-- [ ] JSON scan contract (start, poll progress, titles, main title)
-- [ ] JSON encode contract (start, pause, resume, stop, poll progress)
-- [ ] JSON preview contract
-- [ ] JSON logging contract (all messages, messages from index, reset)
-- [ ] Worker crash detection and automatic restart
-- [ ] Portable-mode disable switch for process isolation
+- [x] Worker process lifecycle (start, handshake, monitor parent, shutdown)
+- [x] Loopback HTTP listener with token authentication
+- [x] JSON init contract
+- [x] JSON scan contract (start, poll progress, titles, main title)
+- [x] JSON encode contract (start, pause, resume, stop, poll progress)
+- [x] JSON preview contract
+- [x] JSON logging contract (all messages, messages from index, reset)
+- [x] Worker crash detection and automatic restart
+- [x] Portable-mode disable switch for process isolation
 
-**Status:** Not started (0/9 verified)
+**Status:** Complete (9/9 verified; `crates/vise-worker` serves the API, `crates/vise-ipc` provides the client, supervisor, and portable-mode switch, and the desktop shell drives the worker instead of the pipeline)
 
 ## Group 14 — Desktop parity with reference product
 
@@ -450,7 +450,7 @@ Required groups: 19
 | 10 | Encoding control and job reliability | In progress (8/10) |
 | 11 | Hardware acceleration | Complete (7/7) |
 | 12 | Platform packaging and release | In progress (3/8) |
-| 13 | Worker process and JSON IPC | Not started (0/9) |
+| 13 | Worker process and JSON IPC | Complete (9/9) |
 | 14 | Desktop parity with reference product | Not started (0/18) |
 | 15 | Preferences surface | Not started (0/8) |
 | 16 | Preset catalog and versioning | Not started (0/13) |

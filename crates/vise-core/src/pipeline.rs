@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::{
-    AudioCodec, ContainerFormat, CoreError, FfprobeScanner, HardwareAcceleration, HardwareCapabilities,
-    JobSpec, SubtitleMode, VideoCodec, VideoProcessingOptions,
+    AudioCodec, ContainerFormat, CoreError, FfprobeScanner, HardwareAcceleration,
+    HardwareCapabilities, JobSpec, SubtitleMode, VideoCodec, VideoProcessingOptions,
 };
 
 /// Baseline transcode planning and execution.
@@ -70,7 +70,85 @@ impl Transcoder {
         }
     }
 
-    fn transcode_job_attempt(&self, spec: &JobSpec, hardware_enabled: bool) -> Result<TranscodeResult, CoreError> {
+    fn transcode_job_attempt(
+        &self,
+        spec: &JobSpec,
+        hardware_enabled: bool,
+    ) -> Result<TranscodeResult, CoreError> {
+        let plan = self.plan_with(spec, hardware_enabled)?;
+        self.execute(&plan)
+    }
+
+    /// Resolve a job specification into a fully expanded encoder invocation.
+    ///
+    /// The plan is plain data, so callers that need process-level control (for
+    /// example the background worker process, which must be able to pause,
+    /// resume, and cancel) can run it themselves instead of going through
+    /// [`Transcoder::transcode`].
+    pub fn plan(&self, spec: &JobSpec) -> Result<TranscodePlan, CoreError> {
+        self.plan_with(spec, spec.hardware_acceleration_options().is_enabled())
+    }
+
+    /// Run a plan produced by [`Transcoder::plan`] and probe the output.
+    pub fn execute(&self, plan: &TranscodePlan) -> Result<TranscodeResult, CoreError> {
+        if let Some(parent) = plan.output_path.parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent).map_err(|e| CoreError::Io(e.to_string()))?;
+            }
+        }
+
+        if let Some(first_pass) = &plan.first_pass_args {
+            let null_device = if cfg!(windows) { "NUL" } else { "/dev/null" };
+            let _ = Command::new(&plan.program)
+                .args(first_pass)
+                .arg(null_device)
+                .output();
+        }
+
+        let output = Command::new(&plan.program)
+            .args(&plan.args)
+            .output()
+            .map_err(|e| CoreError::CommandFailed(e.to_string()))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            return Err(CoreError::CommandFailed(if stderr.trim().is_empty() {
+                format!(
+                    "ffmpeg transcode failed (status {:?})",
+                    output.status.code()
+                )
+            } else {
+                stderr
+            }));
+        }
+
+        if !plan.output_path.is_file() {
+            return Err(CoreError::CommandFailed(
+                "ffmpeg did not produce output file".into(),
+            ));
+        }
+
+        // Best-effort metadata probe.
+        let (duration_seconds, video_codec_name, audio_codec_name) =
+            self.probe_output(&plan.output_path);
+
+        Ok(TranscodeResult {
+            input_path: plan.input_path.clone(),
+            output_path: plan.output_path.clone(),
+            container: plan.container,
+            video_codec: plan.video_codec,
+            audio_codec: plan.audio_codec,
+            duration_seconds,
+            video_codec_name,
+            audio_codec_name,
+        })
+    }
+
+    fn plan_with(
+        &self,
+        spec: &JobSpec,
+        hardware_enabled: bool,
+    ) -> Result<TranscodePlan, CoreError> {
         let ffmpeg = self.ffmpeg_bin()?;
         let input = PathBuf::from(&spec.input_path);
         if !input.is_file() {
@@ -78,12 +156,6 @@ impl Transcoder {
                 "input file does not exist: {}",
                 input.display()
             )));
-        }
-
-        if let Some(parent) = Path::new(&spec.output_path).parent() {
-            if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent).map_err(|e| CoreError::Io(e.to_string()))?;
-            }
         }
 
         let container = spec.container;
@@ -158,34 +230,46 @@ impl Transcoder {
         let resolved_encoder = caps.preferred_encoder(video_codec, &hw_opts);
         let hw_decode = caps.preferred_decoder_arg(&hw_opts);
 
-        let mut cmd = Command::new(&ffmpeg);
+        let mut args: Vec<String> = Vec::new();
         if let Some(dec) = &hw_decode {
-            cmd.arg("-hwaccel").arg(dec);
+            args.push("-hwaccel".into());
+            args.push(dec.clone());
             let dev = hw_opts
                 .device
                 .clone()
                 .or_else(|| hw_opts.decode.device.clone());
             if let Some(dev) = dev {
-                cmd.arg("-hwaccel_device").arg(dev);
+                args.push("-hwaccel_device".into());
+                args.push(dev);
             }
         }
-        cmd.arg("-y").arg("-i").arg(&input);
+        args.push("-y".into());
+        args.push("-i".into());
+        args.push(input.to_string_lossy().to_string());
         if !combined_filter.is_empty() {
-            cmd.arg("-vf").arg(&combined_filter);
+            args.push("-vf".into());
+            args.push(combined_filter.clone());
         }
-        cmd.arg("-c:v").arg(&resolved_encoder);        if audio_opts.passthrough || audio_opts.copy {
-            cmd.arg("-c:a").arg("copy");
+        args.push("-c:v".into());
+        args.push(resolved_encoder.clone());
+        if audio_opts.passthrough || audio_opts.copy {
+            args.push("-c:a".into());
+            args.push("copy".into());
         } else {
-            cmd.arg("-c:a").arg(audio_encoder(audio_codec));
+            args.push("-c:a".into());
+            args.push(audio_encoder(audio_codec).into());
         }
         if !audio_filter_chain.is_empty() {
-            cmd.arg("-af").arg(&audio_filter_chain);
+            args.push("-af".into());
+            args.push(audio_filter_chain.clone());
         }
         if let Some(rate) = audio_opts.sample_rate {
-            cmd.arg("-ar").arg(rate.to_string());
+            args.push("-ar".into());
+            args.push(rate.to_string());
         }
         if let Some(ch) = audio_opts.channels {
-            cmd.arg("-ac").arg(ch.to_string());
+            args.push("-ac".into());
+            args.push(ch.to_string());
         }
         // Keep broad compatibility for software baseline encoding.
         let pix_fmt = if video_opts.ten_bit {
@@ -193,57 +277,64 @@ impl Transcoder {
         } else {
             "yuv420p"
         };
-        cmd.arg("-pix_fmt").arg(pix_fmt);
+        args.push("-pix_fmt".into());
+        args.push(pix_fmt.into());
         // constant frame rate handling
         let cfr_fps = match &video_opts.frame_rate {
             Some(crate::FrameRateMode::Constant(fps)) => Some(*fps),
             _ => video_opts.constant_frame_rate,
         };
         if let Some(fps) = cfr_fps {
-            cmd.arg("-r").arg(fps.to_string());
+            args.push("-r".into());
+            args.push(fps.to_string());
         }
         // variable frame rate handling
         if video_opts.variable_frame_rate
             || matches!(video_opts.frame_rate, Some(crate::FrameRateMode::Variable))
         {
-            cmd.arg("-vsync").arg("vfr");
+            args.push("-vsync".into());
+            args.push("vfr".into());
         }
         let chapter_opts = spec.chapter_processing_options();
         let metadata_opts = spec.metadata_processing_options();
 
         if container == ContainerFormat::Mp4 {
-            cmd.arg("-movflags").arg("+faststart");
+            args.push("-movflags".into());
+            args.push("+faststart".into());
         }
         // HDR metadata preservation
         if video_opts.hdr || video_opts.hdr_metadata {
-            cmd.arg("-color_primaries").arg("bt2020");
-            cmd.arg("-color_trc").arg("smpte2084");
-            cmd.arg("-colorspace").arg("bt2020nc");
-            cmd.arg("-map_metadata").arg("0");
+            args.push("-color_primaries".into());
+            args.push("bt2020".into());
+            args.push("-color_trc".into());
+            args.push("smpte2084".into());
+            args.push("-colorspace".into());
+            args.push("bt2020nc".into());
+            args.push("-map_metadata".into());
+            args.push("0".into());
         }
         match spec.subtitle_mode {
             SubtitleMode::None => {
-                cmd.arg("-sn");
+                args.push("-sn".into());
             }
             SubtitleMode::BurnIn => {
-                cmd.arg("-sn");
+                args.push("-sn".into());
             }
             SubtitleMode::Passthrough => {
-                cmd.arg("-map").arg("0");
+                args.push("-map".into());
+                args.push("0".into());
                 if sub_opts.srt_to_mp4 || matches!(container, ContainerFormat::Mp4) {
-                    cmd.arg("-c:s").arg("mov_text");
+                    args.push("-c:s".into());
+                    args.push("mov_text".into());
                 } else {
-                    cmd.arg("-c:s").arg("copy");
+                    args.push("-c:s".into());
+                    args.push("copy".into());
                 }
             }
         }
         // Chapter/metadata copy-edit handling through ffmpeg arguments.
-        for arg in chapter_opts.build_ffmpeg_args() {
-            cmd.arg(arg);
-        }
-        for arg in metadata_opts.build_metadata_args() {
-            cmd.arg(arg);
-        }
+        args.extend(chapter_opts.build_ffmpeg_args());
+        args.extend(metadata_opts.build_metadata_args());
 
         // Encoding rate-control mode.
         let resolved_mode = spec.resolved_encoding_mode();
@@ -253,82 +344,67 @@ impl Transcoder {
 
         let input_duration = self.probe_duration(&input);
         if resolved_mode.is_lossless() {
-            cmd.arg("-crf").arg("0");
+            args.push("-crf".into());
+            args.push("0".into());
         } else if resolved_mode.is_constant_quality() {
             if let Some(q) = quality {
-                cmd.arg("-crf").arg(q.to_string());
+                args.push("-crf".into());
+                args.push(q.to_string());
             }
         } else if resolved_mode.is_average_bitrate() {
             if let Some(b) = bitrate {
-                cmd.arg("-b:v").arg(format!("{}k", b));
+                args.push("-b:v".into());
+                args.push(format!("{b}k"));
             }
         } else if resolved_mode.is_target_size() {
             if let (Some(bytes), Some(dur)) = (target, input_duration) {
                 if dur > 0.0 {
                     let kbps = ((bytes as f64) * 8.0 / 1000.0 / dur) as u64;
-                    if kbps > 0 { cmd.arg("-b:v").arg(format!("{}k", kbps)); }
+                    if kbps > 0 {
+                        args.push("-b:v".into());
+                        args.push(format!("{kbps}k"));
+                    }
                 }
             }
         }
 
-        if spec.two_pass_enabled() {
-            cmd.arg("-pass").arg("2");
-        }
-
-        if spec.two_pass_enabled() {
-            let null_device = if cfg!(windows) { "NUL" } else { "/dev/null" };
-            let mut first = Command::new(&ffmpeg);
-            first.arg("-y").arg("-i").arg(&input);
+        let first_pass_args = if spec.two_pass_enabled() {
+            args.push("-pass".into());
+            args.push("2".into());
+            let mut first = vec!["-y".to_string(), "-i".to_string()];
+            first.push(input.to_string_lossy().to_string());
             if !combined_filter.is_empty() {
-                first.arg("-vf").arg(&combined_filter);
+                first.push("-vf".into());
+                first.push(combined_filter.clone());
             }
-            first.arg("-c:v").arg(&resolved_encoder);
-            first.arg("-an");
-            first.arg("-pass").arg("1");
-            first.arg("-f").arg("null");
-            first.arg(null_device);
-            let _ = first.output();
-        }
+            first.push("-c:v".into());
+            first.push(resolved_encoder.clone());
+            first.push("-an".into());
+            first.push("-pass".into());
+            first.push("1".into());
+            first.push("-f".into());
+            first.push("null".into());
+            Some(first)
+        } else {
+            None
+        };
 
-        cmd.arg("-shortest");
-        cmd.arg(&spec.output_path);
+        args.push("-shortest".into());
+        args.push(spec.output_path.clone());
 
-        let output = cmd
-            .output()
-            .map_err(|e| CoreError::CommandFailed(e.to_string()))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            return Err(CoreError::CommandFailed(if stderr.trim().is_empty() {
-                format!(
-                    "ffmpeg transcode failed (status {:?})",
-                    output.status.code()
-                )
-            } else {
-                stderr
-            }));
-        }
-
-        let output_path = PathBuf::from(&spec.output_path);
-        if !output_path.is_file() {
-            return Err(CoreError::CommandFailed(
-                "ffmpeg did not produce output file".into(),
-            ));
-        }
-
-        // Best-effort metadata probe.
-        let (duration_seconds, video_codec_name, audio_codec_name) =
-            self.probe_output(&output_path);
-
-        Ok(TranscodeResult {
+        Ok(TranscodePlan {
+            program: ffmpeg,
+            args,
+            first_pass_args,
             input_path: input,
-            output_path,
+            output_path: PathBuf::from(&spec.output_path),
             container,
             video_codec,
             audio_codec,
-            duration_seconds,
-            video_codec_name,
-            audio_codec_name,
+            video_encoder: resolved_encoder,
+            filter_chain: combined_filter,
+            audio_filter_chain,
+            duration_seconds: input_duration,
         })
     }
 
@@ -353,13 +429,22 @@ impl Transcoder {
     fn probe_duration(&self, path: &Path) -> Option<f64> {
         let ffprobe = self.ffprobe_bin().ok()?;
         let output = Command::new(&ffprobe)
-            .arg("-v").arg("error")
-            .arg("-show_entries").arg("format=duration")
-            .arg("-of").arg("default=noprint_wrappers=1:nokey=1")
+            .arg("-v")
+            .arg("error")
+            .arg("-show_entries")
+            .arg("format=duration")
+            .arg("-of")
+            .arg("default=noprint_wrappers=1:nokey=1")
             .arg(path)
-            .output().ok()?;
-        if !output.status.success() { return None; }
-        String::from_utf8_lossy(&output.stdout).trim().parse::<f64>().ok()
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .parse::<f64>()
+            .ok()
     }
     fn probe_output(&self, path: &Path) -> (Option<f64>, Option<String>, Option<String>) {
         let ffprobe = match self.ffprobe_bin() {
@@ -411,6 +496,45 @@ pub struct TranscodeResult {
     pub duration_seconds: Option<f64>,
     pub video_codec_name: Option<String>,
     pub audio_codec_name: Option<String>,
+}
+
+/// A fully resolved encoder invocation.
+///
+/// A plan is inert data: resolving it performs no media work beyond validating
+/// the input and probing its duration. Frontends that need process-level
+/// control (pause, resume, cancel, or crash isolation) can spawn
+/// [`TranscodePlan::program`] with [`TranscodePlan::args`] directly.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TranscodePlan {
+    /// Encoder executable resolved for this job.
+    pub program: PathBuf,
+    /// Full argument vector for the main encode pass.
+    pub args: Vec<String>,
+    /// First-pass argument vector for two-pass encodes; the null sink argument
+    /// is appended by the executor.
+    pub first_pass_args: Option<Vec<String>>,
+    pub input_path: PathBuf,
+    pub output_path: PathBuf,
+    pub container: ContainerFormat,
+    pub video_codec: VideoCodec,
+    pub audio_codec: AudioCodec,
+    /// Concrete video encoder name selected after hardware capability probing.
+    pub video_encoder: String,
+    /// Video filter chain applied by the plan.
+    pub filter_chain: String,
+    /// Audio filter chain applied by the plan.
+    pub audio_filter_chain: String,
+    /// Probed input duration, when available.
+    pub duration_seconds: Option<f64>,
+}
+
+impl TranscodePlan {
+    /// Command-line rendering of the main pass, for logs and diagnostics.
+    pub fn command_line(&self) -> String {
+        let mut parts = vec![self.program.to_string_lossy().to_string()];
+        parts.extend(self.args.iter().cloned());
+        parts.join(" ")
+    }
 }
 
 fn infer_container(path: &Path) -> ContainerFormat {

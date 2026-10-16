@@ -24,9 +24,21 @@ impl ChapterMode {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Chapter {
-    #[serde(default, alias = "start", alias = "start_time", alias = "start_ms", alias = "startTime")]
+    #[serde(
+        default,
+        alias = "start",
+        alias = "start_time",
+        alias = "start_ms",
+        alias = "startTime"
+    )]
     pub start_seconds: Option<f64>,
-    #[serde(default, alias = "end", alias = "end_time", alias = "end_ms", alias = "endTime")]
+    #[serde(
+        default,
+        alias = "end",
+        alias = "end_time",
+        alias = "end_ms",
+        alias = "endTime"
+    )]
     pub end_seconds: Option<f64>,
     #[serde(default, alias = "name", alias = "label")]
     pub title: Option<String>,
@@ -100,10 +112,16 @@ pub type ChapterTrackConfiguration = ChapterTrackConfig;
 
 impl ChapterProcessingOptions {
     pub fn effective_copy(&self) -> bool {
-        self.copy || self.chapter_copy || self.mode == Some(ChapterMode::Copy) || self.mode.is_none()
+        self.copy
+            || self.chapter_copy
+            || self.mode == Some(ChapterMode::Copy)
+            || self.mode.is_none()
     }
     pub fn effective_edit(&self) -> bool {
-        self.edit || self.chapter_edit || self.chapter_editing || self.mode == Some(ChapterMode::Edit)
+        self.edit
+            || self.chapter_edit
+            || self.chapter_editing
+            || self.mode == Some(ChapterMode::Edit)
     }
     pub fn effective_none(&self) -> bool {
         self.mode == Some(ChapterMode::None)

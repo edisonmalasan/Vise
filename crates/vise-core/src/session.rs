@@ -106,7 +106,8 @@ impl Session {
         self.add_job(spec)
     }
     pub fn save(&self, path: impl AsRef<Path>) -> Result<(), CoreError> {
-        let data = serde_json::to_string_pretty(self).map_err(|e| CoreError::Parse(e.to_string()))?;
+        let data =
+            serde_json::to_string_pretty(self).map_err(|e| CoreError::Parse(e.to_string()))?;
         fs::write(path, data).map_err(|e| CoreError::Io(e.to_string()))
     }
     pub fn persist(&self, path: impl AsRef<Path>) -> Result<(), CoreError> {
@@ -141,7 +142,9 @@ impl Session {
         let mut s = Self::default();
         let mut next = 0;
         for j in snap.jobs {
-            if j.id > next { next = j.id; }
+            if j.id > next {
+                next = j.id;
+            }
             s.jobs.push(j);
         }
         s.next_id = next;
