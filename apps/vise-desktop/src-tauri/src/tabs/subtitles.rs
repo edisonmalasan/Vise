@@ -240,6 +240,8 @@ pub struct SubtitlesTabViewModel {
     pub hidden: usize,
     /// The imported subtitle file.
     pub external: TextViewModel,
+    /// The full path of the imported file, so the page can keep showing it.
+    pub external_path: String,
     /// Whether an imported file can be used.
     pub external_available: bool,
     /// Why an imported file cannot be used, when it cannot.
@@ -389,6 +391,7 @@ pub fn tab_view(
         tracks,
         hidden,
         external,
+        external_path: settings.external_path.trim().to_string(),
         external_available,
         external_reason: if external_available {
             String::new()
