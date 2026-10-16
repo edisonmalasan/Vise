@@ -3893,6 +3893,26 @@ dependencies = [
  "tauri",
  "tauri-build",
  "vise-core",
+ "vise-ipc",
+]
+
+[[package]]
+name = "vise-ipc"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "vise-core",
+]
+
+[[package]]
+name = "vise-worker"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "vise-core",
+ "vise-ipc",
 ]
 
 [[package]]

@@ -65,7 +65,10 @@ pub enum EncodingMode {
 }
 impl EncodingMode {
     pub fn is_constant_quality(&self) -> bool {
-        matches!(self, Self::ConstantQuality | Self::ConstantQualityMode | Self::Cq | Self::Crf)
+        matches!(
+            self,
+            Self::ConstantQuality | Self::ConstantQualityMode | Self::Cq | Self::Crf
+        )
     }
     pub fn is_average_bitrate(&self) -> bool {
         matches!(self, Self::AverageBitrate | Self::Abr)
@@ -85,11 +88,17 @@ impl EncodingMode {
 /// Canonical, serializable specification for a single transcode job.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct JobSpec {
+    #[serde(default)]
     pub input_path: String,
+    #[serde(default)]
     pub output_path: String,
+    #[serde(default)]
     pub container: ContainerFormat,
+    #[serde(default)]
     pub video_codec: VideoCodec,
+    #[serde(default)]
     pub audio_codec: AudioCodec,
+    #[serde(default)]
     pub subtitle_mode: SubtitleMode,
     /// Source title index to process, if applicable.
     pub title_index: Option<u32>,
@@ -108,7 +117,14 @@ pub struct JobSpec {
     pub constant_quality_value: Option<u32>,
 
     /// Encoding rate-control mode.
-    #[serde(default, alias = "rate_control", alias = "rate_control_mode", alias = "encode_mode", alias = "video_rate_control", alias = "encoding_rate_control")]
+    #[serde(
+        default,
+        alias = "rate_control",
+        alias = "rate_control_mode",
+        alias = "encode_mode",
+        alias = "video_rate_control",
+        alias = "encoding_rate_control"
+    )]
     pub encoding_mode: Option<EncodingMode>,
 
     #[serde(default)]
@@ -159,15 +175,34 @@ pub struct JobSpec {
     pub filters: Option<VideoProcessingOptions>,
 
     /// Audio processing options applied during encoding.
-    #[serde(default, alias = "audio_filters", alias = "audio_options", alias = "audio")]
+    #[serde(
+        default,
+        alias = "audio_filters",
+        alias = "audio_options",
+        alias = "audio"
+    )]
     pub audio_processing: AudioProcessingOptions,
 
     /// Subtitle processing options applied during encoding.
-    #[serde(default, alias = "subtitle_filters", alias = "subtitle_options", alias = "subtitles_options", alias = "subtitle", alias = "subtitles", alias = "subtitle_processing_options")]
+    #[serde(
+        default,
+        alias = "subtitle_filters",
+        alias = "subtitle_options",
+        alias = "subtitles_options",
+        alias = "subtitle",
+        alias = "subtitles",
+        alias = "subtitle_processing_options"
+    )]
     pub subtitle_processing: crate::SubtitleProcessingOptions,
 
     /// Subtitle tracks configuration.
-    #[serde(default, alias = "subtitle_track_list", alias = "subtitle_tracks_config", alias = "subtitle_track", alias = "subtitles_tracks")]
+    #[serde(
+        default,
+        alias = "subtitle_track_list",
+        alias = "subtitle_tracks_config",
+        alias = "subtitle_track",
+        alias = "subtitles_tracks"
+    )]
     pub subtitle_tracks: Vec<crate::SubtitleTrackConfig>,
     #[serde(default)]
     pub subtitle_track_configs: Vec<crate::SubtitleTrackConfig>,
@@ -175,11 +210,24 @@ pub struct JobSpec {
     pub subtitle_track_config: Option<crate::SubtitleTrackConfig>,
 
     /// External subtitle file path.
-    #[serde(default, alias = "subtitles_path", alias = "subtitle_file", alias = "external_subtitle", alias = "subtitle_input")]
+    #[serde(
+        default,
+        alias = "subtitles_path",
+        alias = "subtitle_file",
+        alias = "external_subtitle",
+        alias = "subtitle_input"
+    )]
     pub subtitle_path: Option<String>,
 
     /// Chapter processing options.
-    #[serde(default, alias = "chapter_options", alias = "chapters", alias = "chapter", alias = "chapter_processing_options", alias = "chapters_options")]
+    #[serde(
+        default,
+        alias = "chapter_options",
+        alias = "chapters",
+        alias = "chapter",
+        alias = "chapter_processing_options",
+        alias = "chapters_options"
+    )]
     pub chapter_processing: crate::ChapterProcessingOptions,
 
     /// Alias for chapter processing options.
@@ -187,7 +235,12 @@ pub struct JobSpec {
     pub chapters_processing: Option<crate::ChapterProcessingOptions>,
 
     /// Metadata processing options.
-    #[serde(default, alias = "metadata", alias = "metadata_processing_options", alias = "tags")]
+    #[serde(
+        default,
+        alias = "metadata",
+        alias = "metadata_processing_options",
+        alias = "tags"
+    )]
     pub metadata_processing: crate::MetadataProcessingOptions,
 
     /// Alias for metadata processing options.
@@ -372,19 +425,45 @@ impl JobSpec {
     pub fn audio_processing_options(&self) -> AudioProcessingOptions {
         let mut opts = self.audio_processing.clone();
         if let Some(o) = &self.audio_track_config {
-            if o.mixdown.is_some() { opts.mixdown = o.mixdown.clone(); }
-            if o.mixdown_enum.is_some() { opts.mixdown_enum = o.mixdown_enum; }
-            if o.sample_rate.is_some() { opts.sample_rate = o.sample_rate; }
-            if o.dither { opts.dither = true; }
-            if o.dither_mode.is_some() { opts.dither_mode = o.dither_mode.clone(); }
-            if o.gain.is_some() { opts.gain = o.gain; }
-            if o.volume.is_some() { opts.volume = o.volume; }
-            if o.delay.is_some() { opts.delay = o.delay; }
-            if o.passthrough { opts.passthrough = true; }
-            if o.channel_count.is_some() { opts.channels = o.channel_count; }
-            if o.encoder.is_some() { opts.encoder = o.encoder.clone(); }
-            if o.bitrate.is_some() { opts.bitrate = o.bitrate; }
-            if o.quality.is_some() { opts.quality = o.quality; }
+            if o.mixdown.is_some() {
+                opts.mixdown = o.mixdown.clone();
+            }
+            if o.mixdown_enum.is_some() {
+                opts.mixdown_enum = o.mixdown_enum;
+            }
+            if o.sample_rate.is_some() {
+                opts.sample_rate = o.sample_rate;
+            }
+            if o.dither {
+                opts.dither = true;
+            }
+            if o.dither_mode.is_some() {
+                opts.dither_mode = o.dither_mode.clone();
+            }
+            if o.gain.is_some() {
+                opts.gain = o.gain;
+            }
+            if o.volume.is_some() {
+                opts.volume = o.volume;
+            }
+            if o.delay.is_some() {
+                opts.delay = o.delay;
+            }
+            if o.passthrough {
+                opts.passthrough = true;
+            }
+            if o.channel_count.is_some() {
+                opts.channels = o.channel_count;
+            }
+            if o.encoder.is_some() {
+                opts.encoder = o.encoder.clone();
+            }
+            if o.bitrate.is_some() {
+                opts.bitrate = o.bitrate;
+            }
+            if o.quality.is_some() {
+                opts.quality = o.quality;
+            }
         }
         opts
     }
@@ -397,7 +476,10 @@ impl JobSpec {
             self.hw_accel.as_ref(),
             self.acceleration.as_ref(),
             self.hwacceleration.as_ref(),
-        ].into_iter().flatten() {
+        ]
+        .into_iter()
+        .flatten()
+        {
             if x.enabled {
                 opts.enabled = true;
             }
@@ -420,22 +502,50 @@ impl JobSpec {
     pub fn subtitle_processing_options(&self) -> crate::SubtitleProcessingOptions {
         let mut opts = self.subtitle_processing.clone();
         if let Some(t) = &self.subtitle_track_config {
-            if t.source_track_id.is_some() { opts.source_track = t.source_track_id; }
-            if t.burn_in { opts.burn_in = true; }
-            if t.copy { opts.passthrough = true; opts.copy = true; }
-            if t.external_path.is_some() { opts.input_path = t.external_path.clone(); }
-            if t.closed_captions { opts.closed_captions = true; }
-            if t.foreign_scan { opts.foreign_audio_scan = true; }
-            if t.mode.is_some() { opts.mode = t.mode; }
+            if t.source_track_id.is_some() {
+                opts.source_track = t.source_track_id;
+            }
+            if t.burn_in {
+                opts.burn_in = true;
+            }
+            if t.copy {
+                opts.passthrough = true;
+                opts.copy = true;
+            }
+            if t.external_path.is_some() {
+                opts.input_path = t.external_path.clone();
+            }
+            if t.closed_captions {
+                opts.closed_captions = true;
+            }
+            if t.foreign_scan {
+                opts.foreign_audio_scan = true;
+            }
+            if t.mode.is_some() {
+                opts.mode = t.mode;
+            }
         }
-        for t in self.subtitle_tracks.iter().chain(self.subtitle_track_configs.iter()) {
-            if opts.source_track.is_none() { opts.source_track = t.source_track_id; }
+        for t in self
+            .subtitle_tracks
+            .iter()
+            .chain(self.subtitle_track_configs.iter())
+        {
+            if opts.source_track.is_none() {
+                opts.source_track = t.source_track_id;
+            }
         }
         if let Some(p) = &self.subtitle_path {
-            if opts.input_path.is_none() { opts.input_path = Some(p.clone()); }
+            if opts.input_path.is_none() {
+                opts.input_path = Some(p.clone());
+            }
         }
-        if self.subtitle_mode == crate::SubtitleMode::BurnIn { opts.burn_in = true; }
-        if self.subtitle_mode == crate::SubtitleMode::Passthrough { opts.passthrough = true; opts.copy = true; }
+        if self.subtitle_mode == crate::SubtitleMode::BurnIn {
+            opts.burn_in = true;
+        }
+        if self.subtitle_mode == crate::SubtitleMode::Passthrough {
+            opts.passthrough = true;
+            opts.copy = true;
+        }
         if self.subtitle_mode == crate::SubtitleMode::None {
             opts.mode = Some(crate::SubtitleMode::None);
         }
@@ -446,33 +556,79 @@ impl JobSpec {
         let mut opts = self.chapter_processing.clone();
         if let Some(c) = &self.chapters_processing {
             // merge fields
-            if c.copy { opts.copy = true; }
-            if c.edit { opts.edit = true; }
-            if !c.chapters.is_empty() { opts.chapters = c.chapters.clone(); }
-            if c.cover_art { opts.cover_art = true; }
-            if c.attachments { opts.attachments = true; }
+            if c.copy {
+                opts.copy = true;
+            }
+            if c.edit {
+                opts.edit = true;
+            }
+            if !c.chapters.is_empty() {
+                opts.chapters = c.chapters.clone();
+            }
+            if c.cover_art {
+                opts.cover_art = true;
+            }
+            if c.attachments {
+                opts.attachments = true;
+            }
         }
-        if self.chapter_copy { opts.copy = true; opts.chapter_copy = true; }
-        if self.chapter_edit { opts.edit = true; opts.chapter_edit = true; }
-        if self.chapter_editing { opts.chapter_editing = true; opts.edit = true; }
-        if self.cover_art_handling { opts.cover_art = true; }
-        if self.attachment_handling { opts.attachments = true; opts.attachment_copy = true; }
+        if self.chapter_copy {
+            opts.copy = true;
+            opts.chapter_copy = true;
+        }
+        if self.chapter_edit {
+            opts.edit = true;
+            opts.chapter_edit = true;
+        }
+        if self.chapter_editing {
+            opts.chapter_editing = true;
+            opts.edit = true;
+        }
+        if self.cover_art_handling {
+            opts.cover_art = true;
+        }
+        if self.attachment_handling {
+            opts.attachments = true;
+            opts.attachment_copy = true;
+        }
         opts
     }
 
     pub fn metadata_processing_options(&self) -> crate::MetadataProcessingOptions {
         let mut opts = self.metadata_processing.clone();
         if let Some(m) = &self.metadata_options {
-            if m.copy { opts.copy = true; }
-            if m.edit { opts.edit = true; }
-            if m.title.is_some() { opts.title = m.title.clone(); }
-            if !m.metadata.is_empty() { opts.metadata = m.metadata.clone(); }
+            if m.copy {
+                opts.copy = true;
+            }
+            if m.edit {
+                opts.edit = true;
+            }
+            if m.title.is_some() {
+                opts.title = m.title.clone();
+            }
+            if !m.metadata.is_empty() {
+                opts.metadata = m.metadata.clone();
+            }
         }
-        if self.metadata_copy { opts.copy = true; opts.metadata_copy = true; }
-        if self.metadata_edit { opts.edit = true; opts.metadata_edit = true; }
-        if self.metadata_editing { opts.metadata_editing = true; opts.edit = true; }
-        if self.cover_art_handling { opts.cover_art = true; }
-        if self.attachment_handling { opts.attachments = true; opts.attachment_copy = true; }
+        if self.metadata_copy {
+            opts.copy = true;
+            opts.metadata_copy = true;
+        }
+        if self.metadata_edit {
+            opts.edit = true;
+            opts.metadata_edit = true;
+        }
+        if self.metadata_editing {
+            opts.metadata_editing = true;
+            opts.edit = true;
+        }
+        if self.cover_art_handling {
+            opts.cover_art = true;
+        }
+        if self.attachment_handling {
+            opts.attachments = true;
+            opts.attachment_copy = true;
+        }
         opts
     }
 
