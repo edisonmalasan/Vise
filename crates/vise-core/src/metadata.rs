@@ -67,7 +67,12 @@ pub struct MetadataProcessingOptions {
     #[serde(default)]
     pub encoder: Option<String>,
 
-    #[serde(default, alias = "tags", alias = "metadata_tags", alias = "custom_tags")]
+    #[serde(
+        default,
+        alias = "tags",
+        alias = "metadata_tags",
+        alias = "custom_tags"
+    )]
     pub metadata: BTreeMap<String, String>,
 
     #[serde(default)]
@@ -106,7 +111,10 @@ pub type MetadataTrackConfiguration = MetadataTrackConfig;
 
 impl MetadataProcessingOptions {
     pub fn effective_copy(&self) -> bool {
-        self.copy || self.metadata_copy || self.mode == Some(MetadataMode::Copy) || self.mode.is_none()
+        self.copy
+            || self.metadata_copy
+            || self.mode == Some(MetadataMode::Copy)
+            || self.mode.is_none()
     }
     pub fn effective_edit(&self) -> bool {
         self.edit
@@ -122,20 +130,48 @@ impl MetadataProcessingOptions {
     }
     pub fn user_tags(&self) -> BTreeMap<String, String> {
         let mut out = self.metadata.clone();
-        if let Some(v) = &self.title { out.insert("title".into(), v.clone()); }
-        if let Some(v) = &self.artist { out.insert("artist".into(), v.clone()); }
-        if let Some(v) = &self.album_artist { out.insert("album_artist".into(), v.clone()); }
-        if let Some(v) = &self.album { out.insert("album".into(), v.clone()); }
-        if let Some(v) = &self.track { out.insert("track".into(), v.clone()); }
-        if let Some(v) = &self.disc_number { out.insert("disc_number".into(), v.clone()); }
-        if let Some(v) = &self.date { out.insert("date".into(), v.clone()); }
-        if let Some(v) = &self.recording_date { out.insert("recording_date".into(), v.clone()); }
-        if let Some(v) = &self.genre { out.insert("genre".into(), v.clone()); }
-        if let Some(v) = &self.comment { out.insert("comment".into(), v.clone()); }
-        if let Some(v) = &self.description { out.insert("description".into(), v.clone()); }
-        if let Some(v) = &self.copyright { out.insert("copyright".into(), v.clone()); }
-        if let Some(v) = &self.composer { out.insert("composer".into(), v.clone()); }
-        if let Some(v) = &self.encoder { out.insert("encoder".into(), v.clone()); }
+        if let Some(v) = &self.title {
+            out.insert("title".into(), v.clone());
+        }
+        if let Some(v) = &self.artist {
+            out.insert("artist".into(), v.clone());
+        }
+        if let Some(v) = &self.album_artist {
+            out.insert("album_artist".into(), v.clone());
+        }
+        if let Some(v) = &self.album {
+            out.insert("album".into(), v.clone());
+        }
+        if let Some(v) = &self.track {
+            out.insert("track".into(), v.clone());
+        }
+        if let Some(v) = &self.disc_number {
+            out.insert("disc_number".into(), v.clone());
+        }
+        if let Some(v) = &self.date {
+            out.insert("date".into(), v.clone());
+        }
+        if let Some(v) = &self.recording_date {
+            out.insert("recording_date".into(), v.clone());
+        }
+        if let Some(v) = &self.genre {
+            out.insert("genre".into(), v.clone());
+        }
+        if let Some(v) = &self.comment {
+            out.insert("comment".into(), v.clone());
+        }
+        if let Some(v) = &self.description {
+            out.insert("description".into(), v.clone());
+        }
+        if let Some(v) = &self.copyright {
+            out.insert("copyright".into(), v.clone());
+        }
+        if let Some(v) = &self.composer {
+            out.insert("composer".into(), v.clone());
+        }
+        if let Some(v) = &self.encoder {
+            out.insert("encoder".into(), v.clone());
+        }
         out
     }
 

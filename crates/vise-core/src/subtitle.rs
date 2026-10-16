@@ -80,13 +80,37 @@ impl SubtitleCodec {
 /// Serializable options model for subtitle processing.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct SubtitleProcessingOptions {
-    #[serde(default, alias = "track", alias = "source_track", alias = "subtitle_track", alias = "track_index", alias = "source_track_id", alias = "track_id", alias = "index")]
+    #[serde(
+        default,
+        alias = "track",
+        alias = "source_track",
+        alias = "subtitle_track",
+        alias = "track_index",
+        alias = "source_track_id",
+        alias = "track_id",
+        alias = "index"
+    )]
     pub source_track: Option<u32>,
 
-    #[serde(default, alias = "subtitle_tracks", alias = "track_ids", alias = "tracks", alias = "source_tracks")]
+    #[serde(
+        default,
+        alias = "subtitle_tracks",
+        alias = "track_ids",
+        alias = "tracks",
+        alias = "source_tracks"
+    )]
     pub source_tracks: Vec<u32>,
 
-    #[serde(default, alias = "path", alias = "file", alias = "subtitle_path", alias = "subtitles_path", alias = "subtitle_file", alias = "input_subtitle", alias = "external_subtitle")]
+    #[serde(
+        default,
+        alias = "path",
+        alias = "file",
+        alias = "subtitle_path",
+        alias = "subtitles_path",
+        alias = "subtitle_file",
+        alias = "input_subtitle",
+        alias = "external_subtitle"
+    )]
     pub input_path: Option<String>,
 
     #[serde(default, alias = "format_name")]
@@ -152,7 +176,15 @@ pub type SubtitleProcessing = SubtitleProcessingOptions;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct SubtitleTrackConfig {
-    #[serde(default, alias = "track", alias = "source", alias = "source_track", alias = "source_track_id", alias = "track_id", alias = "index")]
+    #[serde(
+        default,
+        alias = "track",
+        alias = "source",
+        alias = "source_track",
+        alias = "source_track_id",
+        alias = "track_id",
+        alias = "index"
+    )]
     pub source_track_id: Option<u32>,
 
     #[serde(default)]
@@ -173,7 +205,13 @@ pub struct SubtitleTrackConfig {
     #[serde(default)]
     pub language: Option<String>,
 
-    #[serde(default, alias = "path", alias = "file", alias = "subtitle_path", alias = "input_path")]
+    #[serde(
+        default,
+        alias = "path",
+        alias = "file",
+        alias = "subtitle_path",
+        alias = "input_path"
+    )]
     pub external_path: Option<String>,
 
     #[serde(default, alias = "closed_caption", alias = "cc")]
@@ -207,7 +245,11 @@ impl SubtitleProcessingOptions {
 
         if self.effective_burn_in() {
             if let Some(path) = self.effective_path() {
-                if self.ass_handling || self.ssa_handling || self.format == Some(SubtitleFormat::Ass) || self.format == Some(SubtitleFormat::Ssa) {
+                if self.ass_handling
+                    || self.ssa_handling
+                    || self.format == Some(SubtitleFormat::Ass)
+                    || self.format == Some(SubtitleFormat::Ssa)
+                {
                     parts.push(format!("ass='{}'", path));
                 } else {
                     parts.push(format!("subtitles='{}'", path));

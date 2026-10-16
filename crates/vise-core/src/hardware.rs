@@ -4,7 +4,7 @@
 //! Detection is based on the installed ffmpeg binary; all paths fall back to
 //! software encoding/decoding when hardware support is unavailable.
 
-use crate::{VideoCodec};
+use crate::VideoCodec;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -187,7 +187,11 @@ impl HardwareCapabilities {
     }
 
     pub fn detect_with(ffmpeg: Option<PathBuf>) -> Self {
-        let ffmpeg = ffmpeg.or_else(|| crate::FfprobeScanner::default().ffmpeg_path().map(PathBuf::from));
+        let ffmpeg = ffmpeg.or_else(|| {
+            crate::FfprobeScanner::default()
+                .ffmpeg_path()
+                .map(PathBuf::from)
+        });
         let Some(ffmpeg) = ffmpeg else {
             return Self::default();
         };
@@ -204,13 +208,20 @@ impl HardwareCapabilities {
 
     pub fn supports_decoder(&self, name: &str) -> bool {
         let needle = name.to_lowercase();
-        self.decoders.iter().any(|d| d.to_lowercase().contains(&needle))
-            || self.hwaccels.iter().any(|h| h.to_lowercase().contains(&needle))
+        self.decoders
+            .iter()
+            .any(|d| d.to_lowercase().contains(&needle))
+            || self
+                .hwaccels
+                .iter()
+                .any(|h| h.to_lowercase().contains(&needle))
     }
 
     pub fn supports_encoder(&self, name: &str) -> bool {
         let needle = name.to_lowercase();
-        self.encoders.iter().any(|e| e.to_lowercase().contains(&needle))
+        self.encoders
+            .iter()
+            .any(|e| e.to_lowercase().contains(&needle))
     }
 
     pub fn supports_decode(&self, codec: &str) -> bool {
@@ -246,8 +257,20 @@ impl HardwareCapabilities {
             }
         }
         let candidates: Vec<&str> = match codec {
-            VideoCodec::H264 => vec!["h264_nvenc", "h264_qsv", "h264_vaapi", "h264_amf", "h264_videotoolbox"],
-            VideoCodec::H265 => vec!["hevc_nvenc", "hevc_qsv", "hevc_vaapi", "hevc_amf", "hevc_videotoolbox"],
+            VideoCodec::H264 => vec![
+                "h264_nvenc",
+                "h264_qsv",
+                "h264_vaapi",
+                "h264_amf",
+                "h264_videotoolbox",
+            ],
+            VideoCodec::H265 => vec![
+                "hevc_nvenc",
+                "hevc_qsv",
+                "hevc_vaapi",
+                "hevc_amf",
+                "hevc_videotoolbox",
+            ],
             VideoCodec::Av1 => vec!["av1_nvenc", "av1_qsv", "av1_vaapi", "av1_amf"],
             VideoCodec::Vp9 => vec!["vp9_vaapi"],
         };
@@ -260,7 +283,10 @@ impl HardwareCapabilities {
     }
 
     pub fn preferred_decoder_arg(&self, hw: &HardwareAcceleration) -> Option<String> {
-        if !hw.is_enabled() || hw.mode == HardwareMode::Software || hw.preference == HardwarePreference::Disable {
+        if !hw.is_enabled()
+            || hw.mode == HardwareMode::Software
+            || hw.preference == HardwarePreference::Disable
+        {
             return None;
         }
         if let Some(name) = &hw.decode.hwaccel {
@@ -289,7 +315,9 @@ impl HardwareCapabilities {
 
 fn run_lines(ffmpeg: &Path, args: &[&str]) -> Vec<String> {
     let output = Command::new(ffmpeg).args(args).output();
-    let Ok(output) = output else { return Vec::new(); };
+    let Ok(output) = output else {
+        return Vec::new();
+    };
     let text = format!(
         "{}\n{}",
         String::from_utf8_lossy(&output.stdout),

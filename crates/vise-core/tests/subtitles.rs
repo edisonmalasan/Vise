@@ -52,7 +52,10 @@ fn subtitle_model_build() {
     };
     let chain = opts.build();
     assert!(chain.contains("subtitles"), "{chain}");
-    assert_eq!(vise_core::SubtitleMode::default(), vise_core::SubtitleMode::Passthrough);
+    assert_eq!(
+        vise_core::SubtitleMode::default(),
+        vise_core::SubtitleMode::Passthrough
+    );
 }
 
 #[test]
@@ -77,7 +80,10 @@ fn text_subtitle_passthrough() {
     let _ = result;
 
     let scan = scanner().scan_path(&out).expect("probe");
-    let has_sub = scan.streams.iter().any(|s| matches!(s.kind, vise_core::TrackKind::Subtitle));
+    let has_sub = scan
+        .streams
+        .iter()
+        .any(|s| matches!(s.kind, vise_core::TrackKind::Subtitle));
     assert!(has_sub, "expected subtitle stream");
 }
 

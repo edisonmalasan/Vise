@@ -1,9 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use vise_core::{
-    AudioMixdown, AudioProcessingOptions, AudioTrackConfig, Transcoder,
-};
+use vise_core::{AudioMixdown, AudioProcessingOptions, AudioTrackConfig, Transcoder};
 
 fn tool(name: &str) -> PathBuf {
     vise_core::FfprobeScanner::default()
