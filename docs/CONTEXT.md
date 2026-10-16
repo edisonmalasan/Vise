@@ -5,20 +5,20 @@
 ## At a Glance
 
 - **Project:** Vise Transcoder
-- **What it does:** Clean-room media transcoder targeting a reference transcoder architecture at version 1.11.2 and its user-facing capabilities; the repository currently holds planning and reverse-engineering documentation only, with no implementation.
+- **What it does:** Clean-room media transcoder targeting a reference transcoder architecture at version 1.11.2 and its user-facing capabilities; the repository holds Rust workspace source, tests, and planning/reverse-engineering documentation.
 - **Primary users / use cases:** Not yet verified from repository evidence. Intended audiences are media-transcoding users and contributors working on the clean-room implementation.
-- **Current focus:** Documentation and planning. Milestone 1 prerequisites and all implementation groups in `docs/ROADMAP.md` are not started; no source, tests, or build configuration exist.
+- **Current focus:** Groups 0–13 of `docs/ROADMAP.md` are implemented and verified; packaging and desktop/UI parity groups remain.
 
 ## Where to Look
 
 | Need | Canonical source |
 |---|---|
 | Goals, features, and progress | `docs/ROADMAP.md` |
-| Current application behavior | No application source exists yet; inspect `docs/ROADMAP.md` for intended behavior |
+| Current application behavior | `crates/vise-core` (media, pipeline), `crates/vise-worker` (worker JSON API), `apps/vise-desktop` (shell); `crates/vise-ipc` (client, supervisor, contract) |
 | Technical design and key boundaries | `re` reverse-engineering notes (behavioral/structural reference only); `docs/ROADMAP.md` architecture decisions |
-| Build and test commands | Root `AGENTS.md` (none currently configured) |
+| Build and test commands | Root `AGENTS.md` |
 | Agent skills and lock | `.agents/skills/` and `skills-lock.json` (vendored skill definitions) |
-| Important existing dependencies | No runtime dependencies; Graphify output in `graphify-out/` is derived analysis |
+| Important existing dependencies | serde/serde_json for the worker contract; no HTTP framework; ffmpeg/ffprobe subprocesses; `graphify-out/` is derived analysis |
 | Reusable lessons from other projects | Central Obsidian vault, when configured |
 
 ## Project-Specific Constraints

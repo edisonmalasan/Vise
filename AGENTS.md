@@ -5,8 +5,9 @@
 - **Name:** Vise Transcoder
 - **Purpose:** Clean-room implementation of a media transcoder targeting a reference transcoder architecture at version 1.11.2 and its user-facing capabilities. The repository now contains Rust application source, tests, build manifests, and planning/reverse-engineering documentation.
 - **Primary users:** Not yet verified from repository evidence. Intended audiences are media-transcoding users and contributors; see `docs/ROADMAP.md` for the product/capability target.
-- **Current state:** Rust workspace (`Cargo.toml`, `crates/vise-core`, `crates/vise-cli`, `apps/vise-desktop`) with Group 0–12 required outcomes implemented where feasible. `docs/ROADMAP.md` tracks verified status. `re/docs/` and `re/README.md` contain reverse-engineering notes.
+- **Current state:** Rust workspace (`Cargo.toml`, `crates/vise-core`, `crates/vise-cli`, `crates/vise-ipc`, `crates/vise-worker`, `apps/vise-desktop`) with Group 0–13 required outcomes implemented where feasible. `docs/ROADMAP.md` tracks verified status. `re/docs/` and `re/README.md` contain reverse-engineering notes.
 - **Current progress:** `main` contains the merged integration branches and a reconciled roadmap. Platform installers and optional DVD/Blu-ray support remain pending.
+- **Worker architecture:** the desktop shell never runs the pipeline in-process. `crates/vise-worker` serves a token-authenticated loopback JSON API; `crates/vise-ipc` holds the shared contract, the client, the process supervisor (start, handshake, crash restart), and the portable-mode switch that can disable process isolation.
 
 ## Source of Truth
 
@@ -29,8 +30,9 @@
 | Layer | Technology / version | Evidence |
 |---|---|---|
 | Frontend / UI | Tauri 2 desktop scaffold with placeholder web UI; planned full Tauri + web UI | `apps/vise-desktop`, `docs/ROADMAP.md` |
-| Backend / runtime | Rust stable workspace; verified with cargo 1.99.0 and rustc 1.99.0 | `Cargo.toml`, `crates/vise-core`, `crates/vise-cli` |
+| Backend / runtime | Rust stable workspace; verified with cargo 1.99.0 and rustc 1.99.0 | `Cargo.toml`, `crates/vise-core`, `crates/vise-cli`, `crates/vise-ipc`, `crates/vise-worker` |
 | Media tooling | ffmpeg 9.0.2 / ffprobe via subprocess bridge | Group 1/2 implementations and tests |
+| Worker IPC | Minimal HTTP/1.1 over `std::net` on 127.0.0.1 with a `token` header; serde/serde_json payloads | `crates/vise-ipc/src/http.rs`, `crates/vise-ipc/src/contract.rs` |
 | Database / storage | Not used currently; JSON presets/settings via files | `docs/ROADMAP.md`; storage code |
 | Build / tooling | Cargo workspace + optional Graphify analysis | `Cargo.toml`, `graphify-out/` |
 | Tests | Rust unit/integration tests | `crates/*/tests`, `cargo test --workspace` |
