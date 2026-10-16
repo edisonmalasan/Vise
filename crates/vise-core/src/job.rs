@@ -85,6 +85,49 @@ impl EncodingMode {
 }
 // Compatibility aliases removed.
 
+/// Output framing and compatibility choices for the finished file.
+///
+/// These are properties of the finished container rather than of any one
+/// stream, so they sit beside the codec choices on the job. Each flag is a
+/// request the pipeline either honours for the chosen container or reports as
+/// unavailable, never something that is accepted and then quietly dropped.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct OutputOptions {
+    /// Move the index to the front of an MP4 so playback can start before the
+    /// whole file has downloaded.
+    ///
+    /// Unset means "on", because that is what an MP4 has always been given and
+    /// turning it off silently would change existing jobs.
+    pub web_optimized: Option<bool>,
+    /// Nudge audio timestamps so the first sound lines up with the first frame.
+    pub align_audio_video: bool,
+    /// Restrict an MP4 to the coding tools older portable players understand.
+    pub ipod_compatible: bool,
+    /// Copy source tags to the output instead of dropping them.
+    pub passthrough_metadata: bool,
+}
+
+impl OutputOptions {
+    /// Whether the finished MP4 carries a front-loaded index.
+    pub fn wants_web_optimized(&self) -> bool {
+        self.web_optimized.unwrap_or(true) || self.ipod_compatible
+    }
+
+    /// Whether this job asks for anything at all.
+    pub fn is_empty(&self) -> bool {
+        !self.wants_web_optimized()
+            && !self.align_audio_video
+            && !self.ipod_compatible
+            && !self.passthrough_metadata
+    }
+
+    /// The MP4 profile and level that the portable-player flag pins, if any.
+    pub fn mp4_compatibility(&self) -> Option<(&'static str, &'static str)> {
+        self.ipod_compatible.then_some(("baseline", "3.0"))
+    }
+}
+
 /// Canonical, serializable specification for a single transcode job.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct JobSpec {
@@ -126,6 +169,24 @@ pub struct JobSpec {
         alias = "encoding_rate_control"
     )]
     pub encoding_mode: Option<EncodingMode>,
+
+    /// Encoder-side video choices: preset, profile, tune, level, colour range.
+    #[serde(
+        default,
+        alias = "encoding_options",
+        alias = "video_encoder_options",
+        alias = "encoder_options"
+    )]
+    pub video_encoding: crate::VideoEncodingOptions,
+
+    /// Output framing and compatibility flags for the finished container.
+    #[serde(
+        default,
+        alias = "output",
+        alias = "container_options",
+        alias = "output_flags"
+    )]
+    pub output_options: OutputOptions,
 
     #[serde(default)]
     pub bitrate: Option<u32>,
@@ -329,6 +390,9 @@ impl JobSpec {
             if x.rotate_degrees.is_some() {
                 opts.rotate_degrees = x.rotate_degrees;
             }
+            if x.flip.is_some() {
+                opts.flip = x.flip;
+            }
             if x.pad.is_some() {
                 opts.pad = x.pad;
             }
@@ -366,6 +430,19 @@ impl JobSpec {
             if opts.scale.is_none() && opts.scale_to.is_none() {
                 opts.scale_to = Some(s);
             }
+        }
+        opts
+    }
+
+    /// Encoder-side video options, with the portable-player profile folded in.
+    ///
+    /// The compatibility profile is a hard requirement of the output flags, so
+    /// it wins over a profile the user picked while the flag is on.
+    pub fn video_encoding_options(&self) -> crate::VideoEncodingOptions {
+        let mut opts = self.video_encoding.clone();
+        if let Some((profile, level)) = self.output_options.mp4_compatibility() {
+            opts.profile = Some(profile.to_string());
+            opts.level = Some(level.to_string());
         }
         opts
     }
@@ -621,6 +698,9 @@ impl JobSpec {
         if self.metadata_editing {
             opts.metadata_editing = true;
             opts.edit = true;
+        }
+        if self.output_options.passthrough_metadata {
+            opts.copy = true;
         }
         if self.cover_art_handling {
             opts.cover_art = true;

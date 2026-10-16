@@ -130,9 +130,42 @@ impl ChapterProcessingOptions {
         !self.chapters.is_empty() || self.effective_edit()
     }
 
+    /// Whether the output takes its chapter markers from this list.
+    ///
+    /// An edited or replaced list is authoritative, so the source markers are
+    /// not copied as well.
+    pub fn uses_edited_chapters(&self) -> bool {
+        !self.chapters.is_empty() && !self.effective_none()
+    }
+
+    /// Render the markers as an ffmpeg metadata document.
+    ///
+    /// Chapter times are written in milliseconds because that is the resolution
+    /// the format stores; a marker without a start time is left out rather than
+    /// silently written as the beginning of the file.
+    pub fn render_ffmetadata(&self) -> String {
+        let mut out = String::from(";FFMETADATA1\n");
+        for chapter in &self.chapters {
+            let Some(start) = chapter.start_seconds.filter(|s| s.is_finite() && *s >= 0.0) else {
+                continue;
+            };
+            out.push_str("\n[CHAPTER]\nTIMEBASE=1/1000\n");
+            out.push_str(&format!("START={}\n", (start * 1000.0).round() as i64));
+            if let Some(end) = chapter.end_seconds.filter(|s| s.is_finite() && *s > start) {
+                out.push_str(&format!("END={}\n", (end * 1000.0).round() as i64));
+            }
+            if let Some(title) = chapter.title.as_deref().map(str::trim) {
+                if !title.is_empty() {
+                    out.push_str(&format!("title={}\n", title.replace(['\n', '='], " ")));
+                }
+            }
+        }
+        out
+    }
+
     pub fn build(&self) -> String {
         let mut parts: Vec<String> = Vec::new();
-        if self.effective_copy() && !self.effective_none() {
+        if self.effective_copy() && !self.effective_none() && !self.uses_edited_chapters() {
             parts.push("-map_chapters 0".to_string());
         }
         if self.cover_art {

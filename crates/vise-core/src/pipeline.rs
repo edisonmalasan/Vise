@@ -110,6 +110,12 @@ impl Transcoder {
             .output()
             .map_err(|e| CoreError::CommandFailed(e.to_string()))?;
 
+        // The sidecar has served its purpose whether or not the encode worked;
+        // leaving it behind would put a stray file next to the output.
+        if let Some(path) = &plan.chapter_metadata_path {
+            let _ = std::fs::remove_file(path);
+        }
+
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
             return Err(CoreError::CommandFailed(if stderr.trim().is_empty() {
@@ -230,6 +236,19 @@ impl Transcoder {
         let resolved_encoder = caps.preferred_encoder(video_codec, &hw_opts);
         let hw_decode = caps.preferred_decoder_arg(&hw_opts);
 
+        let chapter_opts = spec.chapter_processing_options();
+        // An edited or replaced marker list becomes a metadata sidecar that
+        // ffmpeg reads as a second input, so the markers the window shows are
+        // the markers the finished file carries.
+        let chapter_metadata_path = if chapter_opts.uses_edited_chapters() {
+            let sidecar = chapter_sidecar_path(Path::new(&spec.output_path));
+            std::fs::write(&sidecar, chapter_opts.render_ffmetadata())
+                .map_err(|e| CoreError::Io(e.to_string()))?;
+            Some(sidecar)
+        } else {
+            None
+        };
+
         let mut args: Vec<String> = Vec::new();
         if let Some(dec) = &hw_decode {
             args.push("-hwaccel".into());
@@ -246,12 +265,19 @@ impl Transcoder {
         args.push("-y".into());
         args.push("-i".into());
         args.push(input.to_string_lossy().to_string());
+        if let Some(path) = &chapter_metadata_path {
+            args.push("-i".into());
+            args.push(path.to_string_lossy().to_string());
+        }
         if !combined_filter.is_empty() {
             args.push("-vf".into());
             args.push(combined_filter.clone());
         }
         args.push("-c:v".into());
         args.push(resolved_encoder.clone());
+        // Preset, profile, tune, level, and colour range shape how frames are
+        // coded, so they follow the encoder name.
+        args.extend(spec.video_encoding_options().encoder_args());
         if audio_opts.passthrough || audio_opts.copy {
             args.push("-c:a".into());
             args.push("copy".into());
@@ -259,9 +285,17 @@ impl Transcoder {
             args.push("-c:a".into());
             args.push(audio_encoder(audio_codec).into());
         }
-        if !audio_filter_chain.is_empty() {
+        let mut audio_filters = audio_filter_chain.clone();
+        if spec.output_options.align_audio_video {
+            // Nudge audio onto the video timeline when the streams start apart.
+            if !audio_filters.is_empty() {
+                audio_filters.push(',');
+            }
+            audio_filters.push_str("aresample=async=1:first_pts=0");
+        }
+        if !audio_filters.is_empty() {
             args.push("-af".into());
-            args.push(audio_filter_chain.clone());
+            args.push(audio_filters);
         }
         if let Some(rate) = audio_opts.sample_rate {
             args.push("-ar".into());
@@ -295,10 +329,11 @@ impl Transcoder {
             args.push("-vsync".into());
             args.push("vfr".into());
         }
-        let chapter_opts = spec.chapter_processing_options();
         let metadata_opts = spec.metadata_processing_options();
 
-        if container == ContainerFormat::Mp4 {
+        // The front-loaded index only exists in MP4; the other containers have
+        // no equivalent flag, which is why the interface says so out loud.
+        if container == ContainerFormat::Mp4 && spec.output_options.wants_web_optimized() {
             args.push("-movflags".into());
             args.push("+faststart".into());
         }
@@ -310,8 +345,10 @@ impl Transcoder {
             args.push("smpte2084".into());
             args.push("-colorspace".into());
             args.push("bt2020nc".into());
-            args.push("-map_metadata".into());
-            args.push("0".into());
+            if chapter_metadata_path.is_none() {
+                args.push("-map_metadata".into());
+                args.push("0".into());
+            }
         }
         match spec.subtitle_mode {
             SubtitleMode::None => {
@@ -335,6 +372,12 @@ impl Transcoder {
         // Chapter/metadata copy-edit handling through ffmpeg arguments.
         args.extend(chapter_opts.build_ffmpeg_args());
         args.extend(metadata_opts.build_metadata_args());
+        if chapter_metadata_path.is_some() {
+            // The marker list the window holds wins over anything the source
+            // carried, so it is mapped last.
+            args.push("-map_metadata".into());
+            args.push("1".into());
+        }
 
         // Encoding rate-control mode.
         let resolved_mode = spec.resolved_encoding_mode();
@@ -405,6 +448,7 @@ impl Transcoder {
             filter_chain: combined_filter,
             audio_filter_chain,
             duration_seconds: input_duration,
+            chapter_metadata_path,
         })
     }
 
@@ -500,8 +544,9 @@ pub struct TranscodeResult {
 
 /// A fully resolved encoder invocation.
 ///
-/// A plan is inert data: resolving it performs no media work beyond validating
-/// the input and probing its duration. Frontends that need process-level
+/// A plan is nearly inert data: resolving it performs no media work beyond
+/// validating the input, probing its duration, and writing the chapter
+/// sidecar that an edited marker list needs. Frontends that need process-level
 /// control (pause, resume, cancel, or crash isolation) can spawn
 /// [`TranscodePlan::program`] with [`TranscodePlan::args`] directly.
 #[derive(Debug, Clone, PartialEq)]
@@ -526,6 +571,9 @@ pub struct TranscodePlan {
     pub audio_filter_chain: String,
     /// Probed input duration, when available.
     pub duration_seconds: Option<f64>,
+    /// Chapter metadata sidecar written while planning, if the job carried an
+    /// edited marker list. [`Transcoder::execute`] removes it afterwards.
+    pub chapter_metadata_path: Option<PathBuf>,
 }
 
 impl TranscodePlan {
@@ -535,6 +583,19 @@ impl TranscodePlan {
         parts.extend(self.args.iter().cloned());
         parts.join(" ")
     }
+}
+
+/// Where the chapter sidecar for an output file lives.
+///
+/// The name sits beside the output so the executor can clean it up without
+/// searching, and it is named after the output so two queued jobs writing to
+/// different folders never collide.
+fn chapter_sidecar_path(output: &Path) -> PathBuf {
+    let stem = output
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_string())
+        .unwrap_or_else(|| "output".to_string());
+    output.with_file_name(format!("{stem}.vise-chapters.ffmeta"))
 }
 
 fn infer_container(path: &Path) -> ContainerFormat {
