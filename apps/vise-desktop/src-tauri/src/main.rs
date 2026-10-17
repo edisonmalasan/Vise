@@ -15,19 +15,21 @@ use std::thread;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use vise_core::{Job, JobId, JobSpec, JobState, Progress, Session};
 use vise_ipc::contract::{CommandResult, EncodeCommand, InitCommand, ScanCommand, WorkState};
 use vise_ipc::portable::PortableSettings;
 use vise_ipc::timespan::TimeSpan;
 use vise_ipc::{WorkerClient, WorkerConfig, WorkerSupervisor};
 
+mod appearance;
 mod scanflow;
 mod sources;
 mod tabs;
 mod viewmodel;
 mod windows;
 
+use appearance::{AppearanceState, AppearanceViewModel, SystemTheme};
 use scanflow::{scan_in_process, ScanFlow};
 use sources::{RecentSources, SourceDropReport, SourceViewModel};
 use tabs::{
@@ -44,6 +46,15 @@ use windows::presets::{PresetAction, PresetInput, PresetState};
 use windows::preview::{CropOverlay, PreviewState, PreviewViewModel, StillImage, StillPosition};
 use windows::queue::{QueueSelectionInput, QueueState};
 use windows::SurfaceState;
+
+/// Label the configuration gives the application window.
+///
+/// The appearance of the window is read from and written to this one window, so
+/// its label is named here rather than repeated at every use.
+const MAIN_WINDOW: &str = "main";
+
+/// Event the page listens to for a theme the operating system changed.
+const APPEARANCE_EVENT: &str = "appearance-changed";
 
 /// How the shell reaches the transcode pipeline.
 enum Backend {
@@ -123,6 +134,9 @@ struct DesktopState {
     confirmed: Option<AlertAction>,
     /// The preset library.
     presets: PresetState,
+    /// Theme and layout direction: the preference, the observation, and the
+    /// answer both of them add up to.
+    appearance: AppearanceState,
 }
 
 type SharedState = Arc<Mutex<DesktopState>>;
@@ -2246,10 +2260,102 @@ fn close_window(
     Ok(guard.surfaces.view())
 }
 
+/* ----------------------------------------------------------------- appearance */
+
+/// What the window is showing, resolved.
+#[tauri::command]
+fn appearance_view(
+    app: AppHandle,
+    state: State<'_, SharedState>,
+) -> Result<AppearanceViewModel, String> {
+    // The platform is asked on every read rather than only at start-up, because
+    // the window theme is the one observation available before the page has run
+    // and the one that costs nothing to re-ask.
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    observe_platform_theme(&app, &mut guard.appearance);
+    Ok(guard.appearance.view())
+}
+
+/// Choose the theme, and keep the choice.
+#[tauri::command]
+fn set_theme_mode(
+    mode: String,
+    state: State<'_, SharedState>,
+) -> Result<AppearanceViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.appearance.set_theme_mode(&mode)
+}
+
+/// Choose the layout direction, and keep the choice.
+#[tauri::command]
+fn set_direction_mode(
+    mode: String,
+    state: State<'_, SharedState>,
+) -> Result<AppearanceViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.appearance.set_direction_mode(&mode)
+}
+
+/// Record the theme the page reports for the `prefers-color-scheme` query.
+///
+/// The page is a sensor here and nowhere else: it says which way the media query
+/// is pointing and the window decides what that means. Reporting the query
+/// rather than a theme name is deliberate, so the colours on screen and the
+/// answer in this state cannot be produced by two different readings of the
+/// same preference.
+#[tauri::command]
+fn report_system_theme(
+    dark: bool,
+    state: State<'_, SharedState>,
+) -> Result<AppearanceViewModel, String> {
+    let (view, changed) = {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        let changed = guard
+            .appearance
+            .observe_theme(SystemTheme::of_dark(dark), true);
+        (guard.appearance.view(), changed)
+    };
+    if changed {
+        push_log(&state, "the system theme changed; the window follows it");
+    }
+    Ok(view)
+}
+
+/// Record the locale the page is showing in.
+#[tauri::command]
+fn report_locale(
+    locale: String,
+    state: State<'_, SharedState>,
+) -> Result<AppearanceViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.appearance.observe_locale(&locale);
+    Ok(guard.appearance.view())
+}
+
+/// Ask the platform what theme it is in, and record the answer.
+///
+/// Not every platform answers, and one that does not is left at the light theme
+/// rather than failing: a window that opens readable and then corrects itself is
+/// better than one that refuses to open.
+fn observe_platform_theme(app: &AppHandle, appearance: &mut AppearanceState) {
+    let Some(window) = app.get_webview_window(MAIN_WINDOW) else {
+        return;
+    };
+    let Ok(theme) = window.theme() else {
+        return;
+    };
+    appearance.observe_theme(SystemTheme::of_window(theme), false);
+}
+
 fn main() {
     let settings_path = sources::default_settings_path();
     let recents = RecentSources::load(&settings_path);
     let preset_path = preset_file(&settings_path);
+    // The theme starts light and the locale comes from the environment, so a
+    // window has an answer before the page has said anything. The setup hook
+    // replaces the theme with the platform's own as soon as there is a window
+    // to ask.
+    let appearance = AppearanceState::load(&settings_path, SystemTheme::Light, None);
     let state: SharedState = Arc::new(Mutex::new(DesktopState {
         // Build the backend before the window opens so the first scan does not
         // pay for process start-up.
@@ -2258,10 +2364,53 @@ fn main() {
         settings_path,
         presets: PresetState::new(preset_path),
         tabs: TabSettings::new(),
+        appearance,
         ..DesktopState::default()
     }));
+    // The builder needs the state in three places and moves each closure, so each
+    // one is handed its own handle to the same lock.
+    let start_up = state.clone();
+    let observing = state.clone();
     tauri::Builder::default()
         .manage(state)
+        .setup(move |app| {
+            // The window exists by now, so the platform can be asked before the
+            // page has run. That is the only observation available at this point,
+            // and it is what the page starts from if it has nothing of its own.
+            if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
+                if let Ok(theme) = window.theme() {
+                    if let Ok(mut guard) = start_up.lock() {
+                        guard
+                            .appearance
+                            .observe_theme(SystemTheme::of_window(theme), false);
+                    }
+                }
+            }
+            Ok(())
+        })
+        // The operating system can change theme while the window is open. The
+        // page watches the same media query and reports it too; both arrive at
+        // the same observation, so the two answers cannot produce two themes.
+        .on_window_event(move |window, event| {
+            let WindowEvent::ThemeChanged(theme) = event else {
+                return;
+            };
+            let view = {
+                let Ok(mut guard) = observing.lock() else {
+                    return;
+                };
+                if !guard
+                    .appearance
+                    .observe_theme(SystemTheme::of_window(*theme), false)
+                {
+                    return;
+                }
+                guard.appearance.view()
+            };
+            if let Err(e) = window.emit(APPEARANCE_EVENT, &view) {
+                eprintln!("appearance could not be sent to the page: {e}");
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             select_source,
             inspect_sources,
@@ -2331,7 +2480,12 @@ fn main() {
             apply_preset_action,
             window_catalog,
             open_window,
-            close_window
+            close_window,
+            appearance_view,
+            set_theme_mode,
+            set_direction_mode,
+            report_system_theme,
+            report_locale
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -2749,5 +2903,71 @@ mod tests {
             preset_file(std::path::Path::new("settings.json")),
             std::path::PathBuf::from("presets.json")
         );
+    }
+
+    /// The page paints from the resolved pair, so the answer it is handed has to
+    /// name the theme and the direction rather than the preference behind them.
+    #[test]
+    fn the_page_is_handed_the_theme_and_direction_it_paints_from() {
+        let payload = r#"{
+            "themeMode":"system",
+            "directionMode":"auto",
+            "theme":"dark",
+            "direction":"rtl",
+            "followsSystemTheme":true,
+            "followsLocale":true,
+            "systemTheme":"dark",
+            "locale":"ar-EG",
+            "themeOptions":[
+                {"id":"system","label":"Match the system","facts":"","available":true,"reason":"","selected":true},
+                {"id":"light","label":"Light","facts":"","available":true,"reason":"","selected":false},
+                {"id":"dark","label":"Dark","facts":"","available":true,"reason":"","selected":false}
+            ],
+            "directionOptions":[
+                {"id":"auto","label":"Match my language","facts":"","available":true,"reason":"","selected":true},
+                {"id":"ltr","label":"Left to right","facts":"","available":true,"reason":"","selected":false},
+                {"id":"rtl","label":"Right to left","facts":"","available":true,"reason":"","selected":false}
+            ],
+            "summary":"Showing the dark theme, laid out right to left because ar-EG reads right to left.",
+            "flowGlyph":"\u2192",
+            "themeSource":"reported by this window",
+            "localeSource":"reported by this window"
+        }"#;
+        let view: AppearanceViewModel = serde_json::from_str(payload).expect("appearance answer");
+        assert_eq!(view.theme, "dark");
+        assert_eq!(view.direction, "rtl");
+        assert_eq!(view.system_theme, "dark");
+        assert_eq!(view.locale, "ar-EG");
+        assert_eq!(view.theme_options.len(), 3);
+        assert_eq!(view.direction_options.len(), 3);
+        assert_eq!(view.flow_glyph, "\u{2192}");
+
+        // The stylesheet keys its colours and its mirroring off exactly these two
+        // values, so neither may be spelled any other way.
+        assert!(["light", "dark"].contains(&view.theme.as_str()));
+        assert!(["ltr", "rtl"].contains(&view.direction.as_str()));
+    }
+
+    /// A theme the page reports is a fact about the media query, not a request.
+    #[test]
+    fn a_reported_system_theme_is_a_media_query_answer() {
+        assert_eq!(SystemTheme::of_dark(true), SystemTheme::Dark);
+        assert_eq!(SystemTheme::of_dark(false), SystemTheme::Light);
+        // The page sends the boolean rather than a keyword, so nothing on this
+        // side has to agree with a CSS spelling.
+        let payload = r#"{"dark":true}"#;
+        let report: serde_json::Value = serde_json::from_str(payload).expect("report");
+        assert_eq!(
+            SystemTheme::of_dark(report["dark"].as_bool().unwrap()),
+            SystemTheme::Dark
+        );
+    }
+
+    /// The main window's label is named once, and every read of the platform
+    /// theme goes through it.
+    #[test]
+    fn the_appearance_event_has_a_name_the_page_can_subscribe_to() {
+        assert_eq!(APPEARANCE_EVENT, "appearance-changed");
+        assert_eq!(MAIN_WINDOW, "main");
     }
 }
