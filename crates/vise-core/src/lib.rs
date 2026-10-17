@@ -5,6 +5,7 @@
 //! frontends. It has no UI dependency.
 
 mod audio;
+mod catalog;
 mod chapter;
 mod error;
 mod geometry;
@@ -20,6 +21,7 @@ mod session;
 mod subtitle;
 mod video;
 pub use audio::*;
+pub use catalog::*;
 pub use chapter::*;
 pub use error::CoreError;
 pub use geometry::*;

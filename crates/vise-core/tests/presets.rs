@@ -18,7 +18,11 @@ fn tmp_path(name: &str) -> PathBuf {
 fn builtin_preset_exists() {
     let presets = builtin_presets();
     assert!(!presets.is_empty());
-    assert!(presets.iter().any(|p| p.id == "fast-1080p"));
+    assert!(presets.iter().any(|p| p.id == "general-fast-1080-30-h264"));
+    // An identifier an earlier build stored still resolves, because it is in
+    // other people's settings files.
+    let older = vise_core::builtin_preset("fast-1080p").expect("the older identifier");
+    assert_eq!(older.id, "general-fast-1080-30-h264");
 }
 
 #[test]

@@ -322,17 +322,7 @@ impl TabSettings {
             subtitles::to_job_options(&self.subtitles, facts, &self.summary.container)?;
         let chapter_processing = chapters::to_job_options(&self.chapters);
 
-        let video_encoding = VideoEncodingOptions {
-            preset: named(&self.video.preset),
-            profile: named(&self.video.profile),
-            tune: named(&self.video.tune),
-            level: named(&self.video.level),
-            colour_range: match self.video.colour_range.as_str() {
-                "limited" => Some(ColourRange::Limited),
-                "full" => Some(ColourRange::Full),
-                _ => None,
-            },
-        };
+        let video_encoding = video_encoding_options(&self.video);
 
         Ok(JobSpec {
             input_path: input_path.to_string(),
@@ -375,6 +365,25 @@ fn named(value: &str) -> Option<String> {
     match value.trim().to_ascii_lowercase().as_str() {
         "" | "default" => None,
         other => Some(other.to_string()),
+    }
+}
+
+/// The encoder-side choices on the video tab, as the job model wants them.
+///
+/// A preset carries these rather than the job doing it on the way out, so the
+/// coding choices are part of what a preset means rather than part of what a tab
+/// happens to hold when the preset is saved.
+pub fn video_encoding_options(video: &VideoSettings) -> VideoEncodingOptions {
+    VideoEncodingOptions {
+        preset: named(&video.preset),
+        profile: named(&video.profile),
+        tune: named(&video.tune),
+        level: named(&video.level),
+        colour_range: match video.colour_range.as_str() {
+            "limited" => Some(ColourRange::Limited),
+            "full" => Some(ColourRange::Full),
+            _ => None,
+        },
     }
 }
 

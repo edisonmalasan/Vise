@@ -4,7 +4,10 @@
 //! jobs, storage of user presets in a JSON file, import/export helpers, and
 //! application settings persistence. It has no UI dependency.
 
-use crate::{AudioCodec, ContainerFormat, CoreError, JobSpec, SubtitleMode, VideoCodec};
+use crate::{
+    AudioCodec, ContainerFormat, CoreError, EncoderId, EncodingMode, JobSpec, SubtitleMode,
+    VideoCodec, VideoEncodingOptions,
+};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,6 +29,40 @@ pub struct PresetSpec {
     pub audio_codec: Option<AudioCodec>,
     #[serde(default)]
     pub audio: Option<AudioCodec>,
+
+    /// The encoder the preset is written for.
+    ///
+    /// A codec says what is in the file; this says which encoder writes it, and
+    /// it is what makes a hardware preset a hardware preset. Availability is
+    /// resolved against the machine at selection time by
+    /// [`crate::catalog::resolve_availability`], never guessed from the codec.
+    #[serde(default)]
+    pub encoder: Option<EncoderId>,
+
+    /// Encoder-side coding choices: speed preset, profile, tune, level, range.
+    ///
+    /// The quality families in the general catalog are mostly this member, so it
+    /// travels with the preset rather than being retyped on the video tab.
+    #[serde(default)]
+    pub video_encoding: Option<VideoEncodingOptions>,
+
+    /// How the encoder is asked to spend its bits.
+    #[serde(default)]
+    pub encoding_mode: Option<EncodingMode>,
+
+    /// The size the encoder should aim for, in bytes, when the mode is
+    /// [`EncodingMode::TargetSize`].
+    #[serde(default)]
+    pub target_size: Option<u64>,
+
+    /// The longest title this preset is meant for, in seconds.
+    ///
+    /// A size-targeted preset is only honest for the length it was designed
+    /// around, so the cap travels with it. It describes the preset rather than
+    /// the job, so [`apply_preset`] carries it as far as the preset and leaves
+    /// the range to whoever applies it.
+    #[serde(default)]
+    pub duration_cap_seconds: Option<u64>,
 
     #[serde(default)]
     pub subtitle_mode: Option<SubtitleMode>,
@@ -54,6 +91,138 @@ impl PresetSpec {
     pub fn apply_to(&self, job: &JobSpec) -> JobSpec {
         apply_preset(self, job)
     }
+
+    /// The container the preset asks for, whichever member carries it.
+    pub fn container_of(&self) -> Option<ContainerFormat> {
+        self.container.or(self.format)
+    }
+
+    /// The video codec the preset asks for, whichever member carries it.
+    pub fn video_codec_of(&self) -> Option<VideoCodec> {
+        self.video_codec.or(self.video)
+    }
+
+    /// The audio codec the preset asks for, whichever member carries it.
+    pub fn audio_codec_of(&self) -> Option<AudioCodec> {
+        self.audio_codec.or(self.audio)
+    }
+
+    /// The subtitle handling the preset asks for, whichever member carries it.
+    pub fn subtitle_mode_of(&self) -> Option<SubtitleMode> {
+        self.subtitle_mode.or(self.subtitles)
+    }
+
+    /// The title the preset names, whichever member carries it.
+    pub fn title_index_of(&self) -> Option<u32> {
+        self.title_index.or(self.title)
+    }
+
+    /// This preset in its canonical form.
+    ///
+    /// Cleaning is what makes two presets that mean the same thing compare equal
+    /// and serialize the same way. Every duplicated member is folded into the one
+    /// this build reads, blank text is dropped, and a geometry with nothing in it
+    /// is dropped rather than kept as a value no encoder can act on. It changes
+    /// nothing a preset means, and running it twice changes nothing the second
+    /// time.
+    pub fn cleaned(&self) -> Self {
+        let mut out = self.clone();
+        if out.container.is_none() {
+            out.container = out.format;
+        }
+        out.format = None;
+        if out.video_codec.is_none() {
+            out.video_codec = out.video;
+        }
+        out.video = None;
+        if out.audio_codec.is_none() {
+            out.audio_codec = out.audio;
+        }
+        out.audio = None;
+        if out.subtitle_mode.is_none() {
+            out.subtitle_mode = out.subtitles;
+        }
+        out.subtitles = None;
+        if out.title_index.is_none() {
+            out.title_index = out.title;
+        }
+        out.title = None;
+        out.name = trimmed(out.name.take());
+        out.description = trimmed(out.description.take());
+        out.scale_to = out
+            .scale_to
+            .filter(|(width, height)| *width > 0 && *height > 0);
+        out.crop = out
+            .crop
+            .filter(|(_, _, width, height)| *width > 0 && *height > 0);
+        out
+    }
+
+    /// This preset brought in line with the catalog template.
+    ///
+    /// Normalizing is filling and then pruning. Every member the preset leaves
+    /// out is taken from the template, so a preset always has a container, a
+    /// video codec, and an audio codec to answer with even when its file named
+    /// none; the tuning members that still say exactly what the template says
+    /// are then dropped again, so a preset that overrides nothing comes back
+    /// holding nothing rather than holding a copy of the defaults. Doing it
+    /// twice gives the same answer as doing it once.
+    pub fn normalized(&self, template: &PresetSpec) -> Self {
+        let template = template.cleaned();
+        let mut out = self.cleaned();
+        if out.container.is_none() {
+            out.container = template.container;
+        }
+        if out.video_codec.is_none() {
+            out.video_codec = template.video_codec;
+        }
+        if out.audio_codec.is_none() {
+            out.audio_codec = template.audio_codec;
+        }
+        if out.subtitle_mode.is_none() {
+            out.subtitle_mode = template.subtitle_mode;
+        }
+        if out.encoder.is_none() {
+            out.encoder = template.encoder;
+        }
+        if out.encoding_mode.is_none() {
+            out.encoding_mode = template.encoding_mode;
+        }
+        out.without_template_defaults(&template)
+    }
+
+    /// The preset with every tuning member the template already answers removed.
+    ///
+    /// This is the last half of [`PresetSpec::normalized`] and the question an
+    /// imported file asks on its own: which of these values are really this
+    /// preset's own rather than the defaults wearing this preset's name?
+    ///
+    /// Only tuning is pruned. The container and the codecs are what the preset
+    /// *is* rather than how finely it is tuned, and a preset that says MP4 and
+    /// H.264 must keep saying so even when the template happens to agree.
+    fn without_template_defaults(mut self, template: &PresetSpec) -> Self {
+        if self.subtitle_mode == template.subtitle_mode {
+            self.subtitle_mode = None;
+        }
+        if self.encoder == template.encoder {
+            self.encoder = None;
+        }
+        if self.encoding_mode == template.encoding_mode {
+            self.encoding_mode = None;
+        }
+        if self.quality == template.quality {
+            self.quality = None;
+        }
+        self
+    }
+}
+
+/// A string that has something in it, or nothing rather than an empty string.
+fn trimmed(value: Option<String>) -> Option<String> {
+    value.and_then(|text| {
+        let text = text.trim().to_string();
+        (!text.is_empty()).then_some(text)
+    })
 }
 
 pub type Preset = PresetSpec;
@@ -69,58 +238,28 @@ pub struct BuiltInPreset {
 
 pub type BuiltInPresetCatalog = Vec<BuiltInPreset>;
 
+/// The presets that ship with the build, in catalog order.
+///
+/// The list is read from the embedded catalog rather than written here, so the
+/// presets are data this build carries rather than code this build contains, and
+/// the catalog is the one place a preset is described, versioned, and checked.
+/// Each spec is normalized against the catalog template on the way out, so a
+/// caller never has to know which members the template already answers.
 pub fn builtin_presets() -> Vec<BuiltInPreset> {
-    vec![
-        BuiltInPreset {
-            id: "fast-1080p".to_string(),
-            name: "Fast 1080p".to_string(),
-            description: Some("Fast H.264 encode at 1080p".to_string()),
-            preset: PresetSpec {
-                container: Some(ContainerFormat::Mp4),
-                format: Some(ContainerFormat::Mp4),
-                video_codec: Some(VideoCodec::H264),
-                video: Some(VideoCodec::H264),
-                audio_codec: Some(AudioCodec::Aac),
-                audio: Some(AudioCodec::Aac),
-                quality: Some(22),
-                ..Default::default()
-            },
-        },
-        BuiltInPreset {
-            id: "high-quality".to_string(),
-            name: "High Quality".to_string(),
-            description: Some("Higher quality H.265 encode".to_string()),
-            preset: PresetSpec {
-                container: Some(ContainerFormat::Mkv),
-                format: Some(ContainerFormat::Mkv),
-                video_codec: Some(VideoCodec::H265),
-                video: Some(VideoCodec::H265),
-                audio_codec: Some(AudioCodec::Flac),
-                audio: Some(AudioCodec::Flac),
-                quality: Some(18),
-                ..Default::default()
-            },
-        },
-        BuiltInPreset {
-            id: "web-optimized".to_string(),
-            name: "Web Optimized".to_string(),
-            description: Some("WebM/VP9 for web delivery".to_string()),
-            preset: PresetSpec {
-                container: Some(ContainerFormat::Webm),
-                format: Some(ContainerFormat::Webm),
-                video_codec: Some(VideoCodec::Vp9),
-                video: Some(VideoCodec::Vp9),
-                audio_codec: Some(AudioCodec::Opus),
-                audio: Some(AudioCodec::Opus),
-                quality: Some(28),
-                ..Default::default()
-            },
-        },
-    ]
+    crate::catalog::builtin_entries()
+        .iter()
+        .map(|entry| entry.to_builtin())
+        .collect()
 }
 
+/// The preset with this identifier.
+///
+/// An identifier an earlier build stored still resolves, through the catalog's
+/// alias table, so a settings file naming one of them keeps naming the preset it
+/// meant after the entries were put on the catalog's own scheme.
 pub fn builtin_preset(id: &str) -> Option<BuiltInPreset> {
-    builtin_presets().into_iter().find(|p| p.id == id)
+    let wanted = crate::catalog::resolve_builtin_id(id)?;
+    builtin_presets().into_iter().find(|p| p.id == wanted)
 }
 
 impl BuiltInPreset {
@@ -134,19 +273,19 @@ impl BuiltInPreset {
 
 pub fn apply_preset(preset: &PresetSpec, job: &JobSpec) -> JobSpec {
     let mut updated = job.clone();
-    if let Some(v) = preset.container.or(preset.format) {
+    if let Some(v) = preset.container_of() {
         updated.container = v;
     }
-    if let Some(v) = preset.video_codec.or(preset.video) {
+    if let Some(v) = preset.video_codec_of() {
         updated.video_codec = v;
     }
-    if let Some(v) = preset.audio_codec.or(preset.audio) {
+    if let Some(v) = preset.audio_codec_of() {
         updated.audio_codec = v;
     }
-    if let Some(v) = preset.subtitle_mode.or(preset.subtitles) {
+    if let Some(v) = preset.subtitle_mode_of() {
         updated.subtitle_mode = v;
     }
-    if let Some(v) = preset.title_index.or(preset.title) {
+    if let Some(v) = preset.title_index_of() {
         updated.title_index = Some(v);
     }
     if let Some(v) = preset.crop {
@@ -158,7 +297,66 @@ pub fn apply_preset(preset: &PresetSpec, job: &JobSpec) -> JobSpec {
     if let Some(v) = preset.quality {
         updated.quality = Some(v);
     }
+    apply_rate_control(preset, &mut updated);
+    apply_encoder_settings(preset, &mut updated);
     updated
+}
+
+/// Write the rate control a preset asks for onto a job.
+///
+/// The mode is written to the named member and to the flag beside it, because a
+/// job can be read by either: a caller that only sets `target_size_mode` and a
+/// caller that only sets `encoding_mode` mean the same thing, and which of them
+/// a given reader looks at is not something a preset should depend on.
+fn apply_rate_control(preset: &PresetSpec, job: &mut JobSpec) {
+    let Some(mode) = preset.encoding_mode else {
+        return;
+    };
+    job.encoding_mode = Some(mode);
+    job.constant_quality = mode.is_constant_quality();
+    job.average_bitrate_mode = mode.is_average_bitrate();
+    job.target_size_mode = mode.is_target_size();
+    job.two_pass = mode.is_two_pass();
+    job.two_pass_encoding = job.two_pass;
+    job.lossless = mode.is_lossless();
+    job.lossless_encoding = job.lossless;
+    if let Some(size) = preset.target_size {
+        job.target_size = Some(size);
+        job.target_file_size = Some(size);
+        job.target_size_bytes = Some(size);
+    }
+}
+
+/// Write the encoder a preset is written for onto a job.
+///
+/// The encoder name goes where the pipeline reads it, which is the job's
+/// hardware-encode options, so a hardware preset reaches the encoder it was
+/// written for instead of being re-decided from the codec at encode time.
+fn apply_encoder_settings(preset: &PresetSpec, job: &mut JobSpec) {
+    if let Some(encoding) = preset.video_encoding.clone() {
+        let mut merged = job.video_encoding.clone();
+        merged.preset = encoding.preset.clone().or(merged.preset);
+        merged.profile = encoding.profile.clone().or(merged.profile);
+        merged.tune = encoding.tune.clone().or(merged.tune);
+        merged.level = encoding.level.clone().or(merged.level);
+        merged.colour_range = encoding.colour_range.or(merged.colour_range);
+        job.video_encoding = merged;
+    }
+    let Some(encoder) = preset.encoder else {
+        return;
+    };
+    job.hardware_acceleration.encode.encoder = Some(encoder.identifier().to_string());
+    if !encoder.is_hardware() {
+        return;
+    }
+    let api = encoder.hardware_api();
+    job.hardware_acceleration.encode.enabled = true;
+    job.hardware_acceleration.encode.api = api;
+    job.hardware_acceleration.api = api;
+    if !job.hardware_acceleration.enabled {
+        job.hardware_acceleration.enabled = true;
+        job.hardware_acceleration.mode = crate::HardwareMode::Auto;
+    }
 }
 
 pub fn apply(preset: &PresetSpec, job: &JobSpec) -> JobSpec {
@@ -270,6 +468,64 @@ pub fn create_user_preset(
 
 pub fn create_preset(path: &Path, name: &str, preset: PresetSpec) -> Result<UserPreset, CoreError> {
     create_user_preset(path, name, preset)
+}
+
+/// Store a copy of a preset under a new name.
+///
+/// The copy is deep: the settings are read out of the original and stored in a
+/// new record, so changing the copy cannot reach back into what it was copied
+/// from. A copy is the only way to change a preset that ships with the build, so
+/// a shared one would let an edit of the copy rewrite the shipped preset for
+/// everybody who opens the list afterwards.
+pub fn clone_user_preset(
+    path: &Path,
+    id: &str,
+    name: Option<&str>,
+) -> Result<UserPreset, CoreError> {
+    let mut presets = load_user_presets(path)?;
+    let Some(source) = presets.iter().find(|preset| preset.id == id) else {
+        return Err(CoreError::Invalid(format!("preset not found: {id}")));
+    };
+    let mut copy = source.clone();
+    copy.id = now_id("user");
+    copy.name = match name.map(str::trim).filter(|name| !name.is_empty()) {
+        Some(wanted) => wanted.to_string(),
+        None => crate::catalog::copy_suffix(&source.name),
+    };
+    copy.preset.name = Some(copy.name.clone());
+    presets.push(copy.clone());
+    save_user_presets(path, &presets)?;
+    Ok(copy)
+}
+
+/// Move a stored preset `delta` places through the library.
+///
+/// The library is left exactly as it was when the move would take the preset off
+/// either end, so a page that asks for "one further up" at the top gets nothing
+/// rather than a wrap-around it did not ask for.
+pub fn move_user_preset(path: &Path, id: &str, delta: i32) -> Result<bool, CoreError> {
+    let mut presets = load_user_presets(path)?;
+    let moved = crate::catalog::move_entry_by(&mut presets, id, delta, |preset| preset.id.as_str());
+    if moved {
+        save_user_presets(path, &presets)?;
+    }
+    Ok(moved)
+}
+
+/// Put a stored preset at an absolute place in the library.
+pub fn place_user_preset(path: &Path, id: &str, target: usize) -> Result<bool, CoreError> {
+    let mut presets = load_user_presets(path)?;
+    let moved =
+        crate::catalog::move_entry_to(&mut presets, id, target, |preset| preset.id.as_str());
+    if moved {
+        save_user_presets(path, &presets)?;
+    }
+    Ok(moved)
+}
+
+/// The identifiers a stored preset list is in, in order.
+pub fn user_preset_order(presets: &[UserPreset]) -> Vec<String> {
+    presets.iter().map(|preset| preset.id.clone()).collect()
 }
 
 pub fn update_user_preset(
@@ -408,6 +664,18 @@ impl UserPresetStore {
     pub fn delete_preset(&self, id: &str) -> Result<(), CoreError> {
         self.delete(id)
     }
+    /// Store a copy of a preset under a new name.
+    pub fn clone(&self, id: &str, name: Option<&str>) -> Result<UserPreset, CoreError> {
+        clone_user_preset(&self.path, id, name)
+    }
+    /// Move a preset through the library.
+    pub fn move_by(&self, id: &str, delta: i32) -> Result<bool, CoreError> {
+        move_user_preset(&self.path, id, delta)
+    }
+    /// Put a preset at a named place in the library.
+    pub fn place(&self, id: &str, target: usize) -> Result<bool, CoreError> {
+        place_user_preset(&self.path, id, target)
+    }
 }
 
 pub fn import_preset(path: &Path) -> Result<PresetSpec, CoreError> {
@@ -417,8 +685,30 @@ pub fn import_preset(path: &Path) -> Result<PresetSpec, CoreError> {
 pub fn import_preset_file(path: &Path) -> Result<PresetSpec, CoreError> {
     import_preset(path)
 }
+
+/// Read a stored preset out of a file.
+///
+/// Two shapes are read, in this order: the versioned document this build writes,
+/// and the bare record an earlier build wrote. The versioned one is tried first
+/// because it is the one that says which schema it is in; a file that declares a
+/// version this build cannot read is refused rather than falling through to the
+/// second shape, which would read a newer file's settings as an older record and
+/// lose whatever the newer build had put in it.
 pub fn import_user_preset(path: &Path) -> Result<UserPreset, CoreError> {
     let raw = fs::read_to_string(path).map_err(|e| CoreError::Io(e.to_string()))?;
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
+        if value.get("version").is_some() || value.get("entry").is_some() {
+            return crate::catalog::read_preset_document(&value).map(|document| {
+                let entry = document.entry;
+                UserPreset {
+                    id: entry.id,
+                    name: entry.name,
+                    description: Some(entry.description),
+                    preset: entry.spec,
+                }
+            });
+        }
+    }
     serde_json::from_str(&raw).map_err(|e| CoreError::Parse(e.to_string()))
 }
 pub fn export_preset(path: &Path, preset: &PresetSpec) -> Result<(), CoreError> {
@@ -431,12 +721,44 @@ pub fn export_preset(path: &Path, preset: &PresetSpec) -> Result<(), CoreError> 
 pub fn export_preset_file(path: &Path, preset: &PresetSpec) -> Result<(), CoreError> {
     export_preset(path, preset)
 }
+
+/// Write a stored preset to a file as a versioned document.
+///
+/// The version travels with the preset, so a file this build writes says which
+/// schema it is in rather than leaving a reader to work it out from the shape.
 pub fn export_user_preset(path: &Path, preset: &UserPreset) -> Result<(), CoreError> {
-    if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
+    let document = crate::catalog::PresetDocument::new(user_preset_to_entry(
+        preset,
+        crate::catalog::PresetCategory::General,
+    ));
+    crate::catalog::export_preset_document(path, &document)
+}
+
+/// A stored preset written as a catalog entry.
+pub fn user_preset_to_entry(
+    preset: &UserPreset,
+    category: crate::catalog::PresetCategory,
+) -> crate::catalog::PresetEntry {
+    crate::catalog::PresetEntry {
+        id: preset.id.clone(),
+        name: preset.name.clone(),
+        description: preset.description.clone().unwrap_or_default(),
+        category,
+        family: None,
+        encoder: preset.preset.encoder,
+        compatibility: None,
+        spec: preset.preset.clone(),
     }
-    let raw = serde_json::to_string_pretty(preset).map_err(|e| CoreError::Parse(e.to_string()))?;
-    fs::write(path, raw).map_err(|e| CoreError::Io(e.to_string()))
+}
+
+/// A catalog entry read as a stored preset.
+pub fn entry_to_user_preset(entry: &crate::catalog::PresetEntry) -> UserPreset {
+    UserPreset {
+        id: entry.id.clone(),
+        name: entry.name.clone(),
+        description: Some(entry.description.clone()),
+        preset: entry.spec.clone(),
+    }
 }
 
 // Settings persistence

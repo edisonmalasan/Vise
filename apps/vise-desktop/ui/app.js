@@ -1967,6 +1967,8 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
 
     host.appendChild(para(view.summary + " Stored in " + view.storePath + "."));
 
+    host.appendChild(catalogBrowser(view.catalog));
+
     var library = node("div", "controls");
     (view.controls || []).forEach(function (control) {
       library.appendChild(
@@ -1986,8 +1988,300 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       host.appendChild(emptyNote("No presets are available."));
     }
 
-    host.appendChild(presetGroup("Presets that ship with this build", view.builtIn));
     host.appendChild(presetGroup("Your presets", view.user));
+  }
+
+  /* The catalog browser.
+   *
+   * The six categories are a tab strip and the entries in the chosen category
+   * are a listbox, because that is what they are: two levels of choosing one
+   * thing out of many. The window has already decided which entry is open, what
+   * each one will actually run, and why anything is closed, so the page only
+   * wires the keys and the presses to the command that asks again.
+   */
+  function catalogBrowser(catalog) {
+    var box = node("fieldset", "preset-catalog");
+    box.appendChild(node("legend", null, "Presets that ship with this build"));
+    box.appendChild(para(catalog.summary));
+
+    var wrap = node("div", "catalog");
+    var strip = node("div", "tablist catalog-categories");
+    strip.setAttribute("role", "tablist");
+    strip.setAttribute("aria-label", "Preset categories");
+    wrap.appendChild(strip);
+
+    var panels = node("div", "catalog-panels");
+    (catalog.categories || []).forEach(function (category, index) {
+      strip.appendChild(catalogCategoryTab(category, index, catalog.categories.length));
+      panels.appendChild(catalogPanel(category, catalog));
+    });
+    wrap.appendChild(panels);
+    box.appendChild(wrap);
+
+    var note = para(catalog.note, "hint catalog-note");
+    note.id = "catalogNote";
+    box.appendChild(note);
+    box.appendChild(para("Catalog schema version " + catalog.version + ".", "hint"));
+    return box;
+  }
+
+  /* One category on the strip.
+   *
+   * One tab stop for the whole strip, arrow keys along it, Home and End for the
+   * ends, and the arrows swap with the layout because they are the platform's
+   * own. Same contract as the output tabs and the preferences strip.
+   */
+  function catalogCategoryTab(category, index, total) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.id = "catalogTab-" + category.id;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", category.selected ? "true" : "false");
+    button.setAttribute("aria-controls", "catalogPanel-" + category.id);
+    button.title = category.description;
+    button.tabIndex = category.selected ? 0 : -1;
+    setText(button, category.label + " (" + category.count + ")");
+    button.addEventListener("click", function () {
+      browseCatalog({ category: category.id });
+    });
+    button.addEventListener("keydown", function (event) {
+      handleCatalogTabKeys(event, index, total);
+    });
+    return button;
+  }
+
+  function catalogPanel(category, catalog) {
+    var panel = node("div", "tabpanel catalog-panel");
+    panel.id = "catalogPanel-" + category.id;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", "catalogTab-" + category.id);
+    panel.tabIndex = 0;
+    panel.hidden = !category.selected;
+    panel.appendChild(para(category.description, "hint catalog-category-note"));
+
+    var entries = category.selected ? catalog.entries || [] : [];
+    if (!entries.length) {
+      panel.appendChild(emptyNote("There are no presets in this category."));
+      return panel;
+    }
+
+    var list = node("div", "catalog-list");
+    list.setAttribute("role", "listbox");
+    list.id = "catalogList-" + category.id;
+    list.setAttribute("aria-label", category.label + " presets");
+    list.setAttribute("aria-describedby", "catalogNote");
+    entries.forEach(function (entry, index) {
+      list.appendChild(catalogOption(entry, index, entries.length));
+    });
+    panel.appendChild(list);
+    panel.appendChild(catalogDetail(catalog.detail));
+    return panel;
+  }
+
+  /* One entry in the list.
+   *
+   * A listbox option rather than a button, because the arrows walk the list
+   * rather than tabbing through it. An option this machine cannot run is left in
+   * the list with its reason beside it: taking it out of the list would hide the
+   * presets a user may well want to read about on a machine that is not this one.
+   */
+  function catalogOption(entry, index, total) {
+    var option = document.createElement("div");
+    option.className = "catalog-option";
+    option.id = "catalogOption-" + entry.id;
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", entry.selected ? "true" : "false");
+    option.tabIndex = entry.selected ? 0 : -1;
+    if (!entry.available) {
+      option.setAttribute("aria-disabled", "true");
+      option.title = entry.availableReason;
+    }
+
+    var head = node("div", "preset-head");
+    head.appendChild(node("span", "title", entry.name));
+    head.appendChild(node("span", "chip", entry.encoderLabel));
+    if (entry.needsHardware) {
+      head.appendChild(node("span", "chip", entry.family || "Hardware"));
+    }
+    if (entry.fallback) {
+      head.appendChild(node("span", "chip fallback", "Software fallback"));
+    }
+    if (!entry.available) {
+      head.appendChild(node("span", "chip closed", "Not available here"));
+    }
+    if (entry.isDefault) {
+      head.appendChild(node("span", "chip default", "Default"));
+    }
+    option.appendChild(head);
+    option.appendChild(para(entry.summary));
+
+    if (!entry.available && entry.availableReason) {
+      option.appendChild(para(entry.availableReason, "hint catalog-closed"));
+    }
+    option.addEventListener("click", function () {
+      if (entry.id !== (state.presets.catalog.detail || {}).id) {
+        browseCatalog({ category: entry.categoryId, entry: entry.id });
+      }
+    });
+    option.addEventListener("keydown", function (event) {
+      handleCatalogOptionKeys(event, entry.id, index, total);
+    });
+    return option;
+  }
+
+  /* The open entry, read out in full.
+   *
+   * Everything here is text the window wrote: what the preset is for, which
+   * players it is meant for, which encoder will run and whether that is the one
+   * it was written for. The controls are the window's actions, so a preset that
+   * cannot run here arrives with its apply closed and its reason in place.
+   */
+  function catalogDetail(detail) {
+    if (!detail) {
+      return emptyNote("Choose a preset to read what it does.");
+    }
+    var box = node("div", "catalog-detail");
+
+    var head = node("div", "preset-head");
+    head.appendChild(node("span", "title", detail.name));
+    head.appendChild(node("span", "chip", detail.encoder));
+    if (detail.hardware) {
+      head.appendChild(node("span", "chip", "On the chip"));
+    }
+    if (detail.fallback) {
+      head.appendChild(node("span", "chip fallback", "Software fallback"));
+    }
+    box.appendChild(head);
+    box.appendChild(para(detail.description));
+    if (detail.compatibility) {
+      var guidance = node("dl", "facts-list");
+      guidance.appendChild(node("dt", null, "Plays on"));
+      guidance.appendChild(node("dd", null, detail.compatibility));
+      box.appendChild(guidance);
+    }
+    var facts = node("dl", "facts-list");
+    facts.appendChild(node("dt", null, "Sets"));
+    facts.appendChild(node("dd", null, detail.summary));
+    facts.appendChild(node("dt", null, "Encoder"));
+    facts.appendChild(node("dd", null, detail.encoderLabel + " (" + detail.encoder + ")"));
+    box.appendChild(facts);
+
+    if (detail.availableNote) {
+      box.appendChild(para(detail.availableNote, "hint catalog-note"));
+    }
+    if (!detail.available && detail.availableReason) {
+      var closed = para(detail.availableReason, "notice catalog-closed-note");
+      closed.setAttribute("data-tone", "error");
+      box.appendChild(closed);
+    }
+
+    var controls = node("div", "controls");
+    (detail.actions || []).forEach(function (action) {
+      controls.appendChild(
+        actionButton(action, function () {
+          var run = PRESET_ACTIONS[action.id];
+          if (run) {
+            run({ id: detail.id }, state.presetForm);
+          }
+        })
+      );
+    });
+    box.appendChild(controls);
+    return box;
+  }
+
+  function browseCatalog(change) {
+    return call("browse_catalog", { change: change })
+      .then(function (view) {
+        state.presets = view;
+        var shell = shellOf("presets");
+        if (shell && !shell.hidden) {
+          paintPresets(shell, view);
+          /* The list is rebuilt from the answer, so the option that is open now
+             is the one that exists now: focus follows the selection rather than
+             the element that was pressed. */
+          var open = view.catalog && view.catalog.detail;
+          if (open) {
+            var option = el("catalogOption-" + open.id);
+            if (option) {
+              option.focus();
+            }
+          }
+        }
+        return view;
+      })
+      .catch(failed);
+  }
+
+  /* Home and End do not move with the layout: they go to the first and the last
+     either way, which is where they sit on screen. */
+  function handleCatalogTabKeys(event, index, total) {
+    var moved = stepBy(event, index, total);
+    if (moved === null) {
+      return;
+    }
+    var categories = (state.presets && state.presets.catalog.categories) || [];
+    var target = categories[moved];
+    if (!target) {
+      return;
+    }
+    event.preventDefault();
+    browseCatalog({ category: target.id }).then(function () {
+      var button = el("catalogTab-" + target.id);
+      if (button) {
+        button.focus();
+      }
+    });
+  }
+
+  /* The list walks up and down, and the arrows follow the reading direction:
+     the arrow that means "further along" is the one that points that way. */
+  function handleCatalogOptionKeys(event, id, index, total) {
+    var arrows = tabArrows();
+    var next = null;
+    if (event.key === "ArrowDown" || event.key === arrows.forwards) {
+      next = index === total - 1 ? null : index + 1;
+    } else if (event.key === "ArrowUp" || event.key === arrows.backwards) {
+      next = index === 0 ? null : index - 1;
+    } else if (event.key === "Home") {
+      next = 0;
+    } else if (event.key === "End") {
+      next = total - 1;
+    }
+    if (next === null || next === index) {
+      return;
+    }
+    var entries = (state.presets && state.presets.catalog.entries) || [];
+    var target = entries[next];
+    if (!target) {
+      return;
+    }
+    event.preventDefault();
+    browseCatalog({ category: target.categoryId, entry: target.id });
+  }
+
+  /* Which way along a strip a key press goes, or null when it is not one of the
+     keys a strip answers. Shared by the catalog strip so all three strips agree
+     on what wraps and what does not. */
+  function stepBy(event, index, total) {
+    if (!total) {
+      return null;
+    }
+    var last = total - 1;
+    var arrows = tabArrows();
+    if (event.key === arrows.forwards) {
+      return index === last ? 0 : index + 1;
+    }
+    if (event.key === arrows.backwards) {
+      return index === 0 ? last : index - 1;
+    }
+    if (event.key === "Home") {
+      return 0;
+    }
+    if (event.key === "End") {
+      return last;
+    }
+    return null;
   }
 
   function presetGroup(title, presets) {
@@ -2010,6 +2304,12 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     var head = node("div", "preset-head");
     head.appendChild(node("span", "title", preset.name));
     head.appendChild(node("span", "chip", preset.category));
+    if (preset.fallback) {
+      head.appendChild(node("span", "chip fallback", "Software fallback"));
+    }
+    if (!preset.available) {
+      head.appendChild(node("span", "chip closed", "Not available here"));
+    }
     if (preset.isDefault) {
       head.appendChild(node("span", "chip default", "Default"));
     }
@@ -2020,6 +2320,14 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     }
     if (!preset.editable && preset.editReason) {
       row.appendChild(para(preset.editReason));
+    }
+    /* A stored preset is resolved against this machine as well as one from the
+       catalog: a preset copied off another machine may name an encoder this one
+       does not have. */
+    if (!preset.available && preset.availableReason) {
+      row.appendChild(para(preset.availableReason, "hint catalog-closed"));
+    } else if (preset.availableNote) {
+      row.appendChild(para(preset.availableNote, "hint catalog-note"));
     }
 
     var controls = node("div", "controls");

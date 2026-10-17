@@ -255,12 +255,20 @@ impl HardwareCapabilities {
         self.supports_encoder(codec)
     }
 
+    /// The software encoder this build reaches for when no hardware encoder is
+    /// usable for `codec`.
+    ///
+    /// The professional codecs are named here so a preset can fall back to the
+    /// same answer the pipeline would have reached on its own.
     pub fn software_encoder(&self, codec: VideoCodec) -> &'static str {
         match codec {
             VideoCodec::H264 => "libx264",
             VideoCodec::H265 => "libx265",
             VideoCodec::Av1 => "libaom-av1",
             VideoCodec::Vp9 => "libvpx-vp9",
+            VideoCodec::ProRes => "prores_ks",
+            VideoCodec::Dnxhr => "dnxhd",
+            VideoCodec::Ffv1 => "ffv1",
         }
     }
 
@@ -296,6 +304,9 @@ impl HardwareCapabilities {
             ],
             VideoCodec::Av1 => vec!["av1_nvenc", "av1_qsv", "av1_vaapi", "av1_amf"],
             VideoCodec::Vp9 => vec!["vp9_vaapi"],
+            // The professional codecs are editing formats; no GPU encodes them,
+            // so there is no hardware candidate to look for.
+            VideoCodec::ProRes | VideoCodec::Dnxhr | VideoCodec::Ffv1 => Vec::new(),
         };
         for c in candidates {
             if self.supports_encoder(c) {

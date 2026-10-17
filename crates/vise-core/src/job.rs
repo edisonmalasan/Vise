@@ -10,6 +10,13 @@ pub enum ContainerFormat {
     Webm,
 }
 
+/// Video codecs a job can ask for.
+///
+/// The last three are the intra-frame and archival codecs the professional
+/// presets use. They exist here rather than being spelled as encoder names
+/// because the container rules, the tab choices, and the worker validation all
+/// reason about codecs; an encoder name is a property of a machine, and a codec
+/// is a property of the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum VideoCodec {
@@ -18,6 +25,42 @@ pub enum VideoCodec {
     H265,
     Av1,
     Vp9,
+    /// Apple ProRes, for editing and mastering.
+    #[serde(rename = "prores")]
+    ProRes,
+    /// Avid DNxHR, the other editing interchange format.
+    Dnxhr,
+    /// FFV1, the lossless intra codec used for preservation.
+    Ffv1,
+}
+
+impl VideoCodec {
+    /// The name a person uses for this codec.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::H264 => "H.264",
+            Self::H265 => "H.265",
+            Self::Av1 => "AV1",
+            Self::Vp9 => "VP9",
+            Self::ProRes => "ProRes",
+            Self::Dnxhr => "DNxHR",
+            Self::Ffv1 => "FFV1",
+        }
+    }
+
+    /// Whether frames are coded without reference to other frames.
+    ///
+    /// The professional codecs are all intra, which is what makes them usable as
+    /// an editing interchange format and why they are so much larger than a
+    /// distribution encode.
+    pub fn is_intra_only(self) -> bool {
+        matches!(self, Self::ProRes | Self::Dnxhr | Self::Ffv1)
+    }
+
+    /// Whether this codec reproduces the source without loss.
+    pub fn is_lossless(self) -> bool {
+        self.is_intra_only() && self != Self::ProRes && self != Self::Dnxhr
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -31,6 +74,29 @@ pub enum AudioCodec {
     Mp3,
     Ac3,
     Eac3,
+    /// Uncompressed audio, for preservation alongside a lossless video codec.
+    Pcm,
+}
+
+impl AudioCodec {
+    /// The name a person uses for this codec.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Aac => "AAC",
+            Self::Opus => "Opus",
+            Self::Vorbis => "Vorbis",
+            Self::Flac => "FLAC",
+            Self::Mp3 => "MP3",
+            Self::Ac3 => "AC3",
+            Self::Eac3 => "E-AC3",
+            Self::Pcm => "PCM",
+        }
+    }
+
+    /// Whether the audio is reproduced without loss.
+    pub fn is_lossless(self) -> bool {
+        matches!(self, Self::Flac | Self::Pcm)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -64,23 +130,45 @@ pub enum EncodingMode {
     LosslessMode,
 }
 impl EncodingMode {
+    /// Whether this mode asks for one quality value.
     pub fn is_constant_quality(&self) -> bool {
         matches!(
             self,
             Self::ConstantQuality | Self::ConstantQualityMode | Self::Cq | Self::Crf
         )
     }
+    /// Whether this mode asks for a bit rate.
     pub fn is_average_bitrate(&self) -> bool {
-        matches!(self, Self::AverageBitrate | Self::Abr)
+        matches!(
+            self,
+            Self::AverageBitrate | Self::AverageBitrateMode | Self::Abr
+        )
     }
+    /// Whether this mode asks for a file size.
+    ///
+    /// Every spelling of the mode is answered here, not just the ones this build
+    /// writes: a mode is read out of files other builds wrote, and a preset that
+    /// named a size in a spelling this predicate did not know would have its size
+    /// refused as if it had asked for no rate control at all.
     pub fn is_target_size(&self) -> bool {
-        matches!(self, Self::TargetSize | Self::TargetFileSize)
+        matches!(
+            self,
+            Self::TargetSize | Self::TargetFileSize | Self::TargetSizeMode
+        )
     }
+    /// Whether this mode asks for an analysis pass first.
     pub fn is_two_pass(&self) -> bool {
-        matches!(self, Self::TwoPass | Self::TwoPassEncoding)
+        matches!(
+            self,
+            Self::TwoPass | Self::TwoPassEncoding | Self::TwoPassMode
+        )
     }
+    /// Whether this mode asks for no loss.
     pub fn is_lossless(&self) -> bool {
-        matches!(self, Self::Lossless | Self::LosslessEncoding)
+        matches!(
+            self,
+            Self::Lossless | Self::LosslessEncoding | Self::LosslessMode
+        )
     }
 }
 // Compatibility aliases removed.

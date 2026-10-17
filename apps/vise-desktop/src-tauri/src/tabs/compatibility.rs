@@ -47,6 +47,12 @@ pub fn video_codec_of(text: &str) -> Option<VideoCodec> {
         "h265" | "hevc" | "x265" => Some(VideoCodec::H265),
         "av1" => Some(VideoCodec::Av1),
         "vp9" => Some(VideoCodec::Vp9),
+        // The three professional codecs are here because the catalog ships
+        // presets that use them: a preset that names ProRes has to be
+        // applicable, and it can only be applicable if the tabs can hold it.
+        "prores" | "prores_ks" => Some(VideoCodec::ProRes),
+        "dnxhr" | "dnxhd" => Some(VideoCodec::Dnxhr),
+        "ffv1" => Some(VideoCodec::Ffv1),
         _ => None,
     }
 }
@@ -67,6 +73,7 @@ pub fn audio_codec_of(text: &str) -> Option<AudioCodec> {
         "mp3" | "libmp3lame" => Some(AudioCodec::Mp3),
         "ac3" => Some(AudioCodec::Ac3),
         "eac3" | "ddp" => Some(AudioCodec::Eac3),
+        "pcm" | "pcm_s16le" => Some(AudioCodec::Pcm),
         _ => None,
     }
 }
@@ -78,7 +85,27 @@ pub fn video_codec_options() -> Vec<ChoiceOption> {
         ChoiceOption::new("h265", "H.265 (HEVC)"),
         ChoiceOption::new("av1", "AV1"),
         ChoiceOption::new("vp9", "VP9"),
+        ChoiceOption::new("prores", "ProRes (editing interchange)"),
+        ChoiceOption::new("dnxhr", "DNxHR (editing interchange)"),
+        ChoiceOption::new("ffv1", "FFV1 (lossless preservation)"),
     ]
+}
+
+/// The identifier this build's pickers use for a video codec.
+///
+/// The inverse of [`video_codec_of`]. A preset that names an encoder comes back
+/// as an [`vise_core::EncoderId`], and the tab it is written onto names codecs
+/// rather than encoders, so the pair is settled here instead of at each call.
+pub fn video_codec_id(codec: VideoCodec) -> &'static str {
+    match codec {
+        VideoCodec::H264 => "h264",
+        VideoCodec::H265 => "h265",
+        VideoCodec::Av1 => "av1",
+        VideoCodec::Vp9 => "vp9",
+        VideoCodec::ProRes => "prores",
+        VideoCodec::Dnxhr => "dnxhr",
+        VideoCodec::Ffv1 => "ffv1",
+    }
 }
 
 /// Every audio codec this build offers.
@@ -91,20 +118,37 @@ pub fn audio_codec_options() -> Vec<ChoiceOption> {
         ChoiceOption::new("mp3", "MP3"),
         ChoiceOption::new("ac3", "AC3"),
         ChoiceOption::new("eac3", "E-AC3"),
+        ChoiceOption::new("pcm", "PCM (uncompressed)"),
     ]
+}
+
+/// Whether a video codec is one of the editing and preservation formats.
+pub fn is_professional_video(id: &str) -> bool {
+    matches!(id, "prores" | "dnxhr" | "ffv1")
 }
 
 /// Video codecs the chosen container accepts.
 ///
 /// WebM is a VP9 container, so the choice is made for the user rather than
-/// quietly ignored later by the encoder.
+/// quietly ignored later by the encoder. The professional codecs travel in
+/// Matroska in this build — the muxer this window offers has no QuickTime or MXF
+/// wrapper to put them in — so they are listed and then closed with the reason
+/// rather than missing: the catalog ships presets that use them, and a control
+/// that cannot show what is being applied is a control that would do something
+/// else without saying so.
 pub fn video_codecs_for(container: &str) -> Vec<ChoiceOption> {
     let webm = container.trim().eq_ignore_ascii_case("webm");
+    let mkv = container.trim().eq_ignore_ascii_case("mkv");
     video_codec_options()
         .into_iter()
         .map(|option| {
             if webm && option.id != "vp9" {
                 option.blocked("WebM carries VP9 video only.")
+            } else if !mkv && is_professional_video(&option.id) {
+                let label = option.label.clone();
+                option.blocked(format!(
+                    "Matroska is the only container this build offers that carries {label}."
+                ))
             } else {
                 option
             }
@@ -113,6 +157,12 @@ pub fn video_codecs_for(container: &str) -> Vec<ChoiceOption> {
 }
 
 /// Audio codecs the chosen container accepts.
+///
+/// Uncompressed audio is listed everywhere and then closed where the container
+/// cannot carry it, because the preservation presets pair PCM with a lossless
+/// video codec and a closed control is the only honest answer to "why is this not
+/// on offer" — removing it would leave a preset that applies to something the
+/// picker cannot show.
 pub fn audio_codecs_for(container: &str) -> Vec<ChoiceOption> {
     let container = container.trim().to_ascii_lowercase();
     let reason_for = |id: &str| -> Option<&'static str> {
@@ -125,6 +175,10 @@ pub fn audio_codecs_for(container: &str) -> Vec<ChoiceOption> {
             ("mp4", "vorbis") => {
                 Some("MP4 players rarely read Vorbis audio; AAC or Opus is safer.")
             }
+            (_, "pcm") if container != "mkv" => Some(
+                "Matroska is the only container this build offers that carries uncompressed \
+                 audio; an MP4 would carry it in a form that is not this.",
+            ),
             _ => None,
         }
     };
@@ -135,6 +189,57 @@ pub fn audio_codecs_for(container: &str) -> Vec<ChoiceOption> {
             None => option,
         })
         .collect()
+}
+
+/// The rate-control mode named by `text`, in the terms the job model uses.
+///
+/// The tabs name a mode in their own words; a preset has to carry the mode the
+/// job reads, so the two spellings are settled here rather than in the window.
+pub fn encoding_mode_of(text: &str) -> Option<vise_core::EncodingMode> {
+    match text
+        .trim()
+        .to_ascii_lowercase()
+        .replace(['-', ' '], "_")
+        .as_str()
+    {
+        "quality" | "crf" | "cq" | "constant_quality" => {
+            Some(vise_core::EncodingMode::ConstantQuality)
+        }
+        "bitrate" | "abr" | "average_bitrate" => Some(vise_core::EncodingMode::AverageBitrate),
+        "target_size" | "target file size" => Some(vise_core::EncodingMode::TargetSize),
+        "two_pass" => Some(vise_core::EncodingMode::TwoPass),
+        "lossless" => Some(vise_core::EncodingMode::Lossless),
+        _ => None,
+    }
+}
+
+/// The encoder a preset built from these tabs is written for.
+///
+/// The tabs choose a codec, and the codec names the encoder that writes it in
+/// software. Reading it back through the core's own table keeps one answer:
+/// a preset saved here names the encoder the pipeline would reach for on its own,
+/// and the catalog's availability rules can be asked about it.
+pub fn encoder_of(text: &str) -> Option<vise_core::EncoderId> {
+    if let Some(named) = vise_core::EncoderId::parse(text) {
+        return Some(named);
+    }
+    let codec = video_codec_of(text)?;
+    vise_core::EncoderId::parse(vise_core::HardwareCapabilities::default().software_encoder(codec))
+}
+
+/// The target file size a rate control names, in bytes.
+///
+/// The tabs ask for megabytes and the job asks for bytes, and a size-targeted
+/// preset that carried the wrong unit would aim at a different file from the one
+/// the user asked for. The conversion is the one the queue already uses, so a
+/// preset saved from the tabs and a job typed on them agree to the byte.
+pub fn target_size_bytes_of(text: &str, megabytes: Option<u32>) -> Option<u64> {
+    if !encoding_mode_of(text)?.is_target_size() {
+        return None;
+    }
+    megabytes
+        .map(u64::from)
+        .map(|mb| mb.saturating_mul(1_000_000))
 }
 
 /// Whether the encoder writes bitmap subtitle pictures rather than text.
@@ -317,10 +422,33 @@ pub fn encoder_presets(codec: &str) -> Vec<ChoiceOption> {
 }
 
 /// Coding profiles, per video codec family.
+///
+/// The professional codecs are listed with the names their encoders take rather
+/// than with the names the distribution codecs use: ProRes profiles are numbers
+/// to the encoder that writes them, and DNxHR profiles are named after the
+/// formats they produce. A picker that showed "High" for a codec whose encoder
+/// asks for "dnxhr_hqx" would refuse the very value the preset is written to set.
 pub fn encoder_profiles(codec: &str) -> Vec<ChoiceOption> {
     let options: &[(&str, &str)] = match codec.trim() {
         "av1" => &[("main", "Main")],
         "vp9" => &[("main", "Main"), ("high", "High")],
+        "prores" => &[
+            ("0", "Proxy"),
+            ("1", "LT"),
+            ("2", "422"),
+            ("3", "422 HQ"),
+            ("4", "4444"),
+            ("5", "4444 XQ"),
+        ],
+        "dnxhr" => &[
+            ("dnxhr_lb", "DNxHR LB"),
+            ("dnxhr_sq", "DNxHR SQ"),
+            ("dnxhr_hqx", "DNxHR HQX"),
+            ("dnxhr_hq", "DNxHR HQ"),
+            ("dnxhr_444", "DNxHR 444"),
+        ],
+        // FFV1 has no profiles: it is one codec, always lossless, always intra.
+        "ffv1" => &[],
         _ => &[
             ("baseline", "Baseline"),
             ("main", "Main"),
@@ -329,6 +457,15 @@ pub fn encoder_profiles(codec: &str) -> Vec<ChoiceOption> {
         ],
     };
     let mut choices = vec![ChoiceOption::new("default", "Encoder default")];
+    if options.is_empty() {
+        // A codec with no profiles still gets a row, and the row says why it has
+        // nothing in it rather than offering a profile the encoder will refuse.
+        return vec![ChoiceOption::taken(
+            "none",
+            "No profiles for this codec",
+            "This codec has one shape and so takes no profile.",
+        )];
+    }
     choices.extend(
         options
             .iter()
@@ -464,8 +601,53 @@ mod tests {
         assert!(!h264.available);
         assert!(h264.reason.contains("VP9"), "{}", h264.reason);
 
+        // MP4 carries the four distribution codecs and closes the professional
+        // three with the reason rather than leaving them out of the list.
         let mp4 = video_codecs_for("mp4");
-        assert!(mp4.iter().all(|option| option.available));
+        assert!(mp4
+            .iter()
+            .filter(|option| !is_professional_video(&option.id))
+            .all(|option| option.available));
+        for id in ["prores", "dnxhr", "ffv1"] {
+            let option = mp4.iter().find(|o| o.id == id).expect(id);
+            assert!(!option.available, "{id} is not an MP4 codec");
+            assert!(option.reason.contains("Matroska"), "{}", option.reason);
+            assert!(
+                video_codecs_for("mkv")
+                    .iter()
+                    .find(|o| o.id == id)
+                    .expect(id)
+                    .available,
+                "{id} is a Matroska codec"
+            );
+        }
+        assert_eq!(
+            video_codec_of("prores"),
+            Some(VideoCodec::ProRes),
+            "the tab can hold what a professional preset asks for"
+        );
+        assert_eq!(video_codec_of("ffv1"), Some(VideoCodec::Ffv1));
+        assert_eq!(video_codec_of("dnxhd"), Some(VideoCodec::Dnxhr));
+    }
+
+    #[test]
+    fn uncompressed_audio_is_offered_only_where_it_can_be_carried() {
+        let mkv = audio_codecs_for("mkv");
+        let pcm = mkv.iter().find(|o| o.id == "pcm").expect("pcm");
+        assert!(pcm.available);
+        assert_eq!(audio_codec_of("pcm"), Some(AudioCodec::Pcm));
+        for container in ["mp4", "webm"] {
+            let listed = audio_codecs_for(container);
+            let option = listed
+                .iter()
+                .find(|o| o.id == "pcm")
+                .expect("pcm is listed, closed");
+            assert!(
+                !option.available,
+                "pcm should not be offered for {container}"
+            );
+            assert!(option.reason.contains("Matroska"), "{}", option.reason);
+        }
     }
 
     #[test]

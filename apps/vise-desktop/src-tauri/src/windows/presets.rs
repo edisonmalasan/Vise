@@ -18,31 +18,38 @@ use vise_core::{AudioCodec, BuiltInPreset, ContainerFormat, PresetSpec, UserPres
 /// Identifier of the preset surface.
 pub const SURFACE: &str = "presets";
 
-/// The categories a user preset can be filed under.
-pub const CATEGORIES: [(&str, &str); 4] = [
-    ("general", "General"),
-    ("web", "Web"),
-    ("devices", "Devices"),
-    ("professional", "Professional"),
-];
-
-/// The category label for `id`.
-pub fn category_label(id: &str) -> &'static str {
-    CATEGORIES
+/// The categories a preset can be filed under.
+///
+/// These are the catalog's six, read from the catalog rather than written here
+/// twice: a list of four categories in this window and six in the catalog would
+/// mean the same word filing two different things.
+pub fn categories() -> Vec<(&'static str, &'static str)> {
+    vise_core::CATEGORIES
         .iter()
-        .find(|(candidate, _)| *candidate == id)
-        .map(|(_, label)| *label)
-        .unwrap_or("General")
+        .map(|category| (category.id(), category.label()))
+        .collect()
 }
 
 /// The category named by `text`, refusing anything else.
 pub fn parse_category(text: &str) -> Result<&'static str, String> {
     let wanted = text.trim().to_ascii_lowercase();
-    CATEGORIES
+    vise_core::PresetCategory::parse(&wanted)
+        .map(|category| category.id())
+        .ok_or_else(|| {
+            format!(
+                "'{wanted}' is not a preset category this build offers; choose {}.",
+                category_names()
+            )
+        })
+}
+
+/// The category names, in one sentence, for a refusal.
+pub fn category_names() -> String {
+    categories()
         .iter()
-        .find(|(id, _)| *id == wanted)
-        .map(|(id, _)| *id)
-        .ok_or_else(|| format!("'{wanted}' is not a preset category this build offers."))
+        .map(|(_, label)| *label)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// What the window is doing with a preset.
@@ -173,6 +180,37 @@ pub struct PresetViewModel {
     pub edit_reason: String,
     /// One line describing what the preset sets.
     pub summary: String,
+    /// Which players or platforms it is meant for, or nothing.
+    ///
+    /// This is the guidance a person needs before choosing a preset, so it is on
+    /// the row rather than in a file they would have to open.
+    pub compatibility: String,
+    /// The encoder that will run, named the way the media tools name it.
+    pub encoder: String,
+    /// The same encoder, in words.
+    pub encoder_label: String,
+    /// Whether that encoder runs on a chip.
+    pub hardware: bool,
+    /// Whether the preset was written for a chip, whatever this machine does
+    /// with it.
+    ///
+    /// This is what a person reads to understand why a preset is in the hardware
+    /// list at all, and it does not change with the machine: a preset written for
+    /// a chip is written for a chip even where the encoder turns out to be
+    /// missing.
+    pub needs_hardware: bool,
+    /// The chip it was written for, in words, when it needs one.
+    pub family: String,
+    /// Whether it is the software stand-in for the encoder it was written for.
+    pub fallback: bool,
+    /// Whether this preset can be used on this machine at all.
+    pub available: bool,
+    /// Why it cannot be, when it cannot.
+    pub available_reason: String,
+    /// What is happening instead, in words, when something was substituted.
+    pub available_note: String,
+    /// Whether this is the entry the browser has open.
+    pub selected: bool,
     /// Every control on the row, with its availability.
     pub actions: Vec<PresetActionViewModel>,
 }
@@ -267,12 +305,66 @@ pub struct PresetOptionViewModel {
     pub selected: bool,
 }
 
+/// The catalog browser, as the page renders it.
+///
+/// The six categories are the strip; the entries in the chosen category are the
+/// list; the entry that is open is read out in full beside it. Nothing here is a
+/// decision the page could have made: which categories exist, which entries they
+/// hold, which encoder each one will actually run, and why anything is closed are
+/// all answered by the core and sent as finished text.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogViewModel {
+    /// The schema version the shipped catalog is written in.
+    pub version: String,
+    /// Every category, with its count and the chosen one marked.
+    pub categories: Vec<PresetCategoryViewModel>,
+    /// The chosen category.
+    pub active_category: String,
+    /// The entries in the chosen category, in catalog order.
+    pub entries: Vec<PresetViewModel>,
+    /// The entry that is open, or nothing when the category is empty.
+    pub detail: Option<PresetViewModel>,
+    /// How many presets the whole catalog holds.
+    pub total: usize,
+    /// How many of them this machine can use.
+    pub usable: usize,
+    /// How many will run in software rather than on the chip they were written
+    /// for.
+    pub fallback: usize,
+    /// Whether the media tools were found, and so whether anything has been
+    /// checked at all.
+    pub checked: bool,
+    /// One line describing the whole catalog on this machine.
+    pub summary: String,
+    /// What has to be true before the answers below mean anything.
+    pub note: String,
+    /// Whether there is nothing in the chosen category.
+    pub empty: bool,
+}
+
+/// One category on the strip.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresetCategoryViewModel {
+    /// Stable identifier the page sends back.
+    pub id: String,
+    /// The name on the strip.
+    pub label: String,
+    /// What belongs in it.
+    pub description: String,
+    /// How many presets it holds.
+    pub count: usize,
+    /// Whether the strip has it open.
+    pub selected: bool,
+}
+
 /// The preset manager, as the page renders it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PresetView {
-    /// The presets that ship with the build.
-    pub built_in: Vec<PresetViewModel>,
+    /// The presets that ship with the build, browsed by category.
+    pub catalog: CatalogViewModel,
     /// The presets the user has stored.
     pub user: Vec<PresetViewModel>,
     /// The form.
@@ -298,6 +390,16 @@ pub struct PresetView {
     pub controls: Vec<PresetActionViewModel>,
 }
 
+/// What the page sends when it moves around the catalog.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CatalogInput {
+    /// The category to open.
+    pub category: String,
+    /// The entry to open inside it.
+    pub entry: String,
+}
+
 /// The window's own bookkeeping of the preset library.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PresetState {
@@ -307,6 +409,17 @@ pub struct PresetState {
     pub default_id: String,
     /// Which category each stored preset is filed under.
     pub categories: std::collections::BTreeMap<String, String>,
+    /// Which category the browser has open.
+    pub catalog_category: String,
+    /// Which entry the browser has open inside it.
+    pub catalog_entry: String,
+    /// What the media tools were found to offer.
+    ///
+    /// Empty until [`PresetState::observe_hardware`] has run, which is what makes
+    /// "not checked" different from "checked and found nothing".
+    pub capabilities: vise_core::HardwareCapabilities,
+    /// What the user has asked the machine to use.
+    pub acceleration: vise_core::HardwareAcceleration,
 }
 
 impl PresetState {
@@ -316,7 +429,66 @@ impl PresetState {
             path: path.into(),
             default_id: String::new(),
             categories: std::collections::BTreeMap::new(),
+            catalog_category: default_category().to_string(),
+            catalog_entry: String::new(),
+            capabilities: vise_core::HardwareCapabilities::default(),
+            acceleration: vise_core::HardwareAcceleration::auto(),
         }
+    }
+
+    /// Record what the media tools were found to offer.
+    pub fn observe_hardware(
+        &mut self,
+        capabilities: &vise_core::HardwareCapabilities,
+        acceleration: &vise_core::HardwareAcceleration,
+    ) {
+        self.capabilities = capabilities.clone();
+        self.acceleration = acceleration.clone();
+    }
+
+    /// Whether the media tools have been looked for yet.
+    pub fn is_checked(&self) -> bool {
+        self.capabilities.ffmpeg_path.is_some()
+    }
+
+    /// Show `category` in the browser, refusing anything this build does not
+    /// file.
+    pub fn set_catalog_category(&mut self, category: &str) -> Result<(), String> {
+        let wanted = category.trim();
+        if wanted.is_empty() {
+            self.catalog_category = default_category().to_string();
+            self.catalog_entry.clear();
+            return Ok(());
+        }
+        if vise_core::PresetCategory::parse(wanted).is_none() {
+            return Err(format!(
+                "'{wanted}' is not a preset category this build offers; choose {}.",
+                category_names()
+            ));
+        }
+        if self.catalog_category != wanted {
+            // The open entry belongs to the category it was chosen in; opening
+            // another category opens that category's first entry rather than a
+            // selection the user cannot see.
+            self.catalog_entry.clear();
+        }
+        self.catalog_category = wanted.to_string();
+        Ok(())
+    }
+
+    /// Open `entry` in the browser, refusing an identifier that is not a preset
+    /// this build carries.
+    pub fn set_catalog_entry(&mut self, entry: &str) -> Result<(), String> {
+        let wanted = entry.trim();
+        if wanted.is_empty() {
+            self.catalog_entry.clear();
+            return Ok(());
+        }
+        let found = vise_core::builtin_entry(wanted)
+            .ok_or_else(|| format!("There is no preset called '{wanted}' in this build."))?;
+        self.catalog_category = found.category.id().to_string();
+        self.catalog_entry = found.id.clone();
+        Ok(())
     }
 
     /// The category a stored preset is filed under, defaulting to general.
@@ -365,82 +537,57 @@ impl PresetState {
     }
 
     /// Build the whole window for the stored `user` presets.
+    ///
+    /// The presets that ship with the build are not listed here as a flat block:
+    /// they are browsed by category, with the availability of each one resolved
+    /// against what this machine was found to have, so a preset that cannot run
+    /// here is shown closed with the reason beside it rather than as a button
+    /// that would fail at encode time.
     pub fn view(
         &self,
         user: &[UserPreset],
         built_in: &[BuiltInPreset],
         form: PresetFormViewModel,
     ) -> PresetView {
-        let built_in_rows: Vec<PresetViewModel> = built_in
-            .iter()
-            .map(|preset| PresetViewModel {
-                id: preset.id.clone(),
-                name: preset.name.clone(),
-                description: preset
-                    .description
-                    .clone()
-                    .unwrap_or_else(|| "A preset that ships with this build.".to_string()),
-                category: category_label("general").to_string(),
-                category_id: "general".to_string(),
-                built_in: true,
-                is_default: self.default_id == preset.id,
-                editable: false,
-                edit_reason:
-                    "A preset that ships with the build cannot be renamed; copy it instead."
-                        .to_string(),
-                summary: preset_summary(&preset.preset),
-                actions: vec![
-                    PresetActionViewModel::open("apply", "Apply", false),
-                    PresetActionViewModel::open("clone", "Copy", false),
-                    PresetActionViewModel::open("export", "Export", false),
-                    PresetActionViewModel::open("set_default", "Make default", false)
-                        .blocked_or(self.default_id != preset.id, || {
-                            "This preset already starts every new job.".to_string()
-                        }),
-                    PresetActionViewModel::open("delete", "Delete", true).blocked(
-                        "A preset that ships with the build cannot be deleted; copy it first.",
-                    ),
-                ],
-            })
-            .collect();
+        let catalog = self.catalog_view();
         let user_rows: Vec<PresetViewModel> = user
             .iter()
             .map(|preset| {
                 let category = self.category_of(&preset.id);
                 let is_default = self.default_id == preset.id;
-                PresetViewModel {
-                    id: preset.id.clone(),
-                    name: preset.name.clone(),
-                    description: preset.description.clone().unwrap_or_default(),
-                    category: category_label(category).to_string(),
-                    category_id: category.to_string(),
-                    built_in: false,
-                    is_default,
-                    editable: true,
-                    edit_reason: String::new(),
-                    summary: preset_summary(&preset.preset),
-                    actions: vec![
-                        PresetActionViewModel::open("apply", "Apply", false),
-                        PresetActionViewModel::open("clone", "Copy", false),
-                        PresetActionViewModel::open("set_default", "Make default", false)
-                            .blocked_or(!is_default, || {
-                                "This preset already starts every new job.".to_string()
-                            }),
-                        PresetActionViewModel::open(
-                            "clear_default",
-                            "Stop using as default",
-                            false,
-                        )
+                let entry = vise_core::user_preset_to_entry(
+                    preset,
+                    vise_core::PresetCategory::parse(category)
+                        .unwrap_or(vise_core::PresetCategory::General),
+                );
+                let resolution = entry.resolve(&self.capabilities, &self.acceleration);
+                let mut row = self.row(&entry, &preset.preset, &resolution, is_default, false);
+                row.actions = vec![
+                    PresetActionViewModel::open("apply", "Apply", false).blocked_or(
+                        resolution.available,
+                        || {
+                            format!(
+                                "This preset cannot run on this machine. {}",
+                                resolution.reason
+                            )
+                        },
+                    ),
+                    PresetActionViewModel::open("clone", "Copy", false),
+                    PresetActionViewModel::open("set_default", "Make default", false)
+                        .blocked_or(!is_default, || {
+                            "This preset already starts every new job.".to_string()
+                        }),
+                    PresetActionViewModel::open("clear_default", "Stop using as default", false)
                         .blocked_or(is_default, || "This preset is not the default.".to_string()),
-                        PresetActionViewModel::open("export", "Export", false),
-                        PresetActionViewModel::open("edit", "Rename", false),
-                        PresetActionViewModel::open("delete", "Delete", true),
-                    ],
-                }
+                    PresetActionViewModel::open("export", "Export", false),
+                    PresetActionViewModel::open("edit", "Rename", false),
+                    PresetActionViewModel::open("delete", "Delete", true),
+                ];
+                row
             })
             .collect();
         let default_name = self.default_name(user, built_in);
-        let total = built_in_rows.len() + user_rows.len();
+        let total = catalog.total + user_rows.len();
         let controls = vec![
             PresetActionViewModel::open("import", "Import a preset file", false),
             PresetActionViewModel::open("export", "Export the chosen preset", false)
@@ -461,12 +608,214 @@ impl PresetState {
             total,
             empty: total == 0,
             store_path: self.path.display().to_string(),
-            built_in: built_in_rows,
+            catalog,
             user: user_rows,
             controls,
             form,
         }
     }
+
+    /// One row, whatever kind of preset it is.
+    ///
+    /// Whether the preset ships with the build is passed in rather than worked
+    /// out from the identifier: a stored preset that happens to carry an
+    /// identifier the catalog also uses is still a stored preset, and marking it
+    /// unchangeable because of a name collision would be wrong.
+    fn row(
+        &self,
+        entry: &vise_core::PresetEntry,
+        preset: &PresetSpec,
+        resolution: &vise_core::PresetResolution,
+        is_default: bool,
+        built_in: bool,
+    ) -> PresetViewModel {
+        PresetViewModel {
+            id: entry.id.clone(),
+            name: entry.name.clone(),
+            description: if entry.description.trim().is_empty() {
+                preset
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| "A preset that ships with this build.".to_string())
+            } else {
+                entry.description.clone()
+            },
+            category: entry.category.label().to_string(),
+            category_id: entry.category.id().to_string(),
+            built_in,
+            is_default,
+            editable: !built_in,
+            edit_reason: if built_in {
+                "A preset that ships with the build cannot be renamed; copy it instead.".to_string()
+            } else {
+                String::new()
+            },
+            summary: preset_summary(preset),
+            compatibility: entry.compatibility.clone().unwrap_or_default(),
+            encoder: resolution.encoder.identifier().to_string(),
+            encoder_label: resolution.encoder.label().to_string(),
+            hardware: resolution.hardware,
+            needs_hardware: entry
+                .family
+                .map(|family| family != vise_core::HardwareFamily::Software)
+                .unwrap_or(false)
+                || entry
+                    .encoder
+                    .map(|encoder| encoder.is_hardware())
+                    .unwrap_or(false),
+            family: entry
+                .family
+                .map(|family| family.label().to_string())
+                .unwrap_or_default(),
+            fallback: resolution.fallback,
+            available: resolution.available,
+            available_reason: resolution.reason.clone(),
+            available_note: resolution.note.clone(),
+            // Only the browser selects a row; the stored list is not part of it.
+            selected: false,
+            actions: Vec::new(),
+        }
+    }
+
+    /// The catalog browser, resolved against this machine.
+    pub fn catalog_view(&self) -> CatalogViewModel {
+        let category =
+            vise_core::PresetCategory::parse(&self.catalog_category).unwrap_or_else(|| {
+                vise_core::PresetCategory::parse(default_category()).expect("a category")
+            });
+        let mut entries: Vec<PresetViewModel> = Vec::new();
+        for entry in vise_core::builtin_entries_in(category) {
+            let resolution = entry.resolve(&self.capabilities, &self.acceleration);
+            let is_default = self.default_id == entry.id;
+            let mut row = self.row(entry, &entry.spec, &resolution, is_default, true);
+            row.actions = vec![
+                PresetActionViewModel::open("apply", "Apply", false).blocked_or(
+                    resolution.available,
+                    || {
+                        format!(
+                            "This preset cannot run on this machine. {}",
+                            resolution.reason
+                        )
+                    },
+                ),
+                PresetActionViewModel::open("clone", "Copy", false),
+                PresetActionViewModel::open("export", "Export", false),
+                PresetActionViewModel::open("set_default", "Make default", false)
+                    .blocked_or(!is_default, || {
+                        "This preset already starts every new job.".to_string()
+                    }),
+                PresetActionViewModel::open("delete", "Delete", true).blocked(
+                    "A preset that ships with the build cannot be deleted; copy it first.",
+                ),
+            ];
+            entries.push(row);
+        }
+        // The open entry is the one the user asked for, or the first in the
+        // category: a browser that opened on nothing would be a list with no way
+        // to read any of it. The answer is derived rather than stored, so a
+        // category that changed underneath a stale selection still opens on
+        // something the user can see.
+        let selected_id = if entries.iter().any(|row| row.id == self.catalog_entry) {
+            self.catalog_entry.clone()
+        } else {
+            entries
+                .first()
+                .map(|row| row.id.clone())
+                .unwrap_or_default()
+        };
+        for row in entries.iter_mut() {
+            row.selected = row.id == selected_id;
+        }
+        let detail = entries.iter().find(|row| row.selected).cloned();
+        let all = vise_core::builtin_entries();
+        let usable = all
+            .iter()
+            .filter(|entry| {
+                entry
+                    .resolve(&self.capabilities, &self.acceleration)
+                    .available
+            })
+            .count();
+        let fallback = all
+            .iter()
+            .filter(|entry| {
+                entry
+                    .resolve(&self.capabilities, &self.acceleration)
+                    .fallback
+            })
+            .count();
+        let checked = self.is_checked();
+        CatalogViewModel {
+            version: vise_core::builtin_catalog().version.label(),
+            categories: vise_core::CATEGORIES
+                .iter()
+                .map(|each| PresetCategoryViewModel {
+                    id: each.id().to_string(),
+                    label: each.label().to_string(),
+                    description: each.description().to_string(),
+                    count: vise_core::builtin_entries_in(*each).len(),
+                    selected: *each == category,
+                })
+                .collect(),
+            active_category: category.id().to_string(),
+            total: all.len(),
+            usable,
+            fallback,
+            checked,
+            summary: match (checked, fallback) {
+                (false, _) => format!(
+                    "{} presets; this machine has not been checked yet, so nothing below has \
+                     been resolved yet.",
+                    all.len()
+                ),
+                (true, 0) if usable == all.len() => format!(
+                    "{} presets; every one of them runs here as written.",
+                    all.len()
+                ),
+                (true, 0) => format!(
+                    "{} presets; {usable} run here as written and {} need something this machine \
+                     does not have.",
+                    all.len(),
+                    all.len() - usable
+                ),
+                (true, fallback) => format!(
+                    "{} presets; {usable} run here, {fallback} of them in software because the \
+                     chip they were written for is not here.",
+                    all.len()
+                ),
+            },
+            note: if checked {
+                if self.acceleration.is_enabled()
+                    && self.acceleration.mode != vise_core::HardwareMode::Software
+                    && self.acceleration.preference != vise_core::HardwarePreference::Disable
+                {
+                    "Hardware encoding is on, so a preset written for a chip runs on it when the \
+                     media tools offer it."
+                        .to_string()
+                } else {
+                    "Hardware encoding is switched off, so every hardware preset will run its \
+                     software stand-in instead."
+                        .to_string()
+                }
+            } else {
+                "The media tools have not been found, so no preset has been checked against this \
+                 machine. Every preset is left open rather than closed on the strength of a probe \
+                 that never ran."
+                    .to_string()
+            },
+            empty: entries.is_empty(),
+            entries,
+            detail,
+        }
+    }
+}
+
+/// The category the browser opens on.
+pub fn default_category() -> &'static str {
+    vise_core::CATEGORIES
+        .first()
+        .map(|category| category.id())
+        .unwrap_or("general")
 }
 
 impl PresetActionViewModel {
@@ -483,29 +832,39 @@ impl PresetActionViewModel {
 /// One line describing what a preset sets.
 pub fn preset_summary(preset: &PresetSpec) -> String {
     let container = preset
-        .container
-        .or(preset.format)
+        .container_of()
         .map(container_label)
         .unwrap_or_else(|| "the chosen container".to_string());
     let video = preset
-        .video_codec
-        .or(preset.video)
+        .video_codec_of()
         .map(video_label)
         .unwrap_or_else(|| "the chosen encoder".to_string());
     let audio = preset
-        .audio_codec
-        .or(preset.audio)
+        .audio_codec_of()
         .map(audio_label)
         .unwrap_or_else(|| "the chosen audio encoder".to_string());
     let quality = match preset.quality {
         Some(value) => format!(" quality {value}"),
         None => String::new(),
     };
-    let subtitles = match preset.subtitle_mode.or(preset.subtitles) {
+    let subtitles = match preset.subtitle_mode_of() {
         Some(mode) => format!(", subtitles {mode:?}").to_ascii_lowercase(),
         None => String::new(),
     };
-    format!("{container} · {video} · {audio}{quality}{subtitles}")
+    // A size-targeted preset is a different thing from a quality-targeted one, so
+    // the size it aims for is part of what it sets rather than a field the user
+    // has to find on another tab.
+    let size = match (preset.encoding_mode, preset.target_size) {
+        (Some(mode), Some(bytes)) if mode.is_target_size() => {
+            format!(" aiming at {} MB", bytes / 1_000_000)
+        }
+        _ => String::new(),
+    };
+    let cap = match preset.duration_cap_seconds {
+        Some(seconds) => format!(", made for titles up to {seconds} s"),
+        None => String::new(),
+    };
+    format!("{container} · {video} · {audio}{quality}{subtitles}{size}{cap}")
 }
 
 /// The label for a container.
@@ -672,7 +1031,7 @@ pub fn form_view(
                 action_word(action)
             )
         },
-        categories: CATEGORIES
+        categories: categories()
             .iter()
             .map(|(id, label)| PresetOptionViewModel {
                 id: (*id).to_string(),
@@ -799,12 +1158,16 @@ mod tests {
     #[test]
     fn a_category_this_build_does_not_know_is_refused_by_name() {
         assert_eq!(parse_category(" Web ").expect("web"), "web");
-        assert!(parse_category("hardware")
+        // Every category the catalog files under is one this window offers, so
+        // the strip and the store cannot mean different things by the same word.
+        for category in vise_core::CATEGORIES {
+            let id = category.id();
+            assert_eq!(parse_category(id).unwrap_or_else(|_| panic!("{id}")), id);
+        }
+        assert!(parse_category("nonsense")
             .expect_err("unknown category")
-            .contains("hardware"));
-        assert_eq!(category_label("devices"), "Devices");
-        assert_eq!(category_label("nonsense"), "General");
-        assert_eq!(CATEGORIES.len(), 4);
+            .contains("nonsense"));
+        assert_eq!(categories().len(), 6);
     }
 
     #[test]
@@ -815,7 +1178,7 @@ mod tests {
         assert!(form.name_available);
         assert!(form.description_available);
         assert_eq!(form.action, "create");
-        assert_eq!(form.categories.len(), 4);
+        assert_eq!(form.categories.len(), 6);
         assert!(form.categories[0].selected);
         assert!(form.default_available);
 
@@ -999,9 +1362,10 @@ mod tests {
                 .expect("control")
         };
         assert!(control(&empty, "import").available);
-        let export = control(&empty, "export");
-        assert!(!export.available);
-        assert!(export.reason.contains("no preset to export"));
+        // Export is about the library as a whole, and the build ships a catalog,
+        // so there is always something to export even before the user stores one.
+        assert!(control(&empty, "export").available);
+        assert_eq!(empty.user.len(), 0);
 
         state.set_category("u1", "web");
         let filled = state.view(
@@ -1014,32 +1378,50 @@ mod tests {
             .actions
             .iter()
             .any(|action| action.id == "export" && action.available));
-        assert!(filled.built_in[0]
+        assert!(filled.catalog.entries[0]
             .actions
             .iter()
             .any(|action| action.id == "export" && action.available));
     }
 
     #[test]
-    fn the_library_lists_built_in_and_stored_presets_separately() {
+    fn the_library_lists_the_catalog_and_the_stored_presets_separately() {
         let mut state = PresetState::new("C:\\app\\presets.json");
         let built_in = vise_core::builtin_presets();
         let user = vec![stored("u1", "Mine"), stored("u2", "Yours")];
         state.set_category("u2", "professional");
         let view = state.view(&user, &built_in, form_view(&input("create"), &[], None));
 
-        assert_eq!(view.built_in.len(), 3);
+        assert_eq!(view.catalog.categories.len(), 6);
+        assert_eq!(
+            view.catalog.total,
+            built_in.len(),
+            "the browser lists every preset that ships with the build"
+        );
         assert_eq!(view.user.len(), 2);
-        assert_eq!(view.total, 5);
+        assert_eq!(view.total, built_in.len() + 2);
         assert!(!view.empty);
         assert_eq!(view.user[0].category, "General");
         assert_eq!(view.user[1].category, "Professional");
-        assert!(view.built_in.iter().all(|preset| preset.built_in));
+        assert!(view.catalog.entries.iter().all(|preset| preset.built_in));
         assert!(view.user.iter().all(|preset| !preset.built_in));
         assert!(view.store_path.contains("presets.json"));
         assert!(view.summary.contains("none is the default"));
-        assert!(view.built_in[0].summary.contains("mp4"));
-        assert!(view.built_in[0].summary.contains("h264"));
+        assert!(view.catalog.entries[0].summary.contains("mp4"));
+        assert!(view.catalog.entries[0].summary.contains("h264"));
+        // The browser opens on the general ladder, and every rung of it is there
+        // rather than a flat list of every preset in the catalog.
+        assert_eq!(view.catalog.active_category, "general");
+        assert!(view.catalog.entries.len() > 50);
+        assert_eq!(
+            view.catalog
+                .entries
+                .iter()
+                .filter(|entry| entry.summary.contains("h264"))
+                .count(),
+            20,
+            "four quality families by five rungs"
+        );
     }
 
     #[test]
@@ -1050,7 +1432,7 @@ mod tests {
             &built_in,
             form_view(&input("create"), &[], None),
         );
-        let row = &view.built_in[0];
+        let row = &view.catalog.entries[0];
         let action = |id: &str| {
             row.actions
                 .iter()
@@ -1136,5 +1518,348 @@ mod tests {
         assert_eq!(audio_label(AudioCodec::Aac), "aac");
         assert_eq!(video_label(VideoCodec::H265), "h265");
         assert_eq!(container_label(ContainerFormat::Webm), "webm");
+
+        // A size-targeted preset says so on the line that describes it, because
+        // the size it aims for is part of what it sets.
+        let targeted = PresetSpec {
+            encoding_mode: Some(vise_core::EncodingMode::TargetSize),
+            target_size: Some(10_000_000),
+            duration_cap_seconds: Some(60),
+            ..Default::default()
+        };
+        let summary = preset_summary(&targeted);
+        assert!(summary.contains("aiming at 10 MB"), "{summary}");
+        assert!(summary.contains("up to 60 s"), "{summary}");
+    }
+
+    /// A machine that has every encoder the catalog asks for.
+    fn everything() -> vise_core::HardwareCapabilities {
+        vise_core::HardwareCapabilities {
+            ffmpeg_path: Some(std::path::PathBuf::from("ffmpeg")),
+            hwaccels: vec!["qsv".to_string(), "cuda".to_string()],
+            decoders: vec!["h264".to_string()],
+            encoders: vise_core::EVERY_ENCODER
+                .iter()
+                .map(|encoder| encoder.identifier().to_string())
+                .collect(),
+        }
+    }
+
+    /// A machine with the software encoders only.
+    fn software_only() -> vise_core::HardwareCapabilities {
+        let mut caps = everything();
+        caps.hwaccels.clear();
+        caps.encoders
+            .retain(|name| name.starts_with("lib") || name == "ffv1");
+        caps
+    }
+
+    #[test]
+    fn the_browser_offers_the_six_categories_with_what_each_one_holds() {
+        let mut state = PresetState::new("presets.json");
+        state.observe_hardware(&everything(), &vise_core::HardwareAcceleration::auto());
+        let view = state.view(
+            &[],
+            &vise_core::builtin_presets(),
+            form_view(&input("create"), &[], None),
+        );
+        assert_eq!(view.catalog.categories.len(), 6);
+        let labels: Vec<&str> = view
+            .catalog
+            .categories
+            .iter()
+            .map(|category| category.label.as_str())
+            .collect();
+        assert_eq!(
+            labels,
+            vec![
+                "General",
+                "Web",
+                "Devices",
+                "Matroska",
+                "Hardware",
+                "Professional"
+            ]
+        );
+        assert!(view
+            .catalog
+            .categories
+            .iter()
+            .all(|category| category.count > 0 && !category.description.is_empty()));
+        assert!(view.catalog.categories[0].selected);
+        assert_eq!(
+            view.catalog
+                .categories
+                .iter()
+                .map(|c| c.count)
+                .sum::<usize>(),
+            view.catalog.total
+        );
+        assert_eq!(
+            view.catalog.version,
+            vise_core::PRESET_SCHEMA_VERSION.label()
+        );
+        assert!(view.catalog.checked);
+        assert!(
+            view.catalog.summary.contains("as written"),
+            "{}",
+            view.catalog.summary
+        );
+    }
+
+    #[test]
+    fn moving_to_a_category_opens_its_first_entry_and_forgets_the_last_one() {
+        let mut state = PresetState::new("presets.json");
+        state.observe_hardware(&everything(), &vise_core::HardwareAcceleration::auto());
+        state
+            .set_catalog_entry("general-super-hq-2160-60-av1")
+            .expect("an entry");
+        state
+            .set_catalog_category("professional")
+            .expect("a category");
+        let view = state.view(
+            &[],
+            &vise_core::builtin_presets(),
+            form_view(&input("create"), &[], None),
+        );
+        assert_eq!(view.catalog.active_category, "professional");
+        let detail = view
+            .catalog
+            .detail
+            .expect("the professional presets open on one");
+        assert_eq!(detail.id, "professional-prores-422-proxy");
+        assert!(view
+            .catalog
+            .entries
+            .iter()
+            .all(|entry| entry.selected == (entry.id == detail.id)));
+
+        // Opening an entry moves to the category that holds it, so a page that
+        // sends only an identifier still lands somewhere the user can see.
+        state
+            .set_catalog_entry("device-roku-1080-30-h264")
+            .expect("an entry");
+        assert_eq!(state.catalog_category, "devices");
+    }
+
+    #[test]
+    fn a_category_and_an_entry_this_build_does_not_have_are_refused_by_name() {
+        let mut state = PresetState::new("presets.json");
+        let error = state
+            .set_catalog_category("nonsense")
+            .expect_err("no such category");
+        assert!(error.contains("nonsense"), "{error}");
+        assert!(error.contains("General"), "{error}");
+        let error = state
+            .set_catalog_entry("no-such-preset")
+            .expect_err("no such preset");
+        assert!(error.contains("no-such-preset"), "{error}");
+        // Nothing was changed by the refusals.
+        assert_eq!(state.catalog_category, "general");
+        assert!(state.catalog_entry.is_empty());
+    }
+
+    #[test]
+    fn a_hardware_preset_is_closed_on_a_machine_without_the_chip() {
+        let mut state = PresetState::new("presets.json");
+        state.observe_hardware(&software_only(), &vise_core::HardwareAcceleration::auto());
+        state.set_catalog_category("hardware").expect("a category");
+        let view = state.view(
+            &[],
+            &vise_core::builtin_presets(),
+            form_view(&input("create"), &[], None),
+        );
+        let row = |id: &str| {
+            view.catalog
+                .entries
+                .iter()
+                .find(|entry| entry.id == id)
+                .cloned()
+                .expect("a hardware preset")
+        };
+        // A chip that is not here becomes the software encoder of the same codec,
+        // and the row says so rather than hiding it.
+        let nvenc = row("hardware-nvenc-hevc-1080-30");
+        assert!(nvenc.available);
+        assert!(nvenc.fallback);
+        assert!(!nvenc.hardware);
+        assert_eq!(nvenc.encoder, "libx265");
+        assert!(
+            nvenc.available_note.contains("hevc_nvenc"),
+            "{}",
+            nvenc.available_note
+        );
+        assert!(
+            nvenc.available_note.contains("libx265"),
+            "{}",
+            nvenc.available_note
+        );
+        let apply = |row: &PresetViewModel| {
+            row.actions
+                .iter()
+                .find(|action| action.id == "apply")
+                .cloned()
+                .expect("apply")
+        };
+        assert!(
+            apply(&nvenc).available,
+            "a fallback is still a job this machine can do"
+        );
+        assert!(view.catalog.fallback > 0);
+
+        // A machine with the chip runs it, and says which one.
+        let mut with_chip = PresetState::new("presets.json");
+        with_chip.observe_hardware(&everything(), &vise_core::HardwareAcceleration::auto());
+        with_chip
+            .set_catalog_category("hardware")
+            .expect("a category");
+        let view = with_chip.view(
+            &[],
+            &vise_core::builtin_presets(),
+            form_view(&input("create"), &[], None),
+        );
+        let nvenc = view
+            .catalog
+            .entries
+            .iter()
+            .find(|entry| entry.id == "hardware-nvenc-hevc-1080-30")
+            .expect("a hardware preset");
+        assert!(nvenc.hardware);
+        assert!(!nvenc.fallback);
+        assert_eq!(nvenc.encoder, "hevc_nvenc");
+    }
+
+    #[test]
+    fn a_preset_with_no_software_stand_in_is_closed_with_its_reason() {
+        let mut state = PresetState::new("presets.json");
+        let mut caps = software_only();
+        caps.encoders.retain(|name| name != "prores_ks");
+        state.observe_hardware(&caps, &vise_core::HardwareAcceleration::auto());
+        state
+            .set_catalog_category("professional")
+            .expect("a category");
+        let view = state.view(
+            &[],
+            &vise_core::builtin_presets(),
+            form_view(&input("create"), &[], None),
+        );
+        let row = view
+            .catalog
+            .entries
+            .iter()
+            .find(|entry| entry.id == "professional-prores-422-hq")
+            .expect("a ProRes preset");
+        assert!(!row.available, "a proxy is not an interchange master");
+        assert!(
+            row.available_reason.contains("prores_ks"),
+            "{}",
+            row.available_reason
+        );
+        let apply = row
+            .actions
+            .iter()
+            .find(|action| action.id == "apply")
+            .expect("apply");
+        assert!(!apply.available);
+        assert!(
+            apply.reason.contains("cannot run on this machine"),
+            "{}",
+            apply.reason
+        );
+        // Copying and exporting are still on offer: reading a preset is not the
+        // same as running it.
+        assert!(row.actions.iter().any(|a| a.id == "clone" && a.available));
+        assert!(row.actions.iter().any(|a| a.id == "export" && a.available));
+    }
+
+    #[test]
+    fn a_machine_that_was_never_probed_closes_nothing_and_says_so() {
+        let mut state = PresetState::new("presets.json");
+        state.set_catalog_category("hardware").expect("a category");
+        let view = state.view(
+            &[],
+            &vise_core::builtin_presets(),
+            form_view(&input("create"), &[], None),
+        );
+        assert!(!view.catalog.checked);
+        assert!(view.catalog.entries.iter().all(|entry| entry.available));
+        assert!(
+            view.catalog.note.contains("not been found"),
+            "{}",
+            view.catalog.note
+        );
+        assert!(
+            view.catalog.summary.contains("not been checked"),
+            "{}",
+            view.catalog.summary
+        );
+    }
+
+    #[test]
+    fn switching_hardware_off_is_shown_on_every_hardware_row() {
+        let mut state = PresetState::new("presets.json");
+        state.observe_hardware(
+            &everything(),
+            &crate::preferences::hardware::to_hardware_options(
+                &crate::preferences::hardware::HardwareSettings {
+                    acceleration: crate::preferences::hardware::AccelerationPreference::Never,
+                    ..Default::default()
+                },
+            ),
+        );
+        state.set_catalog_category("hardware").expect("a category");
+        let view = state.view(
+            &[],
+            &vise_core::builtin_presets(),
+            form_view(&input("create"), &[], None),
+        );
+        assert!(
+            view.catalog
+                .entries
+                .iter()
+                // The Media Foundation rows are in this list for decoding and
+                // name a software encoder, so they are not the ones that fall
+                // back; the rest are written for a chip and are.
+                .filter(|entry| {
+                    vise_core::builtin_entry(&entry.id)
+                        .and_then(|found| found.encoder)
+                        .map(|encoder| encoder.is_hardware())
+                        .unwrap_or(false)
+                })
+                .all(|entry| entry.fallback && !entry.hardware),
+            "every hardware row falls back when hardware encoding is off"
+        );
+        assert!(view
+            .catalog
+            .entries
+            .iter()
+            .any(|entry| entry.needs_hardware));
+        assert!(
+            view.catalog.note.contains("switched off"),
+            "{}",
+            view.catalog.note
+        );
+    }
+
+    #[test]
+    fn a_stored_preset_is_resolved_too_rather_than_assumed_runnable() {
+        let mut state = PresetState::new("presets.json");
+        state.observe_hardware(&software_only(), &vise_core::HardwareAcceleration::auto());
+        let mut mine = stored("u1", "Mine");
+        mine.preset.encoder = Some(vise_core::EncoderId::NvencAv1);
+        mine.preset.video_codec = Some(VideoCodec::Av1);
+        let view = state.view(
+            &[mine],
+            &vise_core::builtin_presets(),
+            form_view(&input("create"), &[], None),
+        );
+        let row = &view.user[0];
+        assert!(row.fallback);
+        assert_eq!(row.encoder, "libaom-av1");
+        assert_eq!(row.encoder_label, "software AV1");
+        assert!(
+            row.compatibility.is_empty(),
+            "a stored preset carries no guidance"
+        );
     }
 }
