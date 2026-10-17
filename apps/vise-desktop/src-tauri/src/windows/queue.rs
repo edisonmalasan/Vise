@@ -1309,13 +1309,20 @@ mod tests {
             bulk("cancel_all").available,
             "every job is being encoded, so there is something to cancel"
         );
-        assert!(!bulk("clear_finished").available, "nothing has finished yet");
-        assert!(bulk("clear_finished").reason.contains("No job has finished"));
+        assert!(
+            !bulk("clear_finished").available,
+            "nothing has finished yet"
+        );
+        assert!(bulk("clear_finished")
+            .reason
+            .contains("No job has finished"));
         assert!(
             !bulk("empty_queue").available,
             "emptying the queue would lose an encode in flight"
         );
-        assert!(bulk("empty_queue").reason.contains("cancel them before emptying"));
+        assert!(bulk("empty_queue")
+            .reason
+            .contains("cancel them before emptying"));
     }
 
     #[test]

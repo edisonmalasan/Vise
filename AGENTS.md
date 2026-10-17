@@ -5,7 +5,7 @@
 - **Name:** Vise Transcoder
 - **Purpose:** Clean-room implementation of a media transcoder targeting a reference transcoder architecture at version 1.11.2 and its user-facing capabilities. The repository now contains Rust application source, tests, build manifests, and planning/reverse-engineering documentation.
 - **Primary users:** Not yet verified from repository evidence. Intended audiences are media-transcoding users and contributors; see `docs/ROADMAP.md` for the product/capability target.
-- **Current state:** Rust workspace (`Cargo.toml`, `crates/vise-core`, `crates/vise-cli`, `crates/vise-ipc`, `crates/vise-worker`, `apps/vise-desktop`) with Group 0–13 required outcomes implemented where feasible and the first Group 14 desktop surfaces verified. `docs/ROADMAP.md` tracks verified status. `re/docs/` and `re/README.md` contain reverse-engineering notes.
+- **Current state:** Rust workspace (`Cargo.toml`, `crates/vise-core`, `crates/vise-cli`, `crates/vise-ipc`, `crates/vise-worker`, `apps/vise-desktop`) with Group 0–13 required outcomes implemented where feasible and most Group 14 desktop surfaces verified. `docs/ROADMAP.md` tracks verified status. `re/docs/` and `re/README.md` contain reverse-engineering notes.
 - **Current progress:** `main` contains the merged integration branches and a reconciled roadmap. Platform installers and optional DVD/Blu-ray support remain pending.
 - **Worker architecture:** the desktop shell never runs the pipeline in-process. `crates/vise-worker` serves a token-authenticated loopback JSON API; `crates/vise-ipc` holds the shared contract, the client, the process supervisor (start, handshake, crash restart), and the portable-mode switch that can disable process isolation.
 
