@@ -294,19 +294,21 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [x] Audio tab parity (per-track behaviour, defaults, mixdown, DRC, dither, delay, naming)
 - [x] Subtitles tab parity (behaviour, burn-in behaviour, import, search)
 - [x] Chapters tab parity
-- [ ] Metadata tab parity
-- [ ] Queue window and queue selection window parity
-- [ ] Activity/log window parity
-- [ ] Static preview window parity
+- [x] Metadata tab parity
+- [x] Queue window and queue selection window parity
+- [x] Activity/log window parity
+- [x] Static preview window parity
 - [x] Source selection control parity (source menu, scan modes)
 - [x] Point-to-point range and angle selection parity
-- [ ] Error view, copy-error, countdown alert
-- [ ] About view
-- [ ] Preset add/manage views parity
+- [x] Error view, copy-error, countdown alert
+- [x] About view
+- [x] Preset add/manage views parity
 - [ ] Right-to-left layout support
 - [ ] Theme selection (system/light/dark)
 
-**Status:** In progress (9/18 verified; `apps/vise-desktop` drives the worker from a validated file or folder picker with drag-and-drop and recent sources, shows scan progress without blocking the window, lists the scanned titles with their facts, and resolves range, angle, and track selection in the window so what the page renders is covered by unit tests. Angle selection is wired to the contract's `angle_count`, which this build never reports above one until optical-disc sources arrive, so the control stays hidden until then. The seven configuration tabs are built as Rust view models that carry their own availability and reason, and one settings set drives both the tabs and the job specification, so a queued job cannot disagree with what the tabs showed. Fields the job model lacked were added and honoured in the resolved plan: output framing flags, encoder preset/profile/tune/level, colour range, mirroring, and per-track forced-dialogue selection. Controls the worker contract has no field for are shown closed with the reason instead of being accepted and ignored: the deblock filter, which is a media-depth item, and the MP4-only output flags outside an MP4. Anamorphic scaling and per-chapter inclusion are resolved from the frame size and the marker list rather than stored as separate fields, so they cannot fall out of step with the geometry they describe.)
+**Status:** In progress (16/18 verified; `apps/vise-desktop` drives the worker from a validated file or folder picker with drag-and-drop and recent sources, shows scan progress without blocking the window, lists the scanned titles with their facts, and resolves range, angle, and track selection in the window so what the page renders is covered by unit tests. Angle selection is wired to the contract's `angle_count`, which this build never reports above one until optical-disc sources arrive, so the control stays hidden until then. The seven configuration tabs are built as Rust view models that carry their own availability and reason, and one settings set drives both the tabs and the job specification, so a queued job cannot disagree with what the tabs showed. Fields the job model lacked were added and honoured in the resolved plan: output framing flags, encoder preset/profile/tune/level, colour range, mirroring, and per-track forced-dialogue selection. Controls the worker contract has no field for are shown closed with the reason instead of being accepted and ignored: the deblock filter, which is a media-depth item, and the MP4-only output flags outside an MP4. Anamorphic scaling and per-chapter inclusion are resolved from the frame size and the marker list rather than stored as separate fields, so they cannot fall out of step with the geometry they describe.
+
+The secondary windows are described by the window as one value each and the page draws them from that description, so it cannot open a surface the window does not offer or present one with the wrong accessibility semantics. The queue keeps its own order and its own priority rather than borrowing either from the session, so a reordering and a priority change are answers to the same question and cannot disagree; its selection sheet plans every output name before anything is queued, so two titles that would resolve to one file are refused together rather than the second overwriting the first. The activity window is paged by index, so following a long encode costs the same whether the worker has written ten lines or ten thousand, and the dropped-lines note is shown rather than hidden. The preview window converts a rectangle drawn in displayed pixels into source pixels, refuses one that leaves the frame or has odd sides, and writes it into the dimensions tab, so the rectangle that gets encoded is the one that was checked. Destructive actions ask through a countdown that is counted in Rust, so the count the user reads is the count that arms the confirm control, and one answer drives one action. Presets are created, renamed, copied, imported, exported, and deleted through the core preset API, with the name, duplicate-name, and category rules enforced in the window so a preset it accepted can never fail on the next launch. Verified by unit tests and by running the application against a generated clip: scan, preview still, crop into the dimensions tab, queue, encode through the worker, the countdown alert, and the preset round trip.
 
 ## Group 15 — Preferences surface
 
@@ -451,7 +453,7 @@ Required groups: 19
 | 11 | Hardware acceleration | Complete (7/7) |
 | 12 | Platform packaging and release | In progress (3/8) |
 | 13 | Worker process and JSON IPC | Complete (9/9) |
-| 14 | Desktop parity with reference product | In progress (9/18) |
+| 14 | Desktop parity with reference product | In progress (16/18) |
 | 15 | Preferences surface | Not started (0/8) |
 | 16 | Preset catalog and versioning | Not started (0/13) |
 | 17 | System integration | Not started (0/9) |

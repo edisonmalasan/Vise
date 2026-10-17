@@ -7,7 +7,7 @@
 - **Project:** Vise Transcoder
 - **What it does:** Clean-room media transcoder targeting a reference transcoder architecture at version 1.11.2 and its user-facing capabilities; the repository holds Rust workspace source, tests, and planning/reverse-engineering documentation.
 - **Primary users / use cases:** Not yet verified from repository evidence. Intended audiences are media-transcoding users and contributors working on the clean-room implementation.
-- **Current focus:** Groups 0–13 of `docs/ROADMAP.md` are implemented and verified; Group 14 desktop parity is underway, with the source, scan, title, range, angle, and track surfaces plus the seven configuration tabs verified. Packaging and the remaining parity groups still need work.
+- **Current focus:** Groups 0–13 of `docs/ROADMAP.md` are implemented and verified; Group 14 desktop parity is underway, with the source, scan, title, range, angle, and track surfaces, the seven configuration tabs and the metadata tab, and the secondary windows and dialogs (queue, queue selection, activity, preview, problems, countdown alert, about, presets) verified. Right-to-left layout and theme selection are the remaining Group 14 items; packaging and the later parity groups still need work.
 
 ## Where to Look
 

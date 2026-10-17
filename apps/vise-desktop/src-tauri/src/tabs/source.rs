@@ -68,6 +68,16 @@ pub struct ChapterFacts {
     pub end_seconds: f64,
 }
 
+/// One tag the source carried.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MetadataFact {
+    /// Tag name as the scan reported it.
+    pub key: String,
+    /// Tag value as the scan reported it.
+    pub value: String,
+}
+
 /// Everything the tabs read about the chosen title.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
@@ -90,6 +100,8 @@ pub struct TitleFacts {
     pub subtitles: Vec<SubtitleFacts>,
     /// Chapter markers of the title.
     pub chapters: Vec<ChapterFacts>,
+    /// Tags the source carried, sorted by name.
+    pub metadata: Vec<MetadataFact>,
 }
 
 impl TitleFacts {
@@ -115,6 +127,14 @@ impl TitleFacts {
                     name: chapter.title.trim().to_string(),
                     start_seconds: chapter.start_seconds,
                     end_seconds: chapter.end_seconds,
+                })
+                .collect(),
+            metadata: title
+                .meta_data
+                .iter()
+                .map(|(key, value)| MetadataFact {
+                    key: key.clone(),
+                    value: value.clone(),
                 })
                 .collect(),
         }

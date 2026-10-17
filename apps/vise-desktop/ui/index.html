@@ -12,6 +12,11 @@
   <p>Pick a source, scan it, choose the title, range, angle, and tracks, then set the output up on the tabs below.</p>
 </header>
 
+<!-- The toolbar is built from the window catalog: every surface the window
+     offers gets a control that opens it, and a surface it does not offer has
+     no control at all. -->
+<nav class="toolbar" id="toolbar" aria-label="Windows and dialogs"></nav>
+
 <main class="layout">
   <section class="card" aria-labelledby="sourceHeading">
     <div class="card-head">
@@ -387,41 +392,66 @@
           </div>
           <p class="hint" id="chaptersSummary"></p>
         </div>
+
+        <!-- Metadata -------------------------------------------------------- -->
+        <div class="tabpanel" role="tabpanel" id="panel-metadata" aria-labelledby="tab-metadata" tabindex="0" hidden>
+          <fieldset>
+            <legend>Source tags</legend>
+            <div class="field">
+              <label for="metadataMode">What happens to the source tags</label>
+              <select id="metadataMode"></select>
+              <span class="hint" id="metadataModeHint"></span>
+            </div>
+            <p class="hint" id="metadataSourceNote"></p>
+          </fieldset>
+
+          <fieldset class="flags">
+            <legend>Attachments</legend>
+            <div id="metadataAttachments"></div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Tags</legend>
+            <div class="tags" id="metadataTags"></div>
+            <div class="empty" id="metadataTagEmpty">This title carries no tags.</div>
+            <div class="row">
+              <div class="grow">
+                <label for="metadataNewKey">New tag name</label>
+                <input type="text" id="metadataNewKey" spellcheck="false" />
+                <span class="hint" id="metadataNewKeyHint"></span>
+              </div>
+              <div class="grow">
+                <label for="metadataNewValue">Value</label>
+                <input type="text" id="metadataNewValue" spellcheck="false" />
+                <span class="hint" id="metadataNewValueHint"></span>
+              </div>
+              <button type="button" id="metadataAddBtn">Add tag</button>
+            </div>
+          </fieldset>
+
+          <p class="hint" id="metadataSummary"></p>
+        </div>
       </div>
 
       <div class="row queue-row">
-        <div class="grow">
-          <label for="outPath">Output path</label>
-          <input type="text" id="outPath" spellcheck="false" autocomplete="off"
-                 placeholder="C:\media\out.mp4" />
+            <div class="grow">
+              <label for="outPath">Output path</label>
+              <input type="text" id="outPath" spellcheck="false" autocomplete="off"
+                     placeholder="C:\media\out.mp4" />
+            </div>
+            <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
+            <button type="button" id="openSelectionBtn">Choose titles to queue…</button>
+          </div>
+          <span class="hint" id="queueHint">Scan a source and choose a title first.</span>
         </div>
-        <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
-      </div>
-      <span class="hint" id="queueHint">Scan a source and choose a title first.</span>
-    </div>
-  </section>
+      </section>
+    </main>
 
-  <section class="card full" aria-labelledby="queueHeading">
-    <div class="card-head">
-      <h2 id="queueHeading">Queue</h2>
-    </div>
-    <table>
-      <thead>
-        <tr><th scope="col">Input</th><th scope="col">State</th><th scope="col">Progress</th><th scope="col">Message</th><th scope="col">Controls</th></tr>
-      </thead>
-      <tbody id="queueBody"></tbody>
-    </table>
-    <div class="empty" id="queueEmpty">The queue is empty.</div>
-  </section>
-
-  <section class="card full" aria-labelledby="logHeading">
-    <div class="card-head">
-      <h2 id="logHeading">Activity</h2>
-      <button type="button" class="quiet" id="clearLogsBtn">Clear</button>
-    </div>
-    <div class="logs" id="logList"></div>
-  </section>
-</main>
+<!-- Every secondary surface is built here as well, from the catalog: role,
+     modal flag, heading, hint, close control, and which control takes focus.
+     The page cannot open one the window does not describe, and cannot present
+     one with the wrong accessibility semantics. -->
+<div class="surfaces" id="surfaces"></div>
 
 <script src="app.js"></script>
 </body>
