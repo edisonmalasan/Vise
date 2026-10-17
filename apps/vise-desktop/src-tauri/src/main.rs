@@ -9,7 +9,7 @@
 //! settings file; only then does the shell fall back to calling the core
 //! library in-process.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -17,10 +17,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use vise_core::{Job, JobId, JobSpec, JobState, Progress, Session};
-use vise_ipc::contract::{
-    CommandResult, EncodeCommand, InitCommand, PreviewCommand, PreviewResult, ScanCommand,
-    WorkState,
-};
+use vise_ipc::contract::{CommandResult, EncodeCommand, InitCommand, ScanCommand, WorkState};
 use vise_ipc::portable::PortableSettings;
 use vise_ipc::timespan::TimeSpan;
 use vise_ipc::{WorkerClient, WorkerConfig, WorkerSupervisor};
@@ -29,17 +26,24 @@ mod scanflow;
 mod sources;
 mod tabs;
 mod viewmodel;
+mod windows;
 
 use scanflow::{scan_in_process, ScanFlow};
 use sources::{RecentSources, SourceDropReport, SourceViewModel};
 use tabs::{
     AudioDefaultsInput, AudioTrackInput, ChaptersInput, DimensionsInput, FilterInput, MarkerInput,
-    SubtitleTrackInput, SubtitlesInput, SummaryInput, TabSetViewModel, TabSettings, TitleFacts,
-    VideoInput,
+    MetadataInput, SubtitleTrackInput, SubtitlesInput, SummaryInput, TabSetViewModel, TabSettings,
+    TitleFacts, VideoInput,
 };
 use viewmodel::{
     RangeSelection, ScanPhase, ScanProgressViewModel, SelectionViewModel, TrackSelectionInput,
 };
+use windows::dialogs::{self, AboutViewModel, AlertAction, AlertState, ErrorState, ErrorViewModel};
+use windows::log::ActivityLog;
+use windows::presets::{PresetAction, PresetInput, PresetState};
+use windows::preview::{CropOverlay, PreviewState, PreviewViewModel, StillImage, StillPosition};
+use windows::queue::{QueueSelectionInput, QueueState};
+use windows::SurfaceState;
 
 /// How the shell reaches the transcode pipeline.
 enum Backend {
@@ -90,7 +94,8 @@ impl Backend {
 #[derive(Default)]
 struct DesktopState {
     session: Session,
-    logs: Vec<String>,
+    /// The activity history, from this window and from the worker.
+    activity: ActivityLog,
     backend: Option<Backend>,
     /// The source surface: source, scan, titles, and the current selection.
     flow: ScanFlow,
@@ -102,13 +107,101 @@ struct DesktopState {
     settings_path: PathBuf,
     /// Monotonic stamp that orders the recent source list.
     recents_stamp: u64,
+    /// Which secondary windows and dialogs are open.
+    surfaces: SurfaceState,
+    /// The queue's own order and priorities.
+    queue: QueueState,
+    /// What the queue selection sheet is holding.
+    selection: QueueSelectionInput,
+    /// The still frames the preview window is looking at.
+    preview: PreviewState,
+    /// Everything that went wrong.
+    errors: ErrorState,
+    /// The action waiting for its countdown.
+    alerts: AlertState,
+    /// The action the user has confirmed but not yet acted on.
+    confirmed: Option<AlertAction>,
+    /// The preset library.
+    presets: PresetState,
 }
 
 type SharedState = Arc<Mutex<DesktopState>>;
 
 fn push_log(state: &SharedState, message: impl Into<String>) {
     if let Ok(mut guard) = state.lock() {
-        guard.logs.push(message.into());
+        guard.activity.record(message);
+    }
+}
+
+/// Record a problem and hand back its number.
+///
+/// Everything that fails for a reason the user can act on goes through here, so
+/// the error view is a record of what happened rather than a place the page
+/// composes strings on its own.
+fn record_problem(
+    state: &SharedState,
+    source: &str,
+    context: impl Into<String>,
+    detail: impl Into<String>,
+) {
+    if let Ok(mut guard) = state.lock() {
+        guard.errors.record(source, &context.into(), detail);
+    }
+}
+
+/// Record a warning.
+fn record_warning(
+    state: &SharedState,
+    source: &str,
+    context: impl Into<String>,
+    detail: impl Into<String>,
+) {
+    if let Ok(mut guard) = state.lock() {
+        guard.errors.push_warning(source, &context.into(), detail);
+    }
+}
+
+/// Bring the queue's order in line with the session.
+fn sync_queue(guard: &mut DesktopState) {
+    let jobs = guard.session.jobs().to_vec();
+    guard.queue.sync(&jobs);
+}
+
+/// The queue, as the page renders it, for a state that is already locked.
+fn queue_view(guard: &DesktopState) -> windows::queue::QueueViewModel {
+    windows::queue::queue_view(&guard.queue, guard.session.jobs())
+}
+
+/// Whether the user has confirmed `action` and has not acted on it yet.
+///
+/// The countdown alert is only worth having if it is load-bearing: an action
+/// that destroys work asks first, and the answer has to come from the alert
+/// rather than from the same control that asked for it.
+fn is_confirmed(state: &SharedState, action: AlertAction) -> bool {
+    state
+        .lock()
+        .ok()
+        .map(|guard| guard.confirmed == Some(action))
+        .unwrap_or(false)
+}
+
+/// Refuse `action` until it has been confirmed, with the reason to show.
+fn require_confirmation(state: &SharedState, action: AlertAction) -> Result<(), String> {
+    if is_confirmed(state, action) {
+        return Ok(());
+    }
+    Err(format!(
+        "'{}' cannot be undone, so it asks for confirmation first.",
+        action.verb()
+    ))
+}
+
+/// Spend a confirmation, so one answer cannot drive two actions.
+fn take_confirmation(state: &SharedState, action: AlertAction) {
+    if let Ok(mut guard) = state.lock() {
+        if guard.confirmed == Some(action) {
+            guard.confirmed = None;
+        }
     }
 }
 
@@ -351,9 +444,13 @@ fn begin_scan(
     let Some(source) = guard.flow.source().cloned() else {
         return Err("Choose a file or folder to scan.".to_string());
     };
-    let command = options
-        .unwrap_or_default()
-        .to_command(vec![source.path.clone()])?;
+    let mut options = options.unwrap_or_default();
+    // The preview window owns how many stills a scan extracts, so the page does
+    // not have to remember it.
+    if options.preview_count.is_none() {
+        options.preview_count = Some(guard.preview.still_count());
+    }
+    let command = options.to_command(vec![source.path.clone()])?;
     match worker {
         Some(client) => {
             let started = client.start_scan(&command).map_err(|e| e.to_string())?;
@@ -473,23 +570,178 @@ fn choose_tracks(
     Ok(guard.flow.view_model())
 }
 
+/// The preview window, as the page renders it.
+///
+/// The view is built from a locked state rather than by calling the command
+/// again, so a command that already holds the lock cannot ask for it twice.
+fn preview_view(guard: &mut DesktopState) -> PreviewViewModel {
+    point_preview_at_title(guard);
+    let selection = guard.flow.view_model();
+    let source_label = guard
+        .flow
+        .source()
+        .map(|source| source.name.clone())
+        .unwrap_or_default();
+    let title_label = selection
+        .titles
+        .iter()
+        .find(|title| title.index == selection.selected_title_index)
+        .map(|title| title.label.clone())
+        .unwrap_or_default();
+    guard
+        .preview
+        .view(guard.flow.source().is_some(), &source_label, &title_label)
+}
+
+/// The preview window, as the page renders it.
 #[tauri::command]
-fn extract_preview(
-    state: State<'_, SharedState>,
-    path: String,
-    seconds: f64,
-) -> Result<PreviewResult, String> {
+fn preview_window(state: State<'_, SharedState>) -> Result<PreviewViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    Ok(preview_view(&mut guard))
+}
+
+/// Keep the preview window pointed at whatever title the source area has
+/// chosen, so the stills on screen and the crop rectangle always describe the
+/// title the rest of the window is working on.
+fn point_preview_at_title(guard: &mut DesktopState) {
+    let title = guard.flow.current_title().cloned();
+    let wanted = match title {
+        Some(title) => (title.duration_seconds, (title.width, title.height)),
+        None => (0.0, (0, 0)),
+    };
+    if guard.preview.describes() != wanted {
+        guard.preview.use_title(wanted.0, wanted.1);
+    }
+}
+
+/// Ask the worker for the still the preview window is showing.
+#[tauri::command]
+fn fetch_preview_still(state: State<'_, SharedState>) -> Result<PreviewViewModel, String> {
+    let (command, number) = {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        preview_view(&mut guard);
+        let path = guard
+            .flow
+            .source()
+            .map(|source| source.path.clone())
+            .ok_or_else(|| "Choose a file or folder to scan first.".to_string())?;
+        let title_index = guard
+            .flow
+            .current_title()
+            .map(|title| title.index)
+            .ok_or_else(|| "Choose a title before asking for a still.".to_string())?;
+        let number = guard.preview.still_number();
+        (guard.preview.command(&path, title_index), number)
+    };
     let worker = worker_client(&state)?;
     let Some(client) = worker else {
-        return Err("preview extraction requires the worker process".to_string());
+        return Err("preview stills require the worker process".to_string());
     };
-    client
-        .get_preview(&PreviewCommand {
-            path,
-            time_seconds: seconds,
-            ..PreviewCommand::default()
-        })
-        .map_err(|e| e.to_string())
+    let result = client.get_preview(&command).map_err(|e| e.to_string())?;
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    if !result.was_successful {
+        let reason = if result.error.trim().is_empty() {
+            "the worker produced no image for that point in the title".to_string()
+        } else {
+            result.error.clone()
+        };
+        guard
+            .errors
+            .record("worker", "extracting a preview still", &reason);
+        guard.preview.fail_image(&reason);
+    } else if result.image_base64.is_empty() {
+        guard
+            .preview
+            .fail_image("the worker returned no image for that point in the title");
+    } else {
+        guard.preview.accept_image(StillImage {
+            number,
+            byte_length: result.image_bytes,
+            data_base64: result.image_base64,
+        });
+    }
+    Ok(preview_view(&mut guard))
+}
+
+/// Choose how many stills the next scan extracts.
+#[tauri::command]
+fn set_preview_still_count(
+    state: State<'_, SharedState>,
+    count: u32,
+) -> Result<PreviewViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.preview.set_still_count(count)?;
+    Ok(preview_view(&mut guard))
+}
+
+/// Move along the still list.
+#[tauri::command]
+fn select_preview_still(
+    state: State<'_, SharedState>,
+    number: Option<u32>,
+    delta: Option<i32>,
+    position: Option<StillPosition>,
+) -> Result<PreviewViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    preview_view(&mut guard);
+    if let Some(position) = position {
+        guard.preview.scrub(position)?;
+    } else if let Some(delta) = delta {
+        guard.preview.step(delta);
+    } else if let Some(number) = number {
+        guard.preview.select(number)?;
+    } else {
+        return Err("Ask for a still by number, by step, or by position.".to_string());
+    }
+    Ok(preview_view(&mut guard))
+}
+
+/// Move the crop rectangle drawn over the frame.
+#[tauri::command]
+fn set_preview_crop(
+    state: State<'_, SharedState>,
+    crop: CropOverlay,
+) -> Result<PreviewViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.preview.set_overlay(crop)?;
+    Ok(preview_view(&mut guard))
+}
+
+/// Put the rectangle drawn over the frame into the dimensions tab.
+///
+/// The preview window and the dimensions tab are the same rectangle: the tab's
+/// crop fields are written from the overlay, so what the user drew and what the
+/// encoder is asked for cannot drift apart.
+#[tauri::command]
+fn apply_preview_crop(state: State<'_, SharedState>) -> Result<TabSetViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    let Some(rect) = guard.preview.crop_rect()? else {
+        guard.tabs.dimensions.crop_mode = "none".to_string();
+        guard
+            .activity
+            .record("preview crop cleared; the whole frame is kept");
+        return Ok(guard.tabs.view(&facts));
+    };
+    guard.tabs.dimensions.crop_mode = "manual".to_string();
+    guard.tabs.dimensions.crop_x = tabs::common::NumField::of(rect.0);
+    guard.tabs.dimensions.crop_y = tabs::common::NumField::of(rect.1);
+    guard.tabs.dimensions.crop_width = tabs::common::NumField::of(rect.2);
+    guard.tabs.dimensions.crop_height = tabs::common::NumField::of(rect.3);
+    guard.activity.record(format!(
+        "preview crop applied: {}, {} · {} by {}",
+        rect.0, rect.1, rect.2, rect.3
+    ));
+    Ok(guard.tabs.view(&facts))
+}
+
+/// Forget the crop rectangle and keep the whole frame.
+#[tauri::command]
+fn reset_preview_crop(state: State<'_, SharedState>) -> Result<PreviewViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.preview.reset_overlay();
+    Ok(preview_view(&mut guard))
 }
 
 // ---------------------------------------------------------------------------
@@ -535,9 +787,26 @@ macro_rules! tab_command {
     };
 }
 
-tab_command!(set_summary, SummaryInput, |tabs, change| {
-    change.apply(&mut tabs.summary)
-});
+/// Apply a change to the summary tab.
+///
+/// The metadata tab owns the passthrough flag, so this switch writes into it
+/// rather than keeping a second copy that could drift out of step.
+#[tauri::command]
+fn set_summary(
+    state: State<'_, SharedState>,
+    change: SummaryInput,
+) -> Result<TabSetViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    let passthrough = change.passthrough_metadata;
+    change.apply(&mut guard.tabs.summary)?;
+    if passthrough.is_some() {
+        let wanted = guard.tabs.summary.passthrough_metadata;
+        guard.tabs.metadata.set_passthrough(wanted);
+    }
+    Ok(guard.tabs.view(&facts))
+}
 
 tab_command!(set_dimensions, DimensionsInput, |tabs, change| {
     change.apply(&mut tabs.dimensions)
@@ -562,6 +831,22 @@ tab_command!(set_chapters, ChaptersInput, |tabs, change| {
 tab_command!(change_marker, MarkerInput, |tabs, change| {
     change.apply(&mut tabs.chapters)
 });
+
+/// Apply a change to the metadata tab.
+///
+/// The tab reads the chosen title's tags, so it needs those facts rather than
+/// the generic macro the other tabs use.
+#[tauri::command]
+fn set_metadata(
+    state: State<'_, SharedState>,
+    change: MetadataInput,
+) -> Result<TabSetViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    change.apply(&mut guard.tabs.metadata, &facts)?;
+    Ok(guard.tabs.view(&facts))
+}
 
 /// Apply a change to the audio rules every track starts from.
 #[tauri::command]
@@ -673,7 +958,8 @@ fn subtitle_extension(name: &str) -> bool {
 fn add_job(state: State<'_, SharedState>, spec: JobSpec) -> Result<JobId, String> {
     let mut guard = state.lock().map_err(|e| e.to_string())?;
     let id = guard.session.add_job(spec);
-    guard.logs.push(format!("queued job {}", id));
+    guard.queue.push(id);
+    guard.activity.record(format!("queued job {id}"));
     Ok(id)
 }
 
@@ -718,10 +1004,219 @@ fn queue_selection(state: State<'_, SharedState>, output_path: String) -> Result
     spec.title_index = Some(selection.selected_title_index);
 
     let id = guard.session.add_job(spec);
+    guard.queue.push(id);
     guard
-        .logs
-        .push(format!("queued job {id} for title {title_index}"));
+        .activity
+        .record(format!("queued job {id} for title {title_index}"));
     Ok(id)
+}
+
+/// The titles the queue selection sheet may offer, with the facts it needs.
+fn selection_titles(guard: &DesktopState) -> Vec<(u32, String, String)> {
+    guard
+        .flow
+        .view_model()
+        .titles
+        .iter()
+        .map(|title| (title.index, title.name.clone(), title.facts.clone()))
+        .collect()
+}
+
+/// The output extension the chosen container implies.
+fn output_extension(guard: &DesktopState) -> String {
+    guard
+        .tabs
+        .summary
+        .container
+        .clone()
+        .trim()
+        .to_ascii_lowercase()
+}
+
+/// The queue selection sheet, as the page renders it.
+#[tauri::command]
+fn queue_selection_window(
+    state: State<'_, SharedState>,
+) -> Result<windows::queue::QueueSelectionViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let titles = selection_titles(&guard);
+    let extension = output_extension(&guard);
+    // An empty sheet starts with the chosen title picked, because that is the
+    // one title a user almost always wants.
+    if guard.selection.titles.is_empty() {
+        let chosen = guard.flow.view_model().selected_title_index;
+        if chosen > 0 {
+            guard.selection.titles = vec![chosen];
+        }
+    }
+    let directory = guard.selection.output_directory.clone();
+    let (valid, problem) = check_output_directory(&directory);
+    Ok(windows::queue::selection_view(
+        &guard.selection,
+        &titles,
+        &extension,
+        valid,
+        &problem,
+    ))
+}
+
+/// Whether a folder can be written to, and why not when it cannot.
+fn check_output_directory(directory: &str) -> (bool, String) {
+    let directory = directory.trim();
+    if directory.is_empty() {
+        return (
+            false,
+            "Choose a folder to write the finished files into.".to_string(),
+        );
+    }
+    let path = PathBuf::from(directory);
+    if !path.is_dir() {
+        return (false, format!("{directory} is not a folder that exists."));
+    }
+    (true, String::new())
+}
+
+/// Record what the selection sheet is holding.
+#[tauri::command]
+fn set_queue_selection(
+    state: State<'_, SharedState>,
+    change: QueueSelectionInput,
+) -> Result<windows::queue::QueueSelectionViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let titles = selection_titles(&guard);
+    let extension = output_extension(&guard);
+    let directory = change.output_directory.trim().to_string();
+    let (valid, problem) = check_output_directory(&directory);
+    guard.selection.output_directory = directory;
+    if !change.name_pattern.trim().is_empty() {
+        guard.selection.name_pattern = change.name_pattern.trim().to_string();
+    }
+    if change.titles.is_empty() {
+        guard.selection.titles.clear();
+    } else {
+        let known: Vec<u32> = titles.iter().map(|(index, _, _)| *index).collect();
+        let wanted: Vec<u32> = change
+            .titles
+            .iter()
+            .copied()
+            .filter(|index| known.contains(index))
+            .collect();
+        if wanted.is_empty() {
+            return Err("None of those titles is in the scanned source.".to_string());
+        }
+        guard.selection.titles = wanted;
+    }
+    for (index, name) in &change.names {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            guard.selection.names.remove(index);
+        } else {
+            guard
+                .selection
+                .names
+                .insert(index.clone(), trimmed.to_string());
+        }
+    }
+    Ok(windows::queue::selection_view(
+        &guard.selection,
+        &titles,
+        &extension,
+        valid,
+        &problem,
+    ))
+}
+
+/// Queue every title the selection sheet has chosen.
+///
+/// The whole batch is planned before anything is queued, so two titles that
+/// would write the same file are refused together rather than the second one
+/// quietly overwriting the first.
+#[tauri::command]
+fn queue_titles(state: State<'_, SharedState>) -> Result<Vec<JobId>, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let selection = guard.flow.view_model();
+    if !selection.is_usable() {
+        return Err("Scan a source and choose a title before queueing.".to_string());
+    }
+    let source = guard
+        .flow
+        .source()
+        .map(|source| source.path.clone())
+        .ok_or_else(|| "Choose a file or folder to scan.".to_string())?;
+    let titles = selection_titles(&guard);
+    let names: Vec<(u32, String)> = titles
+        .iter()
+        .map(|(index, name, _)| (*index, name.clone()))
+        .collect();
+    let extension = output_extension(&guard);
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    let tabs = guard.tabs.view(&facts);
+    if !tabs.can_queue {
+        return Err(format!(
+            "Fix these before queueing: {}",
+            tabs.problems.join(" ")
+        ));
+    }
+    let planned = windows::queue::plan(&guard.selection, &names, &extension)?;
+    let mut queued = Vec::new();
+    for (index, output) in planned {
+        let base = guard.tabs.to_job_spec(&source, &output, &facts)?;
+        let spec = windows::queue::titled_spec(&base, index, &output);
+        let id = guard.session.add_job(spec);
+        guard.queue.push(id);
+        queued.push(id);
+    }
+    guard.activity.record(format!(
+        "queued {} title(s) from the selection sheet",
+        queued.len()
+    ));
+    Ok(queued)
+}
+
+/// The queue, as the page renders it.
+#[tauri::command]
+fn queue_window(state: State<'_, SharedState>) -> Result<windows::queue::QueueViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    sync_queue(&mut guard);
+    Ok(queue_view(&guard))
+}
+
+/// Move a job through the queue's order.
+#[tauri::command]
+fn move_job(
+    state: State<'_, SharedState>,
+    id: JobId,
+    delta: i32,
+) -> Result<windows::queue::QueueViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    sync_queue(&mut guard);
+    guard.queue.move_by(id, delta)?;
+    guard.activity.record(format!("moved job {id}"));
+    Ok(windows::queue::queue_view(
+        &guard.queue,
+        guard.session.jobs(),
+    ))
+}
+
+/// Set what a job is worth in the run order.
+#[tauri::command]
+fn set_job_priority(
+    state: State<'_, SharedState>,
+    id: JobId,
+    priority: String,
+) -> Result<windows::queue::QueueViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    sync_queue(&mut guard);
+    let set = guard.queue.set_priority_name(id, &priority)?;
+    guard.activity.record(format!(
+        "job {id} is now {} priority",
+        set.label().to_ascii_lowercase()
+    ));
+    Ok(windows::queue::queue_view(
+        &guard.queue,
+        guard.session.jobs(),
+    ))
 }
 
 #[tauri::command]
@@ -732,9 +1227,13 @@ fn list_jobs(state: State<'_, SharedState>) -> Result<Vec<Job>, String> {
 
 #[tauri::command]
 fn remove_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
+    require_confirmation(&state, AlertAction::RemoveJob)?;
     let mut guard = state.lock().map_err(|e| e.to_string())?;
     guard.session.remove_job(id).map_err(|e| e.to_string())?;
-    guard.logs.push(format!("removed job {}", id));
+    guard.queue.forget(id);
+    guard.activity.record(format!("removed job {id}"));
+    drop(guard);
+    take_confirmation(&state, AlertAction::RemoveJob);
     Ok(())
 }
 
@@ -759,40 +1258,203 @@ fn set_job_state(
 
 #[tauri::command]
 fn run_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
-    let spec = {
-        let mut guard = state.lock().map_err(|e| e.to_string())?;
-        let job = guard
-            .session
-            .job(id)
-            .ok_or_else(|| format!("job {id} not found"))?;
-        let spec = job.spec.clone();
-        if job.status.state != JobState::Queued && job.status.state != JobState::Paused {
-            return Err(format!(
-                "job {id} is not runnable from state {:?}",
-                job.status.state
-            ));
-        }
-        guard
-            .session
-            .update_status(
-                id,
-                vise_core::JobStatus {
-                    state: JobState::Running,
-                    progress: Progress::new(0.0),
-                    message: Some("running".into()),
-                },
-            )
-            .map_err(|e| e.to_string())?;
-        guard.logs.push(format!("started job {}", id));
-        spec
-    };
-
+    let spec = claim_job(&state, id)?;
     let shared: SharedState = state.inner().clone();
     let worker = worker_client(&state)?;
     thread::spawn(move || match worker {
         Some(client) => run_through_worker(shared, client, id, spec),
         None => run_in_process(shared, id, spec),
     });
+    Ok(())
+}
+
+/// Mark a queued or paused job as running and hand back its specification.
+///
+/// The state change happens under the lock and the work happens after it, so two
+/// clicks cannot both pick up the same job.
+fn claim_job(state: &SharedState, id: JobId) -> Result<JobSpec, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let jobs = guard.session.jobs().to_vec();
+    let Some(job) = jobs.iter().find(|job| job.id == id) else {
+        return Err(format!("job {id} not found"));
+    };
+    let spec = job.spec.clone();
+    let job_state = job.status.state;
+    if !windows::queue::is_runnable(job_state) {
+        return Err(format!(
+            "job {id} is not runnable from state {:?}",
+            job_state
+        ));
+    }
+    guard
+        .session
+        .update_status(
+            id,
+            vise_core::JobStatus {
+                state: JobState::Running,
+                progress: Progress::new(0.0),
+                message: Some("running".into()),
+            },
+        )
+        .map_err(|e| e.to_string())?;
+    let fresh = guard.session.jobs().to_vec();
+    guard.queue.sync(&fresh);
+    guard.activity.record(format!(
+        "started job {id} from {}",
+        windows::queue::state_label(job_state).to_ascii_lowercase()
+    ));
+    Ok(spec)
+}
+
+/// Run every waiting job, in the queue's run order.
+///
+/// The encoder takes one job at a time, so the queue runs them one after
+/// another rather than starting a thread per job; a job that fails does not
+/// stop the ones behind it.
+#[tauri::command]
+fn start_queue(state: State<'_, SharedState>) -> Result<windows::queue::QueueViewModel, String> {
+    require_confirmation(&state, AlertAction::StartQueue)?;
+    let waiting = {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        sync_queue(&mut guard);
+        guard
+            .queue
+            .pending(guard.session.jobs())
+            .into_iter()
+            .collect::<Vec<_>>()
+    };
+    if waiting.is_empty() {
+        return Err("Nothing in the queue is waiting for the encoder.".to_string());
+    }
+    let shared: SharedState = state.inner().clone();
+    take_confirmation(&shared, AlertAction::StartQueue);
+    {
+        let mut guard = shared.lock().map_err(|e| e.to_string())?;
+        guard
+            .activity
+            .record(format!("starting the queue with {} job(s)", waiting.len()));
+    }
+    thread::spawn(move || {
+        for id in waiting {
+            let spec = match claim_job(&shared, id) {
+                Ok(spec) => spec,
+                Err(reason) => {
+                    record_problem(&shared, "queue", format!("starting job {id}"), &reason);
+                    continue;
+                }
+            };
+            // A client per job, because a worker that dies mid-queue is
+            // replaced by the supervisor on the next connection.
+            let client = worker_client(&shared).ok().flatten();
+            match client {
+                Some(client) => run_through_worker(shared.clone(), client, id, spec),
+                None => run_in_process(shared.clone(), id, spec),
+            }
+        }
+    });
+    queue_window(state)
+}
+
+/// Forget every job that has finished.
+#[tauri::command]
+fn clear_finished_jobs(
+    state: State<'_, SharedState>,
+) -> Result<windows::queue::QueueViewModel, String> {
+    require_confirmation(&state, AlertAction::ClearFinished)?;
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    sync_queue(&mut guard);
+    let jobs = guard.session.jobs().to_vec();
+    let done = guard.queue.clear_finished(&jobs);
+    for id in &done {
+        let _ = guard.session.remove_job(*id);
+    }
+    guard
+        .activity
+        .record(format!("cleared {} finished job(s)", done.len()));
+    let view = queue_view(&guard);
+    drop(guard);
+    take_confirmation(&state, AlertAction::ClearFinished);
+    Ok(view)
+}
+
+/// Empty the queue of everything that is not being encoded.
+#[tauri::command]
+fn empty_queue(state: State<'_, SharedState>) -> Result<windows::queue::QueueViewModel, String> {
+    require_confirmation(&state, AlertAction::ClearQueue)?;
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    sync_queue(&mut guard);
+    let jobs = guard.session.jobs().to_vec();
+    let running = guard.queue.active(&jobs);
+    if !running.is_empty() {
+        return Err(format!(
+            "{} job(s) are being encoded; cancel them first.",
+            running.len()
+        ));
+    }
+    let total = guard.session.jobs().len();
+    let ids: Vec<JobId> = guard
+        .queue
+        .run_order(&jobs)
+        .iter()
+        .map(|job| job.id)
+        .collect();
+    for id in ids {
+        let _ = guard.session.remove_job(id);
+        guard.queue.forget(id);
+    }
+    guard
+        .activity
+        .record(format!("emptied the queue of {total} job(s)"));
+    let view = queue_view(&guard);
+    drop(guard);
+    take_confirmation(&state, AlertAction::ClearQueue);
+    Ok(view)
+}
+
+/// Ask the worker to stop whatever it is encoding.
+#[tauri::command]
+fn cancel_all(state: State<'_, SharedState>) -> Result<windows::queue::QueueViewModel, String> {
+    let shared: SharedState = state.inner().clone();
+    require_confirmation(&shared, AlertAction::CancelQueue)?;
+    let worker = worker_client(&state)?;
+    let Some(client) = worker else {
+        return Err("cancelling an encode requires the worker process".to_string());
+    };
+    let running = {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        sync_queue(&mut guard);
+        guard.queue.active(guard.session.jobs())
+    };
+    for id in &running {
+        let result = client.stop_encode().map_err(|e| e.to_string())?;
+        if !result.was_successful {
+            let reason = result.error.clone();
+            record_problem(&state, "worker", format!("cancelling job {id}"), &reason);
+            continue;
+        }
+        set_job_state(
+            &state,
+            *id,
+            JobState::Cancelled,
+            current_progress(&state, *id),
+            Some("cancelled".into()),
+        );
+    }
+    let view = queue_window(state)?;
+    take_confirmation(&shared, AlertAction::CancelQueue);
+    Ok(view)
+}
+
+/// Ask the worker to stop what it is encoding for one job.
+///
+/// Cancelling an encode always asks first, even for a single job, because the
+/// work already spent is lost along with it.
+#[tauri::command]
+fn cancel_job_confirmed(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
+    let shared: SharedState = state.inner().clone();
+    require_confirmation(&shared, AlertAction::CancelJob)?;
+    cancel_one(&shared, id)?;
+    take_confirmation(&shared, AlertAction::CancelJob);
     Ok(())
 }
 
@@ -950,7 +1612,7 @@ fn pause_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
             },
         )
         .map_err(|e| e.to_string())?;
-    guard.logs.push(format!(
+    guard.activity.record(format!(
         "pause requested for job {id} (process control unavailable)"
     ));
     Ok(())
@@ -978,15 +1640,21 @@ fn resume_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
 
 #[tauri::command]
 fn cancel_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
-    let worker = worker_client(&state)?;
+    let shared: SharedState = state.inner().clone();
+    cancel_one(&shared, id)
+}
+
+/// Stop what the worker is encoding for one job.
+fn cancel_one(state: &SharedState, id: JobId) -> Result<(), String> {
+    let worker = worker_client(state)?;
     if let Some(client) = worker {
         let result = client.stop_encode().map_err(|e| e.to_string())?;
         if result.was_successful {
             set_job_state(
-                &state,
+                state,
                 id,
                 JobState::Cancelled,
-                current_progress(&state, id),
+                current_progress(state, id),
                 Some("cancelled".into()),
             );
             return Ok(());
@@ -995,7 +1663,7 @@ fn cancel_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
     }
 
     let mut guard = state.lock().map_err(|e| e.to_string())?;
-    let progress = current_progress(&state, id);
+    let progress = current_progress(state, id);
     guard
         .session
         .update_status(
@@ -1009,7 +1677,7 @@ fn cancel_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
             },
         )
         .map_err(|e| e.to_string())?;
-    guard.logs.push(format!(
+    guard.activity.record(format!(
         "cancel requested for job {id} (process control unavailable)"
     ));
     Ok(())
@@ -1024,57 +1692,571 @@ fn current_progress(state: &SharedState, id: JobId) -> Progress {
 }
 
 // ---------------------------------------------------------------------------
-// Logs
+// Activity window
 // ---------------------------------------------------------------------------
 
+/// The activity window, as the page renders it.
+///
+/// The worker is read by index rather than in full: only the lines this window
+/// has not seen are fetched, so following the tail of a long encode costs the
+/// same whether it has written ten lines or ten thousand.
 #[tauri::command]
-fn logs(state: State<'_, SharedState>) -> Result<Vec<String>, String> {
-    let local = state
+fn activity_window(
+    state: State<'_, SharedState>,
+) -> Result<windows::log::ActivityViewModel, String> {
+    let cursor = state
         .lock()
-        .map(|guard| guard.logs.clone())
+        .map(|guard| guard.activity.cursor())
         .map_err(|e| e.to_string())?;
     let worker = worker_client(&state)?;
-    let mut lines = Vec::new();
-    if let Some(backend) = state
+    let mut page = None;
+    if let Some(client) = worker {
+        match client.get_log_messages_from_index(cursor) {
+            Ok(reply) => page = Some(reply),
+            Err(e) => record_warning(
+                &state,
+                "worker",
+                "reading the activity log",
+                format!("the worker's log could not be read this time: {e}"),
+            ),
+        }
+    }
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    if let Some(page) = page {
+        guard.activity.take_page(page);
+    }
+    Ok(guard.activity.view())
+}
+
+/// Set the level the activity window shows from.
+#[tauri::command]
+fn set_log_level(
+    state: State<'_, SharedState>,
+    level: String,
+) -> Result<windows::log::ActivityViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.activity.set_min_level_name(&level)?;
+    Ok(guard.activity.view())
+}
+
+/// Turn the follow switch on or off.
+#[tauri::command]
+fn set_follow_logs(
+    state: State<'_, SharedState>,
+    follow: bool,
+) -> Result<windows::log::ActivityViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.activity.set_follow(follow);
+    Ok(guard.activity.view())
+}
+
+/// Forget every line, here and in the worker.
+#[tauri::command]
+fn clear_logs(state: State<'_, SharedState>) -> Result<windows::log::ActivityViewModel, String> {
+    let worker = worker_client(&state)?;
+    if let Some(client) = worker {
+        match client.reset_logging() {
+            Ok(result) if !result.was_successful => record_warning(
+                &state,
+                "worker",
+                "clearing the activity log",
+                result.error.clone(),
+            ),
+            Ok(_) => {}
+            Err(e) => record_warning(
+                &state,
+                "worker",
+                "clearing the activity log",
+                format!("the worker did not confirm the reset: {e}"),
+            ),
+        }
+    }
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let cleared = guard.activity.clear();
+    guard.activity.record(format!(
+        "cleared {cleared} line(s) from the activity window"
+    ));
+    Ok(guard.activity.view())
+}
+
+// ---------------------------------------------------------------------------
+// Problems, alerts, and the about view
+// ---------------------------------------------------------------------------
+
+/// Everything that went wrong, as the page renders it.
+#[tauri::command]
+fn error_view(state: State<'_, SharedState>) -> Result<ErrorViewModel, String> {
+    let guard = state.lock().map_err(|e| e.to_string())?;
+    Ok(guard.errors.view())
+}
+
+/// The whole problem list as plain text, for the clipboard.
+#[tauri::command]
+fn error_report(state: State<'_, SharedState>) -> Result<String, String> {
+    let guard = state.lock().map_err(|e| e.to_string())?;
+    Ok(dialogs::report_text(guard.errors.entries()))
+}
+
+/// Forget every recorded problem.
+#[tauri::command]
+fn clear_errors(state: State<'_, SharedState>) -> Result<ErrorViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.errors.clear();
+    Ok(guard.errors.view())
+}
+
+/// Ask for confirmation before an action that cannot be undone.
+///
+/// A destructive action also opens the alert as its own surface, so the
+/// question is where the user is looking rather than tucked behind the control
+/// they just pressed. The headline arrives from the page when it has something
+/// specific to name; otherwise the window writes one, so the question never
+/// appears as a bare verb.
+#[tauri::command]
+fn ask_for_alert(
+    state: State<'_, SharedState>,
+    action: AlertAction,
+    headline: String,
+    job_id: Option<u64>,
+    preset_id: Option<String>,
+) -> Result<dialogs::CountdownAlertViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let destructive = action.is_destructive();
+    let headline = alert_headline(action, headline.trim(), job_id, preset_id.as_deref());
+    guard.alerts.request(action, headline, job_id, preset_id);
+    if destructive {
+        guard.surfaces.open(dialogs::ALERT_SURFACE)?;
+    }
+    Ok(guard.alerts.view())
+}
+
+/// The question a confirmation asks.
+///
+/// An empty headline from the page becomes a sentence that still says what is
+/// about to happen, so the alert is never "Are you sure? Confirm."
+fn alert_headline(
+    action: AlertAction,
+    headline: &str,
+    job_id: Option<u64>,
+    preset_id: Option<&str>,
+) -> String {
+    if !headline.is_empty() {
+        return headline.to_string();
+    }
+    match action {
+        AlertAction::CancelJob | AlertAction::RemoveJob => match job_id {
+            Some(id) => format!("{} job {id}?", action.verb()),
+            None => format!("{}?", action.verb()),
+        },
+        AlertAction::DeletePreset => match preset_id {
+            Some(id) if !id.trim().is_empty() => format!("{} '{id}'?", action.verb()),
+            _ => format!("{}?", action.verb()),
+        },
+        _ => format!("{}?", action.verb()),
+    }
+}
+
+/// Count one second off a pending alert.
+#[tauri::command]
+fn tick_alert(state: State<'_, SharedState>) -> Result<dialogs::CountdownAlertViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.alerts.tick();
+    Ok(guard.alerts.view())
+}
+
+/// Confirm a pending action, once its countdown is over.
+///
+/// The action itself is carried back rather than performed here: only the
+/// commands that own an action can carry it out, so a stale or replayed
+/// confirmation cannot cancel something the caller never asked to cancel.
+#[tauri::command]
+fn confirm_alert(state: State<'_, SharedState>) -> Result<Option<dialogs::CountdownAlert>, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let confirmed = guard.alerts.take_confirmed();
+    if let Some(alert) = &confirmed {
+        guard
+            .activity
+            .record(format!("confirmed: {}", alert.headline));
+        guard.confirmed = Some(alert.action);
+    }
+    guard.surfaces.close(dialogs::ALERT_SURFACE);
+    Ok(confirmed)
+}
+
+/// Back out of a pending action.
+#[tauri::command]
+fn dismiss_alert(
+    state: State<'_, SharedState>,
+) -> Result<dialogs::CountdownAlertViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let dropped = guard
+        .alerts
+        .pending()
+        .map(|pending| pending.headline.clone());
+    guard.confirmed = None;
+    if let Some(headline) = dropped {
+        guard.activity.record(format!("backed out of: {headline}"));
+    }
+    guard.alerts.cancel();
+    guard.surfaces.close(dialogs::ALERT_SURFACE);
+    Ok(guard.alerts.view())
+}
+
+/// The about view.
+#[tauri::command]
+fn about_view(state: State<'_, SharedState>) -> Result<AboutViewModel, String> {
+    let engine = state
         .lock()
         .ok()
         .and_then(|guard| guard.backend.as_ref().map(|backend| backend.describe()))
-    {
-        lines.push(format!("[desktop] {backend}"));
-    }
-    if let Some(client) = worker {
-        if let Ok(messages) = client.get_all_log_messages() {
-            lines.extend(
-                messages
-                    .iter()
-                    .map(|entry| format!("[worker {:?}] {}", entry.log_level, entry.message)),
-            );
-        }
-    }
-    lines.extend(local);
-    Ok(lines)
+        .unwrap_or_default();
+    Ok(dialogs::about(&engine))
 }
 
+// ---------------------------------------------------------------------------
+// Presets
+// ---------------------------------------------------------------------------
+
+/// The stored presets, or none when the file cannot be read.
+///
+/// A library that will not read is treated as empty rather than as a failure:
+/// the window must still open so the problem can be read out of it.
+fn stored_presets(path: &Path) -> Vec<vise_core::UserPreset> {
+    vise_core::load_user_presets(path).unwrap_or_default()
+}
+
+/// The preset manager, as the page renders it.
 #[tauri::command]
-fn clear_logs(state: State<'_, SharedState>) -> Result<(), String> {
-    let worker = worker_client(&state)?;
-    if let Some(client) = worker {
-        let _ = client.reset_logging();
+fn preset_window(
+    state: State<'_, SharedState>,
+    change: Option<PresetInput>,
+) -> Result<windows::presets::PresetView, String> {
+    let guard = state.lock().map_err(|e| e.to_string())?;
+    let stored = stored_presets(&guard.presets.path);
+    let built_in = vise_core::builtin_presets();
+    let input = change.unwrap_or_default();
+    let names: Vec<String> = stored.iter().map(|preset| preset.name.clone()).collect();
+    let found = stored.iter().find(|preset| preset.id == input.id);
+    Ok(guard.presets.view(
+        &stored,
+        &built_in,
+        windows::presets::form_view(&input, &names, found),
+    ))
+}
+
+/// Act on a preset: create, edit, copy, delete, or apply.
+///
+/// Everything is written through `vise_core`'s preset API, so the file on disk
+/// is exactly what the core expects to read back on the next launch.
+#[tauri::command]
+fn apply_preset_action(
+    state: State<'_, SharedState>,
+    change: PresetInput,
+) -> Result<windows::presets::PresetView, String> {
+    let action = change.action()?;
+    let path = {
+        let guard = state.lock().map_err(|e| e.to_string())?;
+        guard.presets.path.clone()
+    };
+    {
+        let names: Vec<String> = stored_presets(&path)
+            .into_iter()
+            .map(|preset| preset.name)
+            .collect();
+        let blocking: Vec<String> = windows::presets::form_view(&change, &names, None)
+            .problems
+            .into_iter()
+            .filter(|problem| !problem.starts_with("Another preset"))
+            .collect();
+        for problem in &blocking {
+            record_problem(&state, "presets", action.as_str(), problem);
+        }
+        if !blocking.is_empty() {
+            return Err(format!(
+                "Fix this before storing the preset: {}",
+                blocking.join(" ")
+            ));
+        }
     }
+
+    // An action that destroys work says so in the log before it happens, so a
+    // bug report that starts after the fact still shows what was asked for.
+    if action.is_destructive() {
+        push_log(
+            &state,
+            format!(
+                "'{}' cannot be undone and asks for confirmation first",
+                action.as_str()
+            ),
+        );
+    }
+
+    match action {
+        PresetAction::Create | PresetAction::Clone => {
+            let spec = preset_from_tabs(&state, &change)?;
+            let created = vise_core::create_user_preset(&path, change.name.trim(), spec)
+                .map_err(|e| e.to_string())?;
+            let category = windows::presets::parse_category(&change.category)?;
+            let mut guard = state.lock().map_err(|e| e.to_string())?;
+            guard.presets.set_category(&created.id, category);
+            if change.default {
+                guard.presets.set_default(&created.id);
+            }
+            guard
+                .activity
+                .record(format!("stored the preset '{}'", created.name));
+        }
+        PresetAction::Edit => {
+            let name = change.name.trim().to_string();
+            let stored = vise_core::update_user_preset(
+                &path,
+                change.id.trim(),
+                Some(&name),
+                Some(preset_from_tabs(&state, &change)?),
+            )
+            .map_err(|e| e.to_string())?;
+            let category = windows::presets::parse_category(&change.category)?;
+            let mut guard = state.lock().map_err(|e| e.to_string())?;
+            guard.presets.set_category(&stored.id, category);
+            guard
+                .activity
+                .record(format!("renamed the preset '{}'", stored.name));
+        }
+        PresetAction::Delete => {
+            require_confirmation(&state, AlertAction::DeletePreset)?;
+            vise_core::delete_user_preset(&path, change.id.trim()).map_err(|e| e.to_string())?;
+            let mut guard = state.lock().map_err(|e| e.to_string())?;
+            guard.presets.forget(change.id.trim());
+            guard.activity.record("deleted a preset");
+            drop(guard);
+            take_confirmation(&state, AlertAction::DeletePreset);
+        }
+        PresetAction::SetDefault => {
+            let mut guard = state.lock().map_err(|e| e.to_string())?;
+            guard.presets.set_default(change.id.trim());
+            let name = guard
+                .presets
+                .default_name(&stored_presets(&path), &vise_core::builtin_presets());
+            guard
+                .activity
+                .record(format!("'{name}' now starts every new job"));
+        }
+        PresetAction::ClearDefault => {
+            let mut guard = state.lock().map_err(|e| e.to_string())?;
+            guard.presets.clear_default();
+            guard
+                .activity
+                .record("no preset starts every new job any more");
+        }
+        PresetAction::Apply => {
+            let stored = vise_core::load_user_presets(&path).map_err(|e| e.to_string())?;
+            let preset = match stored.into_iter().find(|preset| preset.id == change.id) {
+                Some(found) => found.preset,
+                None => vise_core::builtin_preset(change.id.trim())
+                    .map(|preset| preset.preset)
+                    .ok_or_else(|| "There is no preset with that name.".to_string())?,
+            };
+            apply_preset_to_tabs(&state, &preset)?;
+            push_log(&state, "applied a preset to the output settings");
+        }
+        PresetAction::Import => {
+            if let Some(problem) = windows::presets::import_path_problem(&change.path) {
+                return Err(problem);
+            }
+            let imported = vise_core::import_user_preset(std::path::Path::new(change.path.trim()))
+                .map_err(|e| format!("That file could not be read as a preset: {e}"))?;
+            let name = if imported.name.trim().is_empty() {
+                return Err(
+                    "A preset file needs a name; rename it in the file and try again.".to_string(),
+                );
+            } else {
+                imported.name.trim().to_string()
+            };
+            let created = vise_core::create_user_preset(&path, &name, imported.preset)
+                .map_err(|e| e.to_string())?;
+            let category = windows::presets::parse_category(&change.category)?;
+            let mut guard = state.lock().map_err(|e| e.to_string())?;
+            guard.presets.set_category(&created.id, category);
+            if change.default {
+                guard.presets.set_default(&created.id);
+            }
+            guard
+                .activity
+                .record(format!("imported the preset '{}'", created.name));
+        }
+        PresetAction::Export => {
+            if let Some(problem) = windows::presets::export_path_problem(&change.path) {
+                return Err(problem);
+            }
+            let stored = vise_core::load_user_presets(&path).map_err(|e| e.to_string())?;
+            let wanted = change.id.trim();
+            if wanted.is_empty() {
+                return Err("Choose which preset to export.".to_string());
+            }
+            // A preset that ships with the build is exported as a stored preset
+            // with the same name and description, so the file the user gets back
+            // is one this window could import again.
+            let preset = match stored.into_iter().find(|preset| preset.id == wanted) {
+                Some(found) => found,
+                None => match vise_core::builtin_preset(wanted) {
+                    Some(found) => vise_core::UserPreset {
+                        id: found.id.clone(),
+                        name: found.name.clone(),
+                        description: found.description.clone(),
+                        preset: found.preset.clone(),
+                    },
+                    None => return Err("There is no preset with that name.".to_string()),
+                },
+            };
+            let name = preset.name.clone();
+            vise_core::export_user_preset(std::path::Path::new(change.path.trim()), &preset)
+                .map_err(|e| format!("That preset could not be written: {e}"))?;
+            let mut guard = state.lock().map_err(|e| e.to_string())?;
+            guard
+                .activity
+                .record(format!("exported the preset '{name}'"));
+        }
+    }
+
+    preset_window(state, None)
+}
+
+/// Build the preset the current tab settings describe.
+///
+/// A preset carries the choices that shape the output rather than the whole job,
+/// so it stays meaningful against a different title: container, codecs, the
+/// crop and size the user picked, and the quality. Everything else stays on the
+/// tabs.
+fn preset_from_tabs(
+    state: &SharedState,
+    change: &PresetInput,
+) -> Result<vise_core::PresetSpec, String> {
     let mut guard = state.lock().map_err(|e| e.to_string())?;
-    guard.logs.clear();
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    let (crop, scale) =
+        tabs::dimensions::to_job_geometry(&guard.tabs.dimensions, &facts).unwrap_or((None, None));
+    Ok(vise_core::PresetSpec {
+        container: tabs::compatibility::container_of(&guard.tabs.summary.container),
+        format: None,
+        video_codec: tabs::compatibility::video_codec_of(&guard.tabs.summary.video_codec),
+        video: None,
+        audio_codec: tabs::compatibility::audio_codec_of(&guard.tabs.summary.audio_codec),
+        audio: None,
+        subtitle_mode: None,
+        subtitles: None,
+        title_index: None,
+        title: None,
+        crop,
+        scale_to: scale,
+        quality: guard.tabs.video.quality.whole("Quality").ok().flatten(),
+        name: Some(change.name.trim().to_string()),
+        description: non_empty(change.description.trim()),
+    })
+}
+
+/// A description, or nothing rather than an empty string.
+fn non_empty(text: &str) -> Option<String> {
+    if text.is_empty() {
+        None
+    } else {
+        Some(text.to_string())
+    }
+}
+
+/// Write a preset back into the tab settings.
+fn apply_preset_to_tabs(state: &SharedState, preset: &vise_core::PresetSpec) -> Result<(), String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    if let Some(container) = preset.container.or(preset.format) {
+        guard.tabs.summary.container = format!("{container:?}").to_ascii_lowercase();
+    }
+    if let Some(codec) = preset.video_codec.or(preset.video) {
+        guard.tabs.summary.video_codec = format!("{codec:?}").to_ascii_lowercase();
+    }
+    if let Some(codec) = preset.audio_codec.or(preset.audio) {
+        guard.tabs.summary.audio_codec = format!("{codec:?}").to_ascii_lowercase();
+    }
+    if let Some(quality) = preset.quality {
+        guard.tabs.video.quality = tabs::common::NumField::of(quality);
+        guard.tabs.video.rate_control = "quality".to_string();
+    }
+    if let Some((_, _, width, height)) = preset.crop {
+        guard.tabs.dimensions.crop_mode = "manual".to_string();
+        guard.tabs.dimensions.crop_width = tabs::common::NumField::of(width);
+        guard.tabs.dimensions.crop_height = tabs::common::NumField::of(height);
+    }
+    if let Some((width, height)) = preset.scale_to {
+        guard.tabs.dimensions.scale_mode = "exact".to_string();
+        guard.tabs.dimensions.scale_width = tabs::common::NumField::of(width);
+        guard.tabs.dimensions.scale_height = tabs::common::NumField::of(height);
+    }
+    let facts = title_facts(&guard);
+    guard.tabs.sync_with_title(&facts);
+    let problems = guard.tabs.view(&facts).problems;
+    drop(guard);
+    if !problems.is_empty() {
+        return Err(format!(
+            "That preset does not fit this title: {}",
+            problems.join(" ")
+        ));
+    }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Secondary windows
+// ---------------------------------------------------------------------------
+
+/// Which secondary windows and dialogs exist, and which are open.
+#[tauri::command]
+fn window_catalog(
+    state: State<'_, SharedState>,
+) -> Result<windows::SurfaceCatalogViewModel, String> {
+    let guard = state.lock().map_err(|e| e.to_string())?;
+    Ok(guard.surfaces.catalog())
+}
+
+/// Open a secondary window or dialog.
+#[tauri::command]
+fn open_window(state: State<'_, SharedState>, id: String) -> Result<windows::SurfaceSpec, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.surfaces.open(&id)
+}
+
+/// Close a secondary window or dialog.
+///
+/// An empty name, or `all`, closes every one of them; anything else has to
+/// name a surface this build offers, so a stale page cannot quietly close a
+/// surface the user opened on purpose.
+#[tauri::command]
+fn close_window(
+    state: State<'_, SharedState>,
+    id: String,
+) -> Result<windows::SurfaceStateViewModel, String> {
+    let wanted = id.trim();
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    if wanted.is_empty() || wanted == "all" {
+        guard.surfaces.close_all();
+        return Ok(guard.surfaces.view());
+    }
+    if !SurfaceState::is_surface(wanted) {
+        return Err(format!("'{wanted}' is not a window this build offers."));
+    }
+    guard.surfaces.close(wanted);
+    Ok(guard.surfaces.view())
 }
 
 fn main() {
     let settings_path = sources::default_settings_path();
     let recents = RecentSources::load(&settings_path);
+    let preset_path = preset_file(&settings_path);
     let state: SharedState = Arc::new(Mutex::new(DesktopState {
         // Build the backend before the window opens so the first scan does not
         // pay for process start-up.
         backend: Some(build_backend()),
         recents,
         settings_path,
+        presets: PresetState::new(preset_path),
         tabs: TabSettings::new(),
         ..DesktopState::default()
     }));
@@ -1093,7 +2275,6 @@ fn main() {
             choose_title,
             choose_range,
             choose_tracks,
-            extract_preview,
             tab_set,
             set_active_tab,
             set_summary,
@@ -1106,20 +2287,62 @@ fn main() {
             set_subtitle_track,
             set_chapters,
             change_marker,
+            set_metadata,
             import_subtitles,
+            preview_window,
+            fetch_preview_still,
+            set_preview_still_count,
+            select_preview_still,
+            set_preview_crop,
+            reset_preview_crop,
+            apply_preview_crop,
             add_job,
             queue_selection,
+            queue_selection_window,
+            set_queue_selection,
+            queue_titles,
+            queue_window,
+            move_job,
+            set_job_priority,
             list_jobs,
             remove_job,
             run_job,
+            start_queue,
+            cancel_all,
+            clear_finished_jobs,
+            empty_queue,
             pause_job,
             resume_job,
             cancel_job,
-            logs,
-            clear_logs
+            cancel_job_confirmed,
+            activity_window,
+            set_log_level,
+            set_follow_logs,
+            clear_logs,
+            error_view,
+            error_report,
+            clear_errors,
+            ask_for_alert,
+            tick_alert,
+            confirm_alert,
+            dismiss_alert,
+            about_view,
+            preset_window,
+            apply_preset_action,
+            window_catalog,
+            open_window,
+            close_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Where the stored presets live, beside the other settings.
+fn preset_file(settings_path: &Path) -> PathBuf {
+    settings_path
+        .parent()
+        .map(|folder| folder.join("presets.json"))
+        .unwrap_or_else(|| PathBuf::from("presets.json"))
 }
 
 #[cfg(test)]
@@ -1288,7 +2511,7 @@ mod tests {
         let settings = TabSettings::new();
         let view = settings.view(&TitleFacts::default());
         let json = serde_json::to_value(&view).expect("serialise");
-        assert_eq!(json["tabs"].as_array().map(|tabs| tabs.len()), Some(7));
+        assert_eq!(json["tabs"].as_array().map(|tabs| tabs.len()), Some(8));
         assert_eq!(json["tabs"][0]["id"], "summary");
         assert_eq!(json["active"], "summary");
         assert_eq!(json["source"]["chosen"], false);
@@ -1299,6 +2522,9 @@ mod tests {
         assert!(json["audio"]["tracks"].is_array());
         assert!(json["subtitles"]["behaviour"]["options"].is_array());
         assert!(json["chapters"]["mode"]["options"].is_array());
+        assert!(json["metadata"]["mode"]["options"].is_array());
+        assert!(json["metadata"]["tags"].is_array());
+        assert_eq!(json["metadata"]["mode"]["selected"], "copy");
         assert!(json["problems"].is_array());
     }
 
@@ -1353,6 +2579,175 @@ mod tests {
     fn a_tab_the_build_does_not_offer_is_refused_by_name() {
         let settings = TabSettings::new();
         assert!(settings.is_tab("chapters"));
-        assert!(!settings.is_tab("metadata"));
+        assert!(settings.is_tab("metadata"));
+        assert!(!settings.is_tab("advanced"));
+    }
+
+    #[test]
+    fn a_queue_selection_arrives_as_the_names_and_choices_it_needs() {
+        let payload = r#"{"outputDirectory":"C:\\out","namePattern":"{title} ({n})",
+            "names":{"2":"Second"},"titles":[1,2]}"#;
+        let input: windows::queue::QueueSelectionInput =
+            serde_json::from_str(payload).expect("selection");
+        assert_eq!(input.output_directory, "C:\\out");
+        assert_eq!(input.name_pattern, "{title} ({n})");
+        assert_eq!(input.titles, vec![1, 2]);
+        assert_eq!(input.names.get("2").map(String::as_str), Some("Second"));
+
+        let titles = vec![(1u32, "One".to_string()), (2, "One".to_string())];
+        let plan = windows::queue::plan(&input, &titles, "mp4").expect("plan");
+        assert_eq!(
+            plan,
+            vec![
+                (1, "C:\\out\\One (1).mp4".to_string()),
+                (2, "C:\\out\\Second.mp4".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn a_metadata_change_arrives_as_camel_case_the_tab_accepts() {
+        let payload = r#"{"action":"add","key":"comment","value":"mine","checked":false}"#;
+        let change: MetadataInput = serde_json::from_str(payload).expect("metadata change");
+        let mut settings = tabs::MetadataSettings::default();
+        change
+            .apply(&mut settings, &TitleFacts::default())
+            .expect("add");
+        assert!(settings.entries.iter().any(|entry| entry.key == "comment"));
+
+        let mode = r#"{"action":"mode","mode":"edit"}"#;
+        let change: MetadataInput = serde_json::from_str(mode).expect("mode change");
+        change
+            .apply(&mut settings, &TitleFacts::default())
+            .expect("mode");
+        assert!(settings.applies_edits());
+    }
+
+    #[test]
+    fn a_preset_change_arrives_as_the_action_and_the_preset_it_names() {
+        let payload = r#"{"action":"clone","id":"fast-1080p","name":"Mine",
+            "description":"for the shelf","category":"web","default":true}"#;
+        let input: PresetInput = serde_json::from_str(payload).expect("preset change");
+        assert_eq!(input.action().expect("clone"), PresetAction::Clone);
+        assert_eq!(input.id, "fast-1080p");
+        assert_eq!(input.category, "web");
+        assert!(input.default);
+        assert!(PresetAction::Delete.is_destructive());
+        assert!(PresetAction::Edit.needs_name());
+        assert!(!PresetAction::SetDefault.needs_name());
+
+        let view = windows::presets::form_view(&input, &["Fast 1080p".to_string()], None);
+        assert!(view.can_submit, "{:?}", view.problems);
+        assert_eq!(view.selected_category, "web");
+        assert!(view.default);
+    }
+
+    #[test]
+    fn the_output_folder_is_only_accepted_when_it_exists() {
+        let (valid, problem) = check_output_directory("   ");
+        assert!(!valid);
+        assert!(problem.contains("folder"));
+
+        let (valid, problem) = check_output_directory("C:\\definitely\\not\\here");
+        assert!(!valid);
+        assert!(problem.contains("definitely"), "{problem}");
+
+        let dir = std::env::temp_dir().join("vise-desktop-output");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("dir");
+        assert_eq!(
+            check_output_directory(dir.to_str().unwrap()),
+            (true, String::new())
+        );
+    }
+
+    #[test]
+    fn a_window_this_build_does_not_offer_is_refused_and_a_whole_close_is_not() {
+        let mut surfaces = SurfaceState::default();
+        assert!(surfaces.open("queue").is_ok());
+        assert!(surfaces.open("registry editor").is_err());
+        assert_eq!(surfaces.open_surfaces().len(), 1);
+        assert!(!surfaces.open_surfaces().is_empty());
+        surfaces.close_all();
+        assert!(surfaces.open_surfaces().is_empty());
+
+        let catalog = surfaces.catalog();
+        assert_eq!(catalog.surfaces.len(), 8);
+        assert!(catalog
+            .surfaces
+            .iter()
+            .all(|surface| surface.role == "dialog" && surface.modal));
+    }
+
+    #[test]
+    fn the_alert_asks_a_question_even_when_the_page_names_nothing() {
+        assert_eq!(
+            alert_headline(AlertAction::RemoveJob, "", Some(7), None),
+            "Remove from the queue job 7?"
+        );
+        assert_eq!(
+            alert_headline(AlertAction::CancelJob, "", None, None),
+            "Cancel the encode?"
+        );
+        assert_eq!(
+            alert_headline(AlertAction::DeletePreset, "", None, Some("  ")),
+            "Delete the preset?"
+        );
+        assert_eq!(
+            alert_headline(AlertAction::DeletePreset, "", None, Some("user-1234")),
+            "Delete the preset 'user-1234'?"
+        );
+        assert_eq!(
+            alert_headline(AlertAction::ClearQueue, "", None, None),
+            "Empty the queue?"
+        );
+        // A headline the page did write is kept, word for word.
+        assert_eq!(
+            alert_headline(
+                AlertAction::CancelQueue,
+                "Cancel 3 encodes and lose their progress?",
+                None,
+                None
+            ),
+            "Cancel 3 encodes and lose their progress?"
+        );
+        assert_eq!(
+            alert_headline(AlertAction::StartQueue, "", None, None),
+            "Start the queue?"
+        );
+    }
+
+    #[test]
+    fn a_preset_exchange_change_carries_the_file_it_reads_or_writes() {
+        let payload = r#"{"action":"import","path":"C:\\out\\mine.json","category":"web"}"#;
+        let change: PresetInput = serde_json::from_str(payload).expect("import change");
+        let action = change.action().expect("import");
+        assert_eq!(action, PresetAction::Import);
+        assert_eq!(change.path, "C:\\out\\mine.json");
+        assert!(action.needs_path(), "an import reads a file");
+
+        let export = r#"{"action":"export","id":"fast-1080p","path":"C:\\out\\fast.json"}"#;
+        let change: PresetInput = serde_json::from_str(export).expect("export change");
+        let action = change.action().expect("export");
+        assert_eq!(action, PresetAction::Export);
+        assert_eq!(change.id, "fast-1080p");
+        assert!(action.needs_path(), "an export writes a file");
+        assert!(!action.needs_name(), "the exported preset is not renamed");
+    }
+
+    #[test]
+    fn a_preset_file_that_is_not_there_is_refused_before_anything_is_written() {
+        assert!(windows::presets::import_path_problem("C:\\nowhere\\mine.json").is_some());
+        assert!(windows::presets::export_path_problem("C:\\nowhere\\mine.txt").is_some());
+    }
+
+    #[test]
+    fn the_preset_file_lives_beside_the_other_settings() {
+        let path = preset_file(std::path::Path::new("C:/app/settings.json"));
+        assert_eq!(path, std::path::PathBuf::from("C:/app/presets.json"));
+        assert_eq!(
+            preset_file(std::path::Path::new("settings.json")),
+            std::path::PathBuf::from("presets.json")
+        );
     }
 }

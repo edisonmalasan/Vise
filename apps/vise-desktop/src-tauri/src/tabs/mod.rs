@@ -18,6 +18,7 @@ pub mod common;
 pub mod compatibility;
 pub mod dimensions;
 pub mod filters;
+pub mod metadata;
 pub mod source;
 pub mod subtitles;
 pub mod summary;
@@ -31,6 +32,7 @@ pub use audio::{AudioDefaultsInput, AudioTrackInput};
 pub use chapters::{ChapterSettings, ChaptersInput, MarkerInput};
 pub use dimensions::DimensionsInput;
 pub use filters::{FilterInput, FilterSettings};
+pub use metadata::{MetadataInput, MetadataSettings};
 pub use source::{TitleFacts, TitleFactsViewModel};
 use subtitles::SubtitleSettings;
 pub use subtitles::{SubtitleTrackInput, SubtitlesInput};
@@ -75,6 +77,8 @@ pub struct TabSetViewModel {
     pub subtitles: subtitles::SubtitlesTabViewModel,
     /// The chapters tab.
     pub chapters: chapters::ChaptersTabViewModel,
+    /// The metadata tab.
+    pub metadata: metadata::MetadataTabViewModel,
     /// Everything that has to be fixed before a job can be queued.
     pub problems: Vec<String>,
     /// Whether the job can be queued from these choices.
@@ -101,10 +105,12 @@ pub struct TabSettings {
     pub subtitles: SubtitleSettings,
     /// Chapter markers.
     pub chapters: ChapterSettings,
+    /// Source tags and attachments.
+    pub metadata: MetadataSettings,
 }
 
 /// The tab order, with the label and the hint the strip shows.
-const TABS: [(&str, &str, &str); 7] = [
+const TABS: [(&str, &str, &str); 8] = [
     (
         "summary",
         "Summary",
@@ -140,6 +146,11 @@ const TABS: [(&str, &str, &str); 7] = [
         "Chapters",
         "Which chapter markers are written, and editing them.",
     ),
+    (
+        "metadata",
+        "Metadata",
+        "The tags written into the finished file, and its attachments.",
+    ),
 ];
 
 impl TabSettings {
@@ -159,6 +170,10 @@ impl TabSettings {
         self.audio.sync(facts);
         self.subtitles.sync(facts);
         self.chapters.sync(facts);
+        self.metadata.sync_with_title(facts);
+        // The metadata tab owns the passthrough flag, so the summary tab's
+        // switch always reads the same value rather than keeping its own copy.
+        self.summary.passthrough_metadata = self.metadata.copies_source();
     }
 
     /// Mark the tracks the source area chose.
@@ -182,6 +197,7 @@ impl TabSettings {
         let audio = audio::tab_view(&self.audio, facts, container, &self.summary.audio_codec);
         let subtitles = subtitles::tab_view(&self.subtitles, facts, container);
         let chapters = chapters::tab_view(&self.chapters, facts);
+        let metadata = metadata::tab_view(&self.metadata, facts);
 
         // Each tab is listed in one place: its identifier, its label, and whether
         // anything on it still has to be fixed.
@@ -193,6 +209,7 @@ impl TabSettings {
             ("audio", audio.ready),
             ("subtitles", subtitles.ready),
             ("chapters", chapters.ready),
+            ("metadata", metadata.ready),
         ];
         let ready_of = |id: &str| {
             sections
@@ -215,6 +232,7 @@ impl TabSettings {
                 &audio,
                 &subtitles,
                 &chapters,
+                &metadata,
             ) {
                 problems.push(format!("{label}: {problem}"));
             }
@@ -246,6 +264,7 @@ impl TabSettings {
             audio,
             subtitles,
             chapters,
+            metadata,
             can_queue: problems.is_empty(),
             problems,
         }
@@ -323,7 +342,7 @@ impl TabSettings {
                 web_optimized: Some(self.summary.web_optimized),
                 align_audio_video: self.summary.align_audio_video,
                 ipod_compatible: self.summary.ipod_compatible,
-                passthrough_metadata: self.summary.passthrough_metadata,
+                passthrough_metadata: self.metadata.copies_source(),
             },
             encoding_mode: Some(rate_mode),
             quality,
@@ -338,10 +357,7 @@ impl TabSettings {
             subtitle_processing: subtitles::to_job_processing(external),
             audio_tracks,
             chapter_processing,
-            metadata_processing: vise_core::MetadataProcessingOptions {
-                copy: self.summary.passthrough_metadata,
-                ..Default::default()
-            },
+            metadata_processing: self.metadata.to_job_options(),
             ..Default::default()
         })
     }
@@ -439,6 +455,7 @@ fn tab_problems(
     audio: &audio::AudioTabViewModel,
     subtitles: &subtitles::SubtitlesTabViewModel,
     chapters: &chapters::ChaptersTabViewModel,
+    metadata: &metadata::MetadataTabViewModel,
 ) -> Vec<String> {
     match id {
         "summary" => summary.problems.clone(),
@@ -447,6 +464,7 @@ fn tab_problems(
         "video" => video.problems.clone(),
         "audio" => audio.problems.clone(),
         "subtitles" => subtitles.problems.clone(),
+        _ if id == "metadata" => metadata.problems.clone(),
         _ => chapters.problems.clone(),
     }
 }
@@ -507,19 +525,21 @@ mod tests {
     fn the_tabs_report_the_title_they_are_working_on() {
         let settings = ready_settings();
         let view = settings.view(&facts());
-        assert_eq!(view.tabs.len(), 7);
+        assert_eq!(view.tabs.len(), 8);
         assert_eq!(view.tabs[0].id, "summary");
+        assert_eq!(view.tabs[7].id, "metadata");
         assert_eq!(view.active, "summary");
         assert!(view.source.chosen);
         assert_eq!(view.source.resolution_label, "1920x1080");
         assert!(settings.is_tab("chapters"));
-        assert!(!settings.is_tab("metadata"));
+        assert!(settings.is_tab("metadata"));
+        assert!(!settings.is_tab("advanced"));
     }
 
     #[test]
     fn the_active_tab_falls_back_when_the_page_asks_for_one_that_is_not_there() {
         let mut settings = ready_settings();
-        settings.active = "metadata".into();
+        settings.active = "advanced".into();
         assert_eq!(settings.view(&facts()).active, "summary");
         settings.active = "video".into();
         assert_eq!(settings.view(&facts()).active, "video");
