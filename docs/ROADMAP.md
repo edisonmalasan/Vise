@@ -411,14 +411,30 @@ Verified by unit tests across the whole surface rather than by launching the app
 
 *Outcome: The user interface is available in the reference language set and switches at runtime.*
 
-- [ ] UI language selection
-- [ ] Runtime language switching
-- [ ] Translation resource pipeline
-- [ ] Right-to-left locale handling
-- [ ] Localized preset descriptions
-- [ ] Locale fallback behavior
+- [x] UI language selection
+- [x] Runtime language switching
+- [x] Translation resource pipeline
+- [x] Right-to-left locale handling
+- [x] Localized preset descriptions
+- [x] Locale fallback behavior
 
-**Status:** Not started (0/6 verified)
+**Status:** Complete (6/6 verified)
+
+Six languages ship, each translated for every key rather than for a fraction of one: English is the base the fallback chain ends at, and Spanish, German, French, Japanese, and Arabic are translated for all seventy-six keys. The set was chosen for coverage rather than reach — three scripts, four plural habits, and one right-to-left language in the shipped set so the mirroring path is exercised by something a user can pick rather than only by a test fixture. Every language is offered in its own name, because a picker of translated names is a picker nobody who cannot read the current language can use, and a language this build does not ship is not refused: the fallback chain answers with the base language and says which one it used.
+
+A message is reached by a key that is an enum rather than a name, so a key nobody declared cannot be spelled; each locale is a file under `crates/vise-core/data/locales`, embedded with `include_str!` and checked against the key set at test time, so adding a key without translating it is a failed test rather than a blank control. A duplicate key in a file is refused rather than silently overwriting the earlier spelling, a blank is refused, and a translation that fills a placeholder the key does not have — or misses one it does — is refused. The base locale is a file too rather than a set of match arms, which is what makes "every key is present in every language" one check rather than six. A key that is somehow in no file at all is answered by its own readable name; the rule is that a user is never shown an identifier, and there is a test that reads the resolved text and refuses anything that looks like the key.
+
+Resolution is a chain whose rungs are recorded rather than guessed: the locale itself, then the same language under another tag so `de-AT` reads `de` rather than English, then the base locale. Every rung a key took is available afterwards through the catalog's gap report, which the language picker shows and the window writes to the activity log — a half-translated locale is a report somebody can print, not a surprise somebody notices on screen.
+
+The language lives in the preferences record with everything else a user chooses once, and the record moves to version three. A version two record gains the field at its default rather than as a choice, because a record written by a build that spoke one language says nothing about which language its author wants; nothing the record already held is lost, which is why it is a migration rather than a second store. Switching applies the language and nothing else: the window pushes the three answers that moved — the words, the appearance, and the preferences — and the page applies those. The configuration tabs are deliberately absent from the payload, because redrawing them is what would throw away what the user has typed, and the one preferences field with the caret keeps its text even when the panel is rebuilt underneath it.
+
+The layout follows the language through the observation Group 14 already had, so the direction preference is still what decides: Arabic in a left-to-right window is a choice somebody made, and choosing a language cannot override it. The direction tables moved into the language resources with the locale tag reduction, so the shell and the messages cannot answer "which way does this read" differently.
+
+Preset descriptions are localized the same way and for the same reason. The catalog carries the base sentence for all 138 presets, twelve are translated per language, and the browser shows the translation where there is one and the catalog's own words where there is not — a sentence either way, never an identifier and never an empty row. Machine-translating a hundred and forty descriptions would ship sentences nobody has read; a mechanism that falls back honestly is worth more than a hundred and forty invented ones.
+
+**Verified by unit tests and by inspection of the shipped resources:** every locale file parses, has every key, and fills exactly the placeholders its key declares; a duplicate key, a blank, an unknown key name, and an untranslated sentence copied over the base are each refused; the fallback chain answers exact, then base language, then base, and a deliberately incomplete locale built in a test falls back and reports itself as incomplete; a key no file has resolves to a readable label rather than an identifier; a right-to-left language mirrors the window while a pinned left-to-right direction does not move, and a left-to-right language under a pinned right-to-left direction stays mirrored; a language switch re-emits its view models with no tab view model among them and leaves the tabs byte-identical; a version two record migrates with everything it held and its language at its default; and a translated preset description is used where one exists, is not where none does, and every row in every shipped locale has a sentence.
+
+**Not verified by anything but unit tests and inspection, and called out as such:** the page was not run in a browser for this slice. The `data-i18n` mechanism, the `language-changed` event handler, and the tab strip's fallback to the window's own label are the whole of the page's change and are covered by the view models they consume rather than by a browser. The coverage of the catalog is the chrome — the masthead, the toolbar, the tab strip, the source and queue lines, the appearance and preferences surfaces — and the per-control copy inside the eight configuration tabs is still English, because threading a catalog through every tab view model is a larger change than this group asked for and half of it would be untested either way. A preset browser that is open at the moment the language changes shows the new descriptions the next time it is read rather than immediately, because the browser's view model is built from the library rather than from the language. The command line's per-job progress lines stay in the base language: they are log lines rather than sentences, and a translation there would cost a script the reader cannot grep.
 
 ## Group 19 — Media depth
 
@@ -503,7 +519,7 @@ Required groups: 19
 | 15 | Preferences surface | Complete (8/8) |
 | 16 | Preset catalog and versioning | Complete (13/13) |
 | 17 | System integration | Complete (9/9) |
-| 18 | Localization | Not started (0/6) |
+| 18 | Localization | Complete (6/6) |
 | 19 | Media depth | Not started (0/10) |
 | 20 | Diagnostics and developer tools | Not started (0/6) |
 
