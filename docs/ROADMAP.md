@@ -347,21 +347,23 @@ Verified by unit tests across the record's lifecycle: a round trip through the s
 
 *Outcome: Built-in and user presets match the reference catalog and support versioning, migration, and exchange.*
 
-- [ ] Built-in preset catalog with all six categories (General, Web, Devices, Matroska, Hardware, Professional)
-- [ ] General quality families (Very Fast / Fast / HQ / Super HQ at 480p30, 576p25, 720p30, 1080p30, 2160p60 4K, HEVC and AV1 variants)
-- [ ] Web presets (Creator 720p60-2160p60, Social 10 MB / 25 MB with duration caps)
-- [ ] Device presets (Amazon Fire, Android, Apple, Chromecast, Playstation, Roku, Xbox)
-- [ ] Matroska presets (H.264, H.265, VP9, AV1)
-- [ ] Hardware presets (QSV, NVENC, VCN, Media Foundation, VideoToolbox)
-- [ ] Professional presets (ProRes, DNxHR, FFV1 preservation)
-- [ ] Preset schema with explicit version triple and migration
-- [ ] Preset clean/normalize operation
-- [ ] Preset import/export round-trip
-- [ ] Preset clone and reorder operations
-- [ ] Hardware-dependent preset availability resolution with software fallback
-- [ ] Preset descriptions with device compatibility guidance
+- [x] Built-in preset catalog with all six categories (General, Web, Devices, Matroska, Hardware, Professional)
+- [x] General quality families (Very Fast / Fast / HQ / Super HQ at 480p30, 576p25, 720p30, 1080p30, 2160p60 4K, HEVC and AV1 variants)
+- [x] Web presets (Creator 720p60-2160p60, Social 10 MB / 25 MB with duration caps)
+- [x] Device presets (Amazon Fire, Android, Apple, Chromecast, Playstation, Roku, Xbox)
+- [x] Matroska presets (H.264, H.265, VP9, AV1)
+- [x] Hardware presets (QSV, NVENC, VCN, Media Foundation, VideoToolbox)
+- [x] Professional presets (ProRes, DNxHR, FFV1 preservation)
+- [x] Preset schema with explicit version triple and migration
+- [x] Preset clean/normalize operation
+- [x] Preset import/export round-trip
+- [x] Preset clone and reorder operations
+- [x] Hardware-dependent preset availability resolution with software fallback
+- [x] Preset descriptions with device compatibility guidance
 
-**Status:** Not started (0/13 verified)
+**Status:** Complete (13/13 verified; the presets that ship with this build are an embedded JSON catalog rather than code, stamped with a version triple of their own and read against a template so an incomplete preset still means something. 138 entries across the six categories: the four quality families at five rungs each in H.264, H.265, and AV1; Creator 720p60–2160p60 and size-targeted Social presets that each carry the length they were designed around; the seven device families; four Matroska codecs; the five hardware families, each naming the chip it was written for; and ProRes, DNxHR, and FFV1 for preservation. Availability is asked of the machine rather than assumed: a preset names the encoder it was written for, the answer comes from the encoder's own `-encoders` list, and a chip that is missing becomes its documented software stand-in with the substitution said out loud, while a preset with no stand-in is refused by name instead of being given something else silently. A machine that could not be probed at all closes nothing, because refusing every preset on the strength of a probe that never ran would be a guess)
+
+Verified by unit tests over the whole catalog rather than over samples of it: the asset loads and names its own version, every one of the 138 entries validates, every entry normalizes the same way twice, and every entry round-trips through a file and back. The version policy is checked in both directions — a document from a later minor build is read and keeps the members this build does not know, a document from a later major build is refused by name rather than half-read, and a file written before the version existed is migrated forward with what it held intact. Cleaning is checked to fold the duplicated spellings and the two ways of writing "no chip needed", so two presets that mean the same thing compare equal, and the identifiers three earlier builds stored are resolved through an alias table rather than by renaming the entries. Availability is checked four ways: a machine with everything, a software-only machine where a missing chip becomes its stand-in and says so, a machine where hardware has been switched off, a machine that could not be probed at all, and a machine lacking an encoder that has no stand-in. Clone and reorder are checked for independence — a copied entry and a copied stored preset share no mutable state with the original, and a reordered library loses nothing. The browser surface is a Rust view model: the six categories are one tab stop with arrows that wrap and swap with the layout, the entries are a listbox the arrows walk, an entry this machine cannot run stays in the list with its reason beside it rather than disappearing, and the detail reads out the description, the compatibility guidance, and the encoder that will actually run. Two problems were found and fixed while applying a catalog preset to the tabs: a preset's encoder was never written onto the video tab, so a ProRes profile was checked against the H.264 picker and refused, and a field the preset was silent about kept the previous preset's value, so applying two presets in a row produced a job neither of them described. A preset is now the whole instruction for the encode — the encoder comes from the preset and anything it does not name goes back to the encoder default. The application itself was not launched for this slice, so the browser was confirmed through the shipped page and its view model rather than through the running window.
 
 ## Group 17 — System integration
 
@@ -473,7 +475,7 @@ Required groups: 19
 | 13 | Worker process and JSON IPC | Complete (9/9) |
 | 14 | Desktop parity with reference product | Complete (18/18) |
 | 15 | Preferences surface | Complete (8/8) |
-| 16 | Preset catalog and versioning | Not started (0/13) |
+| 16 | Preset catalog and versioning | Complete (13/13) |
 | 17 | System integration | Not started (0/9) |
 | 18 | Localization | Not started (0/6) |
 | 19 | Media depth | Not started (0/10) |
