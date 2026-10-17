@@ -74,6 +74,7 @@
   "language.followSystem": "حسب النظام",
   "language.coverage": "{translated} من {total} نصًّا مترجمة. تُعرض النصوص الأخرى بلغة {base}.",
   "language.switched": "واجهة البرنامج الآن بلغة {locale}.",
+  "language.notShipped": "{requested} ليست لغة في هذا الإصدار، لذلك تظهر الرسائل بلغة {locale}.",
 
   "cli.cancelled": "أُلغي الأمر.",
   "cli.unknownFormat": "{value} ليست حاوية يكتبها هذا الإصدار.",

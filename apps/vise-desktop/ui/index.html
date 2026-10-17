@@ -62,8 +62,8 @@
 </head>
 <body>
 <header class="masthead">
-  <h1>Vise Transcoder</h1>
-  <p>Pick a source, scan it, choose the title, range, angle, and tracks, then set the output up on the tabs below.</p>
+  <h1 data-i18n="app.title">Vise Transcoder</h1>
+  <p data-i18n="app.tagline">Pick a source, scan it, choose the title, range, angle, and tracks, then set the output up on the tabs below.</p>
 </header>
 
 <!-- The toolbar is built from the window catalog: every surface the window
@@ -71,10 +71,12 @@
      no control at all. -->
 <nav class="toolbar" id="toolbar" aria-label="Windows and dialogs"></nav>
 
-<!-- Theme and layout direction. Every control here is a preference the window
-     holds and resolves; the line underneath says what the window resolved and
-     why, so the user never has to work out which of the two systems the colours
-     on screen came from. -->
+<!-- Theme, layout direction, and language. Every control here is a preference
+     the window holds and resolves; the line underneath says what the window
+     resolved and why, so the user never has to work out which of the two
+     systems the colours on screen came from. The language lives in the
+     preferences rather than here, and a change to it arrives as an event with
+     the two answers that moved. -->
 <section class="card full" aria-labelledby="appearanceHeading">
   <div class="card-head">
     <h2 id="appearanceHeading">Appearance</h2>
@@ -83,11 +85,11 @@
 
   <div class="appearance">
     <fieldset>
-      <legend>Theme</legend>
+      <legend data-i18n="appearance.theme">Theme</legend>
       <div class="rules" id="appearanceThemeList"></div>
     </fieldset>
     <fieldset>
-      <legend>Layout direction</legend>
+      <legend data-i18n="appearance.direction">Layout direction</legend>
       <div class="rules" id="appearanceDirectionList"></div>
     </fieldset>
   </div>
@@ -115,8 +117,8 @@
         <input type="text" id="pathInput" spellcheck="false" autocomplete="off" dir="ltr"
                placeholder="C:\media\movie.mkv" aria-describedby="pathHint" />
       </div>
-      <button type="button" id="openBtn">Open</button>
-      <button type="button" class="primary" id="scanBtn" disabled>Scan</button>
+      <button type="button" id="openBtn" data-i18n="common.open">Open</button>
+      <button type="button" class="primary" id="scanBtn" data-i18n="action.scan" disabled>Scan</button>
     </div>
     <span class="hint" id="pathHint">A file is probed directly; a folder is scanned file by file.</span>
 

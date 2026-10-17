@@ -74,6 +74,7 @@
   "language.followSystem": "システムに合わせる",
   "language.coverage": "{total} 個中 {translated} 個が翻訳済みです。残りは {base} で表示します。",
   "language.switched": "画面の言語を {locale} に切り替えました。",
+  "language.notShipped": "{requested} はこのビルドが持つ言語ではないため、メッセージは {locale} で表示します。",
 
   "cli.cancelled": "中止しました。",
   "cli.unknownFormat": "{value} はこのビルドが書き込めるコンテナではありません。",

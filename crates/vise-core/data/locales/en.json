@@ -74,6 +74,7 @@
   "language.followSystem": "Follow the system",
   "language.coverage": "{translated} of {total} strings are translated. The rest are shown in {base}.",
   "language.switched": "The interface is now in {locale}.",
+  "language.notShipped": "{requested} is not a language this build ships, so the messages are shown in {locale}.",
 
   "cli.cancelled": "Cancelled.",
   "cli.unknownFormat": "{value} is not a container this build writes.",

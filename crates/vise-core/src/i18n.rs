@@ -559,6 +559,9 @@ pub enum MessageKey {
     LanguageCoverage,
     /// What a switch did. Takes `{locale}`.
     LanguageSwitched,
+    /// A language this build does not ship, and which one is in force instead.
+    /// Takes `{requested}` and `{locale}`.
+    LanguageNotShipped,
     /// The command line was interrupted.
     CliCancelled,
     /// The container name is not one this build writes. Takes `{value}`.
@@ -581,7 +584,7 @@ pub enum MessageKey {
 
 impl MessageKey {
     /// Every key, in the order the files are written in.
-    pub const ALL: [MessageKey; 75] = [
+    pub const ALL: [MessageKey; 76] = [
         MessageKey::AppTitle,
         MessageKey::AppTagline,
         MessageKey::CommonOk,
@@ -648,6 +651,7 @@ impl MessageKey {
         MessageKey::LanguageFollowSystem,
         MessageKey::LanguageCoverage,
         MessageKey::LanguageSwitched,
+        MessageKey::LanguageNotShipped,
         MessageKey::CliCancelled,
         MessageKey::CliUnknownFormat,
         MessageKey::CliUnknownVideoCodec,
@@ -702,6 +706,7 @@ impl MessageKey {
             MessageKey::AppearanceThemeSystemHint => &["asked", "shown"],
             MessageKey::LanguageCoverage => &["translated", "total", "base"],
             MessageKey::LanguageSwitched => &["locale"],
+            MessageKey::LanguageNotShipped => &["requested", "locale"],
             MessageKey::CliUnknownFormat
             | MessageKey::CliUnknownVideoCodec
             | MessageKey::CliUnknownAudioCodec => &["value"],
@@ -719,7 +724,7 @@ impl MessageKey {
 ///
 /// The length is checked against [`MessageKey::ALL`] by a test rather than by
 /// the type system, because an array length is not part of an enum's identity.
-const NAMES: [&str; 75] = [
+const NAMES: [&str; 76] = [
     "app.title",
     "app.tagline",
     "common.ok",
@@ -786,6 +791,7 @@ const NAMES: [&str; 75] = [
     "language.followSystem",
     "language.coverage",
     "language.switched",
+    "language.notShipped",
     "cli.cancelled",
     "cli.unknownFormat",
     "cli.unknownVideoCodec",
@@ -1009,6 +1015,20 @@ impl Catalog {
     /// The locale's tag.
     pub fn locale_tag(&self) -> &'static str {
         self.locale.tag()
+    }
+
+    /// Every message in this locale, by key name.
+    ///
+    /// For the layer that cannot hold a catalog of its own — the page, which has a
+    /// document and no Rust — and which therefore needs to be handed the words rather
+    /// than asked to compose them. The page addresses them by name and leaves an
+    /// element alone when the name is not in here, so a missing message costs a
+    /// sentence in the base language rather than an empty control.
+    pub fn strings(&self) -> BTreeMap<String, String> {
+        self.messages
+            .iter()
+            .map(|(key, message)| (key.name().to_string(), message.text.clone()))
+            .collect()
     }
 
     /// One message, from the locale or from whichever rung answered.
@@ -1881,7 +1901,7 @@ mod tests {
         assert_eq!(reading_direction("fa_AF.UTF-8"), ReadingDirection::Rtl);
         assert_eq!(reading_direction(""), ReadingDirection::Ltr);
         assert_eq!(reading_direction("*"), ReadingDirection::Ltr);
-        assert_eq!(reading_direction("de").is_rtl(), false);
+        assert!(!reading_direction("de").is_rtl());
         assert!(SUPPORTED.iter().any(|locale| locale.direction().is_rtl()));
     }
 

@@ -74,6 +74,7 @@
   "language.followSystem": "Wie das System",
   "language.coverage": "{translated} von {total} Texten sind übersetzt. Die übrigen werden in {base} angezeigt.",
   "language.switched": "Die Oberfläche ist jetzt auf {locale}.",
+  "language.notShipped": "{requested} ist keine Sprache, die diese Version mitbringt, daher werden die Meldungen in {locale} angezeigt.",
 
   "cli.cancelled": "Abgebrochen.",
   "cli.unknownFormat": "{value} ist kein Container, den diese Version schreiben kann.",

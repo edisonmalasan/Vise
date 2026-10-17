@@ -63,6 +63,11 @@
       theme: document.documentElement.dataset.theme === "dark" ? "dark" : "light",
       direction: document.documentElement.dir === "rtl" ? "rtl" : "ltr"
     },
+    /* The words the window is written in, by name. The page composes nothing: an
+       element says which message it wants and the window's language decides what
+       that message is. Empty until the window answers, which is what leaves the
+       markup's own text in place on the first paint. */
+    strings: {},
     /* What the countdown alert is holding on the user's behalf. */
     confirm: null,
     alertTimer: null,
@@ -3421,6 +3426,92 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     return view;
   }
 
+  /* Put the window's words into the page.
+
+   *
+   *
+   * One rule, the same one the theme follows: the page holds no text of its own.
+   * An element says which message it wants with data-i18n, and the window's
+   * language says what that message is. A name the window does not have leaves
+   * the element exactly as it was, so a gap in a locale costs a sentence in the
+   * base language rather than a blank heading — and never an identifier, because
+   * the window never sends one.
+   */
+  function applyStrings(strings) {
+    if (!strings || typeof strings !== "object") {
+      return state.strings;
+    }
+    state.strings = strings;
+    var marked = document.querySelectorAll("[data-i18n]");
+    Array.prototype.forEach.call(marked, function (element) {
+      var wanted = strings[element.getAttribute("data-i18n")];
+      if (typeof wanted === "string" && wanted !== "") {
+        setText(element, wanted);
+      }
+    });
+    return state.strings;
+  }
+
+  /* The language answer, applied.
+
+   *
+   *
+   * The window sends what moved rather than telling the page to reload, so the
+   * configuration tabs are left alone: what the user has typed into them is not
+   * something a language change is entitled to throw away. The three answers
+   * that did move - the words, the appearance, and the preferences - are put back
+   * in the order the document is built: the language on the document first, so a
+   * sentence in Arabic is laid out as Arabic while it arrives.
+   */
+  function applyLanguage(change) {
+    if (!change) {
+      return null;
+    }
+    /* Whatever has the caret keeps what was typed into it. The preferences panel
+       is rebuilt by the answer below, and a rebuilt panel is an empty field: the
+       window is changing the words, not the answers to anything being typed, so
+       the one field the reader is in is put back with its text. */
+    var focused = document.activeElement;
+    var focusedId =
+      focused && focused.tagName === "INPUT" && focused.id ? focused.id : "";
+    var typed = focusedId ? focused.value : "";
+    var root = document.documentElement;
+    if (change.language && change.language.locale) {
+      root.lang = change.language.locale;
+    }
+    if (change.appearance) {
+      applyAppearance(change.appearance);
+    }
+    if (change.language) {
+      applyStrings(change.language.strings);
+    }
+    if (change.preferences) {
+      repaintPreferences(change.preferences);
+    }
+    if (focusedId) {
+      var again = el(focusedId);
+      if (again && again.value !== typed) {
+        again.value = typed;
+        again.focus();
+      }
+    }
+    if (change.language && change.language.gaps && change.language.gaps.length) {
+      /* A gap is not a failure and not a notice the user has to dismiss; it is
+         reported once, where the answer is being shown, because a
+         half-translated interface that says nothing about it reads as finished. */
+      setText(el("appearanceObservation"), change.language.coverage);
+    }
+    return change;
+  }
+
+  function refreshLanguage() {
+    return call("language_view")
+      .then(applyLanguage)
+      .catch(function () {
+        return null;
+      });
+  }
+
   function cacheAppearance(view) {
     try {
       window.localStorage.setItem(
@@ -3503,12 +3594,22 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
    * same observation in the window, so the two cannot produce two themes.
    */
   function watchSystem() {
-    var first = reportLocale().then(function (view) {
-      /* A locale report that never arrived must not cost the window its pickers,
-         and asking for the answer on its own needs no locale, so the one call
-         that has no dependency stands in for it. */
-      return view || refreshAppearance();
-    });
+    var first = reportLocale()
+      .then(function (view) {
+        /* A locale report that never arrived must not cost the window its pickers,
+           and asking for the answer on its own needs no locale, so the one call
+           that has no dependency stands in for it. */
+        return view || refreshAppearance();
+      })
+      .then(function (view) {
+        /* The words come after the layout rather than with it: the language is
+           asked for separately because it is a separate answer, and a window whose
+           layout has settled is readable in the wrong language for a moment longer
+           than one whose layout is still deciding. */
+        return refreshLanguage().then(function () {
+          return view;
+        });
+      });
     if (window.matchMedia) {
       var query = window.matchMedia("(prefers-color-scheme: dark)");
       var report = function () {
@@ -3548,6 +3649,13 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         if (payload && payload.surface) {
           openSurface(payload.surface);
         }
+      });
+      /* The language was changed from the preferences, by somebody who may not have
+         the window in front at all. The window sends the three answers that moved
+         and the page puts them back; it does not reload the page, because that
+         would throw away what has been typed into the configuration tabs. */
+      bridge.event.listen("language-changed", function (event) {
+        applyLanguage(event && event.payload);
       });
     }
     return first;
@@ -3825,7 +3933,12 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       button.dataset.attention = tab.needsAttention ? "true" : "false";
       button.title = tab.hint;
       button.tabIndex = tab.id === tabs.active ? 0 : -1;
-      setText(button, tab.label);
+      /* The strip asks the window's words for its own label, and falls back to the
+         label the window sent when the language has none: a tab nobody can name is
+         worse than a tab named in the base language, and the window's label is
+         already there. */
+      button.dataset.i18n = "tab." + tab.id;
+      setText(button, state.strings["tab." + tab.id] || tab.label);
       button.addEventListener("click", function () {
         activateTab(tab.id);
       });

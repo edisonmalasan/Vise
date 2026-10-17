@@ -49,10 +49,11 @@ pub const FOLLOW_SYSTEM: &str = "system";
 /// Two answers rather than one tag, because a machine that has never chosen
 /// anything and a machine that has chosen "whatever this one is set to" have to
 /// keep agreeing while the machine's own setting changes underneath.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LanguagePreference {
     /// Whatever this machine reports.
+    #[default]
     FollowSystem,
     /// One language this build ships, by tag.
     ///
@@ -62,12 +63,6 @@ pub enum LanguagePreference {
     /// not have has to be readable so the language module can resolve it through
     /// its own chain rather than being refused here.
     Locale(String),
-}
-
-impl Default for LanguagePreference {
-    fn default() -> Self {
-        Self::FollowSystem
-    }
 }
 
 impl LanguagePreference {

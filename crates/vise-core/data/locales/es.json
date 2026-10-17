@@ -74,6 +74,7 @@
   "language.followSystem": "Seguir al sistema",
   "language.coverage": "{translated} de {total} textos están traducidos. Los demás se muestran en {base}.",
   "language.switched": "La interfaz está ahora en {locale}.",
+  "language.notShipped": "{requested} no es un idioma que incluya esta versión, así que los mensajes se muestran en {locale}.",
 
   "cli.cancelled": "Cancelado.",
   "cli.unknownFormat": "{value} no es un contenedor que esta versión pueda escribir.",

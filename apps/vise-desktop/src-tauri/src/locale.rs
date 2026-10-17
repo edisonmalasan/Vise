@@ -82,6 +82,14 @@ pub struct LanguageViewModel {
     /// Sent rather than only written to the log: a gap that is visible nowhere a
     /// user can reach is a gap that stays a gap.
     pub gaps: Vec<String>,
+    /// Every message in this language, by name.
+    ///
+    /// Here for the one part of the window that cannot hold a catalog of its own:
+    /// the page, whose fixed chrome the window would otherwise have to send one
+    /// view model at a time. The page addresses a message by its name and leaves
+    /// an element alone when the name is not in here, so a gap costs a sentence
+    /// in the base language rather than a blank control.
+    pub strings: std::collections::BTreeMap<String, String>,
     /// Every language this build ships.
     pub options: Vec<LanguageOptionViewModel>,
 }
@@ -130,6 +138,7 @@ pub fn language_view(
         summary: summary(resolved),
         coverage: resolved.coverage(),
         gaps: resolved.gap_notes(),
+        strings: resolved.catalog.strings(),
         options: language_options(resolved.catalog),
     }
 }
@@ -144,14 +153,12 @@ fn summary(resolved: &ResolvedCatalog) -> String {
             &[("locale", endonym)],
         ),
         // Reached through the chain, so the tag that was asked for is named
-        // rather than quietly replaced by the language on screen.
-        MatchSource::BaseLanguage => format!(
-            "'{}' is not a language this build ships, so it is shown in {endonym}.",
-            resolved.requested
-        ),
-        MatchSource::Base => format!(
-            "'{}' is not a language this build ships, so it is shown in the base language ({endonym}).",
-            resolved.requested
+        // rather than quietly replaced by the language on screen — and said in the
+        // language on screen, which is the only language the reader can be assumed
+        // to read.
+        MatchSource::BaseLanguage | MatchSource::Base => resolved.catalog.format(
+            vise_core::MessageKey::LanguageNotShipped,
+            &[("requested", &resolved.requested), ("locale", endonym)],
         ),
     }
 }
@@ -348,6 +355,22 @@ mod tests {
         assert_eq!(view.coverage, resolved.coverage());
         assert!(view.gaps.is_empty());
         assert_eq!(view.options.iter().filter(|o| o.selected).count(), 1);
+        // The page's own chrome is handed the words rather than asked to compose
+        // them, and every name it can ask for is a key this build knows.
+        assert_eq!(view.strings.len(), resolved.total());
+        assert_eq!(
+            view.strings.get("tab.video").map(String::as_str),
+            Some("Video")
+        );
+        let german = language_view(&resolve_catalog("de"), DirectionMode::Auto);
+        assert_eq!(
+            german.strings.get("tab.video").map(String::as_str),
+            Some("Video")
+        );
+        assert_eq!(
+            german.strings.get("tab.summary").map(String::as_str),
+            Some("Überblick")
+        );
     }
 
     #[test]
