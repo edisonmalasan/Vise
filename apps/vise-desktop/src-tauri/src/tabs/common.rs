@@ -108,6 +108,12 @@ pub struct ChoiceGroupViewModel {
 }
 
 impl ChoiceGroupViewModel {
+    /// The control, with its explaining line set.
+    pub fn with_hint(mut self, hint: &str) -> Self {
+        self.hint = hint.to_string();
+        self
+    }
+
     /// The control, unavailable with a reason the user can act on.
     pub fn blocked(mut self, reason: impl Into<String>) -> Self {
         self.available = false;
@@ -180,6 +186,12 @@ impl ToggleViewModel {
         }
     }
 
+    /// The switch, with its explaining line set.
+    pub fn with_hint(mut self, hint: &str) -> Self {
+        self.hint = hint.to_string();
+        self
+    }
+
     /// The switch, unavailable with a reason the user can act on.
     pub fn blocked(mut self, reason: impl Into<String>) -> Self {
         self.available = false;
@@ -196,6 +208,8 @@ pub struct NumberViewModel {
     pub id: String,
     /// Label above the control.
     pub label: String,
+    /// One line explaining what the number decides.
+    pub hint: String,
     /// What the user typed, kept exactly as typed.
     pub text: String,
     /// The typed value, when it reads as a number.
@@ -222,6 +236,7 @@ impl NumberViewModel {
         Self {
             id: id.to_string(),
             label: label.to_string(),
+            hint: String::new(),
             text: text.to_string(),
             value: None,
             unit: unit.to_string(),
@@ -238,6 +253,19 @@ impl NumberViewModel {
     pub fn ranged(mut self, min: f64, max: f64) -> Self {
         self.min = Some(min);
         self.max = Some(max);
+        self
+    }
+
+    /// The control, with its explaining line set.
+    pub fn with_hint(mut self, hint: &str) -> Self {
+        self.hint = hint.to_string();
+        self
+    }
+
+    /// The control, with the value it is showing.
+    pub fn showing(mut self, text: &str, value: f64) -> Self {
+        self.text = text.to_string();
+        self.value = Some(value);
         self
     }
 
@@ -264,6 +292,8 @@ pub struct TextViewModel {
     pub id: String,
     /// Label above the control.
     pub label: String,
+    /// One line explaining what the field is for.
+    pub hint: String,
     /// What the user typed, kept exactly as typed.
     pub text: String,
     /// Text shown while the field is empty.
@@ -284,6 +314,7 @@ impl TextViewModel {
         Self {
             id: id.to_string(),
             label: label.to_string(),
+            hint: String::new(),
             text: text.to_string(),
             placeholder: placeholder.to_string(),
             available: true,
@@ -291,6 +322,12 @@ impl TextViewModel {
             valid: true,
             problem: String::new(),
         }
+    }
+
+    /// The field, with its explaining line set.
+    pub fn with_hint(mut self, hint: &str) -> Self {
+        self.hint = hint.to_string();
+        self
     }
 
     /// The field, unavailable with a reason the user can act on.

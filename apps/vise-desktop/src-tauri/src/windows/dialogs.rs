@@ -274,6 +274,14 @@ pub enum AlertAction {
     StartQueue,
     /// Delete a stored preset.
     DeletePreset,
+    /// Put every preference back to its default.
+    ResetPreferences,
+    /// Close the window once the queue has nothing left to do.
+    ///
+    /// Asked by the window rather than by the page, because the When-done
+    /// preferences can answer "ask me what to do" and this is the question that
+    /// answer puts to the user.
+    CloseWindow,
 }
 
 impl AlertAction {
@@ -287,6 +295,8 @@ impl AlertAction {
             AlertAction::ClearQueue => "Empty the queue",
             AlertAction::StartQueue => "Start the queue",
             AlertAction::DeletePreset => "Delete the preset",
+            AlertAction::ResetPreferences => "Restore the default preferences",
+            AlertAction::CloseWindow => "Close the window",
         }
     }
 
@@ -750,6 +760,8 @@ mod tests {
             (AlertAction::ClearQueue, "clear_queue"),
             (AlertAction::StartQueue, "start_queue"),
             (AlertAction::DeletePreset, "delete_preset"),
+            (AlertAction::ResetPreferences, "reset_preferences"),
+            (AlertAction::CloseWindow, "close_window"),
         ] {
             let json = serde_json::to_string(&action).expect("serialise");
             assert_eq!(json, format!("\"{name}\""));

@@ -13,8 +13,8 @@ use vise_ipc::contract::{ProgressReport, ScanTitle, TitlesResult, WorkState};
 use crate::sources::SourceViewModel;
 use crate::viewmodel::{
     default_audio_selection, phase_of, progress_view, range_view, title_views, track_selection,
-    RangeSelection, RangeViewModel, ScanPhase, ScanProgressViewModel, SelectionViewModel,
-    TrackSelectionInput,
+    RangeMode, RangeSelection, RangeViewModel, ScanPhase, ScanProgressViewModel,
+    SelectionViewModel, TrackSelectionInput,
 };
 
 /// Everything the source surface shows.
@@ -29,6 +29,8 @@ pub struct ScanFlow {
     audio: Vec<u32>,
     subtitle: Vec<u32>,
     problem: String,
+    /// The range a newly chosen title starts in, from the General preferences.
+    default_range_mode: RangeMode,
 }
 
 impl ScanFlow {
@@ -73,6 +75,16 @@ impl ScanFlow {
     pub fn set_source(&mut self, source: Option<SourceViewModel>) {
         self.source = source;
         self.reset_scan();
+    }
+
+    /// The range a newly chosen title starts in.
+    ///
+    /// Held here rather than read from the preference each time a title is
+    /// chosen, because the preference is the answer and this is the state it
+    /// puts the window into: one place the window looks, one place the
+    /// preference is read.
+    pub fn set_default_range_mode(&mut self, mode: RangeMode) {
+        self.default_range_mode = mode;
     }
 
     /// Forget the scan results but keep the loaded source.
@@ -176,7 +188,19 @@ impl ScanFlow {
         };
         let title_index = title.index;
         self.selected_title = title_index;
-        self.range = RangeSelection::default();
+        // The mode the General preferences name, falling back to the whole title
+        // when this title cannot use it: a title with no chapters still opens on
+        // something usable rather than on a mode that is closed.
+        let wanted = self.default_range_mode;
+        let start = RangeSelection {
+            mode: wanted,
+            ..RangeSelection::default()
+        };
+        self.range = if range_view(title, &start).valid {
+            start
+        } else {
+            RangeSelection::default()
+        };
         self.audio = default_audio_selection(title);
         self.subtitle.clear();
         self.problem.clear();

@@ -1427,6 +1427,72 @@ button.warn:hover:not(:disabled) {
   color: var(--success);
 }
 
+/* Preferences ------------------------------------------------------------- */
+
+/* The surface is one column of tabs, and the controls on a tab are a single
+   flow rather than a grid: a preference with three sentences about it reads
+   worse squeezed into a narrow cell than it does with the room it needs. */
+.preferences {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preference-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The facts sit first on a tab: they are what the machine says, and the
+   controls below are answers to it. */
+.preference-body > .facts-list {
+  margin-bottom: 0;
+}
+
+.preference-body > .field {
+  max-width: 560px;
+}
+
+/* A switch that is closed because something else decided it keeps the reason in
+   the same place every other closed control puts it, so the two never have to
+   be told apart by position. */
+.preference-body label.switch[data-blocked="true"] .facts {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.preferences-storage {
+  border-top: 1px solid var(--border);
+  margin: 12px 0 0;
+  padding-top: 10px;
+}
+
+/* The path is set by the window and is not part of the sentence, so it sits on
+   its own line and is marked as a path rather than read as one. */
+.preferences-location {
+  display: block;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
+}
+
+.preferences-problems {
+  margin: 8px 0 0;
+}
+
+.preferences-reset {
+  margin-top: 12px;
+}
+
+.preferences-reset > .hint {
+  margin: 8px 0 0;
+}
+
+.preferences-announcement {
+  margin: 8px 0 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition-duration: 0.01ms !important;

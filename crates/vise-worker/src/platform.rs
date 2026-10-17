@@ -49,6 +49,97 @@ pub fn suspend_supported() -> bool {
     sys::suspend_supported()
 }
 
+/// How much scheduling priority a process asks for.
+///
+/// Zero leaves the process where the platform put it, which is the answer that
+/// costs nothing to give and the one a machine should get by default. The
+/// numbers are a scale rather than names because every platform this builds for
+/// expresses priority as a number with zero in the middle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Priority {
+    /// Much below normal: yield to everything else on the machine.
+    Low,
+    /// Below normal.
+    BelowNormal,
+    /// Whatever the platform gives a process by default.
+    Normal,
+    /// Above normal: take a larger share of the machine.
+    AboveNormal,
+    /// Much above normal.
+    High,
+}
+
+impl Priority {
+    /// Read a priority from the signed scale the contract carries.
+    pub fn of(level: i32) -> Self {
+        match level {
+            i32::MIN..=-2 => Priority::Low,
+            -1 => Priority::BelowNormal,
+            0 => Priority::Normal,
+            1 => Priority::AboveNormal,
+            _ => Priority::High,
+        }
+    }
+
+    /// The level this priority is, on the scale the contract carries.
+    pub fn level(self) -> i32 {
+        match self {
+            Priority::Low => -2,
+            Priority::BelowNormal => -1,
+            Priority::Normal => 0,
+            Priority::AboveNormal => 1,
+            Priority::High => 2,
+        }
+    }
+
+    /// The name the interface shows for it.
+    pub fn label(self) -> &'static str {
+        match self {
+            Priority::Low => "Idle",
+            Priority::BelowNormal => "Below normal",
+            Priority::Normal => "Normal",
+            Priority::AboveNormal => "Above normal",
+            Priority::High => "Realtime",
+        }
+    }
+
+    /// What asking for it means, for the preference that chooses it.
+    pub fn effect(self) -> &'static str {
+        match self {
+            Priority::Low => "The worker steps aside for everything else on the machine.",
+            Priority::BelowNormal => "The worker gives way to other programs.",
+            Priority::Normal => "The worker takes a share of the machine like any other program.",
+            Priority::AboveNormal => {
+                "The worker asks for more of the machine than other programs get."
+            }
+            Priority::High => {
+                "The worker asks for nearly all of the machine and can starve other programs."
+            }
+        }
+    }
+
+    /// Whether a process on this platform can be moved to this priority after
+    /// it has started.
+    pub fn is_supported(self) -> bool {
+        sys::priority_supported()
+    }
+}
+
+/// Move `pid` to `priority`.
+///
+/// The worker asks for this on itself rather than being started at a priority,
+/// because a process cannot be created above the priority of whoever created
+/// it: the parent cannot hand over a priority it does not itself hold. Asking
+/// from inside is therefore the only route that reaches the levels above
+/// normal, and it is also the only route that works once a portable settings
+/// file has already decided the worker should not be isolated at all.
+pub fn set_priority(pid: u32, priority: Priority) -> Result<(), ControlError> {
+    if !priority.is_supported() {
+        return Err(ControlError::Unsupported("process priority"));
+    }
+    sys::set_priority(pid, priority)
+}
+
 #[cfg(windows)]
 mod sys {
     use super::ControlError;
@@ -94,6 +185,63 @@ mod sys {
 
     pub fn suspend_supported() -> bool {
         ntdll_function("NtSuspendProcess").is_some()
+    }
+
+    // Priorities are the same numbers on every Windows version this builds for,
+    // so they are named here once rather than looked up. They are visible
+    // outside this module only so the tests below can pin what each level of the
+    // contract's scale is actually asked for.
+    pub(crate) const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+    pub(crate) const IDLE_PRIORITY_CLASS: u32 = 0x0000_0040;
+    pub(crate) const NORMAL_PRIORITY_CLASS: u32 = 0x0000_0020;
+    pub(crate) const ABOVE_NORMAL_PRIORITY_CLASS: u32 = 0x0000_8000;
+    pub(crate) const REALTIME_PRIORITY_CLASS: u32 = 0x0000_0100;
+    const PROCESS_SET_INFORMATION: u32 = 0x0200;
+    const PROCESS_QUERY_INFORMATION: u32 = 0x0400;
+
+    extern "system" {
+        fn SetPriorityClass(process: *mut c_void, class: u32) -> i32;
+    }
+
+    /// The Windows priority class that a level of the contract's scale asks for.
+    pub(crate) fn priority_class(priority: super::Priority) -> u32 {
+        match priority {
+            super::Priority::Low => IDLE_PRIORITY_CLASS,
+            super::Priority::BelowNormal => BELOW_NORMAL_PRIORITY_CLASS,
+            super::Priority::Normal => NORMAL_PRIORITY_CLASS,
+            super::Priority::AboveNormal => ABOVE_NORMAL_PRIORITY_CLASS,
+            // The top of the contract's scale is the realtime class, which is what
+            // the level is labelled; the ordinary high class is not on that scale
+            // and is not asked for.
+            super::Priority::High => REALTIME_PRIORITY_CLASS,
+        }
+    }
+
+    pub fn priority_supported() -> bool {
+        true
+    }
+
+    pub fn set_priority(pid: u32, priority: super::Priority) -> Result<(), super::ControlError> {
+        let handle =
+            unsafe { OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_INFORMATION, 0, pid) };
+        if handle.is_null() {
+            return Err(super::ControlError::NotFound(pid));
+        }
+        let result = unsafe { SetPriorityClass(handle, priority_class(priority)) };
+        unsafe {
+            CloseHandle(handle);
+        }
+        if result == 0 {
+            // Moving yourself to a realtime class needs a privilege most
+            // sessions do not hold, and asking anyway has to come back as a
+            // reason rather than as a silent no-op.
+            return Err(super::ControlError::Failed(format!(
+                "the process priority could not be changed to {} (error {})",
+                priority.label(),
+                std::io::Error::last_os_error()
+            )));
+        }
+        Ok(())
     }
 
     pub fn suspend(pid: u32) -> Result<(), ControlError> {
@@ -161,6 +309,18 @@ mod sys {
         true
     }
 
+    // POSIX has no portable way to ask for a scheduling priority, and the nice
+    // value is a permission rather than a right: only a privileged process may
+    // lower another process's priority. Saying so is better than a call that
+    // appears to succeed and does nothing.
+    pub fn priority_supported() -> bool {
+        false
+    }
+
+    pub fn set_priority(_pid: u32, _priority: super::Priority) -> Result<(), super::ControlError> {
+        Err(super::ControlError::Unsupported("process priority"))
+    }
+
     pub fn suspend(pid: u32) -> Result<(), ControlError> {
         send(pid, SIGSTOP, "SIGSTOP")
     }
@@ -200,5 +360,71 @@ mod tests {
         // must fail cleanly instead of aborting.
         assert_eq!(suspend(0), Err(ControlError::NotFound(0)));
         assert_eq!(resume(0), Err(ControlError::NotFound(0)));
+    }
+
+    #[test]
+    fn the_priority_scale_round_trips_every_level() {
+        for level in -2..=2 {
+            let priority = Priority::of(level);
+            assert_eq!(priority.level(), level, "level {level} round-trips");
+        }
+        // Anything outside the scale clamps to the nearest end rather than
+        // inventing a level the platform has no name for.
+        assert_eq!(Priority::of(-99), Priority::Low);
+        assert_eq!(Priority::of(99), Priority::High);
+    }
+
+    #[test]
+    fn every_priority_names_itself_and_says_what_it_does() {
+        let all = [
+            Priority::Low,
+            Priority::BelowNormal,
+            Priority::Normal,
+            Priority::AboveNormal,
+            Priority::High,
+        ];
+        let labels: Vec<&str> = all.iter().map(|p| p.label()).collect();
+        assert_eq!(labels.len(), 5, "{labels:?}");
+        for priority in all {
+            assert!(!priority.label().is_empty());
+            assert!(priority.effect().ends_with('.'), "{}", priority.effect());
+        }
+        // The middle of the scale has to read as the unremarkable answer, or a
+        // user cannot tell which one is the one to leave alone.
+        assert_eq!(Priority::Normal.level(), 0);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn every_level_of_the_scale_is_given_the_platform_class_it_is_labelled() {
+        // The label on a level is what the activity window records, so the class
+        // behind it has to be the one the label names: a level called "Realtime"
+        // that quietly asked for "above normal" would record a decision the
+        // machine never made.
+        use super::sys::priority_class;
+        assert_eq!(priority_class(Priority::Low), sys::IDLE_PRIORITY_CLASS);
+        assert_eq!(
+            priority_class(Priority::BelowNormal),
+            sys::BELOW_NORMAL_PRIORITY_CLASS
+        );
+        assert_eq!(priority_class(Priority::Normal), sys::NORMAL_PRIORITY_CLASS);
+        assert_eq!(
+            priority_class(Priority::AboveNormal),
+            sys::ABOVE_NORMAL_PRIORITY_CLASS
+        );
+        assert_eq!(priority_class(Priority::High), sys::REALTIME_PRIORITY_CLASS);
+    }
+
+    #[test]
+    fn a_platform_that_cannot_move_a_priority_says_so_rather_than_pretending() {
+        // The application asks for a priority whether or not this platform can
+        // grant it, so the refusal is the behaviour under test, not a fallback.
+        match set_priority(std::process::id(), Priority::AboveNormal) {
+            Ok(()) => assert!(Priority::AboveNormal.is_supported()),
+            Err(e) => {
+                assert!(!Priority::AboveNormal.is_supported(), "{e}");
+                assert!(e.to_string().contains("priority"), "{e}");
+            }
+        }
     }
 }

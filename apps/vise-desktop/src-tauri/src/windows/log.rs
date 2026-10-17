@@ -71,23 +71,16 @@ impl LogLine {
 }
 
 /// Every level, least to most verbose, for the filter control.
+///
+/// The order and the names come from the contract so the filter, the row labels,
+/// and the preference that chooses a level are all reading one table.
 pub fn levels() -> [LogLevel; 4] {
-    [
-        LogLevel::Error,
-        LogLevel::Warning,
-        LogLevel::Info,
-        LogLevel::Debug,
-    ]
+    LogLevel::ALL
 }
 
 /// The name of a level, as the filter and each row show it.
 pub fn level_label(level: LogLevel) -> &'static str {
-    match level {
-        LogLevel::Debug => "Debug",
-        LogLevel::Info => "Info",
-        LogLevel::Warning => "Warning",
-        LogLevel::Error => "Error",
-    }
+    level.label()
 }
 
 /// One level in the filter control, as the page renders it.

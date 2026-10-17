@@ -334,6 +334,18 @@ impl Default for PreviewState {
 }
 
 impl PreviewState {
+    /// A preview window that extracts `still_count` stills on the next scan.
+    ///
+    /// Taken from the General preferences at start-up, so the count a user chose
+    /// once is the count the first preview they open uses, rather than the count
+    /// this struct happens to default to.
+    pub fn with_still_count(still_count: u32) -> Self {
+        Self {
+            still_count,
+            ..Self::default()
+        }
+    }
+
     /// How many stills the next scan should extract.
     pub fn still_count(&self) -> u32 {
         self.still_count

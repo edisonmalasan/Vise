@@ -65,7 +65,15 @@
     },
     /* What the countdown alert is holding on the user's behalf. */
     confirm: null,
-    alertTimer: null
+    alertTimer: null,
+    /* The preferences surface, held whole because one change can move a control
+       on another tab: the collision switch settles the collision choice, and a
+       record this build cannot write closes every tab at once. */
+    preferences: null,
+    /* What to run for an alert the window opened itself. Written down here
+       rather than sent by the window, because a command name is not data the
+       window can send. */
+    confirmRunners: {}
   };
 
   function el(id) {
@@ -780,6 +788,12 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       return call("preset_window").then(function (view) {
         state.presets = view;
         paintPresets(shell, view);
+      });
+    },
+    preferences: function (shell) {
+      return call("preferences_view").then(function (view) {
+        state.preferences = view;
+        paintPreferences(shell, view);
       });
     }
   };
@@ -2270,7 +2284,12 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
           return null;
         }
         closeSurface("alert");
-        return run ? run() : null;
+        /* An alert the window opened for itself — the queue finishing and asking
+           whether to close — has no page-side runner, so the confirmed action is
+           routed by name instead. Only the window names an action it asked for
+           itself, and only the command that owns the action can carry it out. */
+        var carry = state.confirmRunners[alert.action] || run;
+        return carry ? carry() : null;
       })
       .catch(failed);
   }
@@ -2281,6 +2300,33 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     return call("dismiss_alert").then(function () {
         closeSurface("alert");
       });
+  }
+
+  /* Open the countdown for a question the window asked by itself.
+   *
+   * The alert is already pending in the window, so it is not asked for again;
+   * the page only has to put it on screen and start the count, which is the same
+   * two steps the page takes for a question it asked itself.
+   */
+  function showAskedAlert(view) {
+    if (!view) {
+      return null;
+    }
+    state.alert = view;
+    state.confirm = null;
+    paintAlert(view);
+    if (state.open.indexOf("alert") === -1) {
+      state.open.push("alert");
+    }
+    state.front = "alert";
+    syncBackdrop();
+    showSurface(state.specs.alert);
+    if (view.armed) {
+      stopAlertCountdown();
+    } else {
+      startAlertCountdown();
+    }
+    return view;
   }
 
   function startAlertCountdown() {
@@ -2492,6 +2538,558 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     }
   }
 
+/* ------------------------------------------------------------- preferences */
+
+  /* The preferences surface.
+   *
+   * Nothing here decides anything. The window sends six tabs, each with the
+   * controls on it, the value each one holds, whether it is on offer, and the
+   * reason when it is not; the page puts those on screen, sends back the one
+   * field that was touched, and paints whatever comes back. That is why a tab
+   * can show a control closed with a reason the page never invented, and why a
+   * change that moves another tab's control — the collision switch settling the
+   * collision choice — needs no special case here.
+   */
+  /* Where each tab's view model lives on the answer.
+   *
+   * Written down here rather than sent by the window, for the same reason the
+   * output tabs' fields are read by name: a property name is not data the window
+   * can send, and the window's catalog of six tabs is checked against this list
+   * by a test in the window so the two cannot drift apart.
+   */
+  var PREFERENCE_TAB_FIELDS = [
+    "general",
+    "output",
+    "advanced",
+    "hardware",
+    "updates",
+    "whenDone"
+  ];
+
+  /* The whole view model for the tab named `id`, or nothing when the window has
+     no such tab. */
+  function preferenceTabModel(view, id) {
+    for (var i = 0; i < PREFERENCE_TAB_FIELDS.length; i += 1) {
+      var tab = view[PREFERENCE_TAB_FIELDS[i]];
+      if (tab && tab.id === id) {
+        return tab;
+      }
+    }
+    return null;
+  }
+
+  function paintPreferences(shell, view) {
+    var host = bodyOf(shell);
+    clear(host);
+    state.preferences = view;
+
+    var wrap = node("div", "preferences");
+    var strip = node("div", "tablist");
+    strip.setAttribute("role", "tablist");
+    strip.setAttribute("aria-label", "Preferences");
+    wrap.appendChild(strip);
+
+    var panels = node("div", "tabpanels");
+    wrap.appendChild(panels);
+
+    (view.tabs || []).forEach(function (tab, index) {
+      strip.appendChild(preferenceTab(tab, view.active, index, view.tabs.length));
+      panels.appendChild(preferencePanel(preferenceTabModel(view, tab.id), view.active));
+    });
+    host.appendChild(wrap);
+
+    var storage = node("p", "hint preferences-storage");
+    storage.appendChild(node("strong", null, view.storage.stateLabel + ". "));
+    storage.appendChild(document.createTextNode(view.storage.note));
+    var where = node("span", "hint preferences-location");
+    where.textContent = view.storage.location;
+    storage.appendChild(where);
+    host.appendChild(storage);
+
+    if ((view.problems || []).length) {
+      var problems = node("div", "notice preferences-problems");
+      problems.setAttribute("data-tone", "error");
+      problems.setAttribute("role", "status");
+      problems.setAttribute("aria-live", "polite");
+      problems.textContent = view.problems.join(" ");
+      host.appendChild(problems);
+    }
+
+    host.appendChild(preferenceReset(view.reset));
+    var announcement = node("p", "hint preferences-announcement");
+    announcement.setAttribute("role", "status");
+    announcement.setAttribute("aria-live", "polite");
+    announcement.textContent = view.reset.announcement || "";
+    host.appendChild(announcement);
+  }
+
+  /* One tab on the strip.
+   *
+   * The same semantics as the output tabs: one tab stop for the whole strip,
+   * arrow keys along it, Home and End for the ends, and the arrows swap with
+   * the layout because they are the platform's own. The window says which tab is
+   * showing and which needs attention; the page only wires the presses.
+   */
+  function preferenceTab(tab, active, index, total) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.id = "prefTab-" + tab.id;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", tab.id === active ? "true" : "false");
+    button.setAttribute("aria-controls", "prefPanel-" + tab.id);
+    button.dataset.attention = tab.needsAttention ? "true" : "false";
+    button.title = tab.hint;
+    button.tabIndex = tab.id === active ? 0 : -1;
+    button.textContent = tab.label;
+    button.addEventListener("click", function () {
+      activatePreferenceTab(tab.id);
+    });
+    button.addEventListener("keydown", function (event) {
+      handlePreferenceTabKeys(event, index, total);
+    });
+    return button;
+  }
+
+  function preferencePanel(tab, active) {
+    if (!tab) {
+      /* The window listed a tab it did not send the contents of. An empty panel
+         with the name on it is better than a strip that leads nowhere. */
+      var missing = node("div", "tabpanel");
+      missing.hidden = true;
+      return missing;
+    }
+    var panel = node("div", "tabpanel");
+    panel.id = "prefPanel-" + tab.id;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", "prefTab-" + tab.id);
+    panel.tabIndex = 0;
+    panel.hidden = tab.id !== active;
+    panel.appendChild(para(tab.hint));
+
+    var body = node("div", "preference-body");
+    (tab.choices || []).forEach(function (choice) {
+      body.appendChild(preferenceChoice(choice));
+    });
+    (tab.facts || []).forEach(function (fact) {
+      body.appendChild(preferenceFact(fact));
+    });
+    if ((tab.toggles || []).length) {
+      var flags = node("fieldset", "flags");
+      flags.appendChild(node("legend", null, "Switches"));
+      (tab.toggles || []).forEach(function (toggle) {
+        flags.appendChild(preferenceToggle(toggle));
+      });
+      body.appendChild(flags);
+    }
+    (tab.numbers || []).forEach(function (number) {
+      body.appendChild(preferenceNumber(number));
+    });
+    (tab.texts || []).forEach(function (text) {
+      body.appendChild(preferenceText(text));
+    });
+    if ((tab.actions || []).length) {
+      var row = node("div", "controls");
+      (tab.actions || []).forEach(function (action) {
+        row.appendChild(preferenceAction(action));
+      });
+      body.appendChild(row);
+    }
+    panel.appendChild(body);
+
+    if ((tab.problems || []).length) {
+      var problems = node("div", "notice");
+      problems.setAttribute("data-tone", "error");
+      problems.textContent = tab.problems.join(" ");
+      panel.appendChild(problems);
+    }
+    return panel;
+  }
+
+  /* A single-choice control.
+   *
+   * Built as a labelled select so it is announced with its label, and so an
+   * option that cannot be picked is left in the list with its reason beside it
+   * rather than silently missing.
+   */
+  function preferenceChoice(choice) {
+    var select = document.createElement("select");
+    select.id = choice.id;
+    (choice.options || []).forEach(function (option) {
+      var entry = document.createElement("option");
+      entry.value = option.id;
+      entry.textContent = option.available
+        ? option.label
+        : option.label + " — " + option.reason;
+      entry.disabled = !option.available;
+      entry.selected = option.id === choice.selected;
+      select.appendChild(entry);
+    });
+    var field = labelledField(
+      choice.label,
+      select,
+      choice.available ? choice.hint : choice.reason,
+      choice.available ? "" : "blocked"
+    );
+    select.disabled = !choice.available;
+    select.onchange = function () {
+      sendPreference(choice.id, select.value);
+    };
+    return field;
+  }
+
+  /* A switch. The label wraps the input, so the control and its label are one
+     thing to a screen reader and one thing to click. The line under the label is
+     the reason the control is closed when it is closed, and it is named and
+     linked rather than merely present: a reason only somebody can see is a
+     reason that does not exist for anyone who cannot see it. */
+  function preferenceToggle(toggle) {
+    var input = document.createElement("input");
+    input.type = "checkbox";
+    input.id = toggle.id;
+    input.checked = Boolean(toggle.checked);
+    input.disabled = !toggle.available;
+
+    var facts = node(
+      "span",
+      "facts",
+      toggle.available ? toggle.hint : toggle.reason
+    );
+    facts.id = toggle.id + "Hint";
+
+    var text = node("span", "text");
+    text.appendChild(node("span", null, toggle.label));
+    text.appendChild(facts);
+
+    var label = node("label", "switch");
+    label.htmlFor = input.id;
+    label.appendChild(input);
+    label.appendChild(text);
+    if (!toggle.available) {
+      label.dataset.blocked = "true";
+    }
+    describe(input, facts);
+    input.onchange = function () {
+      sendPreference(toggle.id, input.checked);
+    };
+    return label;
+  }
+
+  /* A number the user types into. What counts as a number is the window's
+     rule; the page only turns what was typed into a number when it is one, and
+     otherwise sends the text so the refusal names the field and says why. */
+  function preferenceNumber(number) {
+    var input = document.createElement("input");
+    input.type = "text";
+    input.id = number.id;
+    input.inputMode = "numeric";
+    input.value = number.text || "";
+    input.disabled = !number.available;
+    var field = labelledField(
+      number.label,
+      input,
+      number.available ? number.hint : number.reason,
+      number.available ? "" : "blocked"
+    );
+    if (number.available) {
+      input.onchange = function () {
+        var typed = input.value.trim();
+        var parsed = Number(typed);
+        sendPreference(number.id, typed !== "" && isFinite(parsed) ? parsed : typed);
+      };
+    }
+    return field;
+  }
+
+  /* A line of text. A folder is a path, so the field reads left to right even
+     in a mirrored layout; that is the one place on this surface where a
+     physical direction is right, and it is the field's own attribute rather
+     than a stylesheet override. */
+  function preferenceText(text) {
+    var input = document.createElement("input");
+    input.type = "text";
+    input.id = text.id;
+    input.spellcheck = false;
+    input.autocomplete = "off";
+    input.dir = "ltr";
+    input.placeholder = text.placeholder || "";
+    input.value = text.text || "";
+    var hint = text.available ? text.hint : text.reason;
+    if (!text.valid && text.problem) {
+      hint = text.problem;
+    }
+    var field = labelledField(
+      text.label,
+      input,
+      hint,
+      text.valid ? "" : text.available ? "error" : "blocked"
+    );
+    input.setAttribute("aria-invalid", text.valid ? "false" : "true");
+    input.disabled = !text.available;
+    if (text.available) {
+      input.onchange = function () {
+        sendPreference(text.id, input.value);
+      };
+    }
+    return field;
+  }
+
+  /* A fact: something the window observed or worked out, not something to
+     change. Marked up as a description list because a row with a name and a
+     value is a pair, and the pair is what a screen reader should announce. */
+  function preferenceFact(fact) {
+    var list = node("dl", "facts-list");
+    list.id = fact.id;
+    var term = node("dt", null, fact.label);
+    var detail = node("dd", null, fact.value);
+    if (!fact.available && fact.reason) {
+      detail.appendChild(document.createTextNode(" "));
+      detail.appendChild(node("span", "hint", fact.reason));
+    }
+    list.appendChild(term);
+    list.appendChild(detail);
+    return list;
+  }
+
+  /* A button. Which command a press means is decided by the page's table, so a
+     button that is not on offer cannot be pressed to find out. */
+  function preferenceAction(action) {
+    var button = node("button", null, action.label);
+    button.type = "button";
+    button.id = action.id;
+    button.title = action.available ? action.hint : action.reason;
+    button.disabled = !action.available;
+    if (!action.available) {
+      button.setAttribute("aria-describedby", "preferences-problem-" + action.id);
+    }
+    button.onclick = action.available
+      ? function () {
+          runPreferenceAction(action);
+        }
+      : null;
+    return button;
+  }
+
+  /* Restore the defaults, and take a restore back.
+   *
+   * Both ask through the countdown alert rather than acting on a click: a reset
+   * throws away every choice on every tab, and the take-back is only offered
+   * when there is something to take back.
+   */
+  function preferenceReset(reset) {
+    var box = node("fieldset", "rule-set preferences-reset");
+    box.appendChild(node("legend", null, "Starting over"));
+
+    var row = node("div", "controls");
+    var restore = node("button", reset.confirms ? "warn" : null, reset.label);
+    restore.type = "button";
+    restore.id = "preferencesReset";
+    restore.title = reset.available ? reset.effect : reset.reason;
+    restore.disabled = !reset.available;
+    restore.onclick = reset.available
+      ? function () {
+          askForAlert(
+            "reset_preferences",
+            "Put every preference on every tab back to its default?",
+            null,
+            function () {
+              return call("reset_preferences").then(function (view) {
+                repaintPreferences(view);
+              });
+            }
+          );
+        }
+      : null;
+    row.appendChild(restore);
+
+    var undo = node("button", null, reset.undoLabel);
+    undo.type = "button";
+    undo.id = "preferencesUndo";
+    undo.title = reset.undoEffect;
+    undo.disabled = !reset.canUndo;
+    undo.onclick = reset.canUndo
+      ? function () {
+          call("undo_preference_reset")
+            .then(function (view) {
+              repaintPreferences(view);
+            })
+            .catch(failed);
+        }
+      : null;
+    row.appendChild(undo);
+    box.appendChild(row);
+
+    if (!reset.available && reset.reason) {
+      var blocked = node("p", "hint");
+      blocked.setAttribute("data-tone", "blocked");
+      blocked.id = "preferences-problem-preferencesReset";
+      blocked.textContent = reset.reason;
+      box.appendChild(blocked);
+    }
+    box.appendChild(para(reset.summary));
+    return box;
+  }
+
+  /* Send one change and paint the whole surface from the answer.
+   *
+   * One command returns everything, so a change that reaches several tabs shows
+   * up everywhere at once, and a refusal puts every control back where the
+   * window says it is rather than leaving the page showing what was asked for.
+   */
+  function sendPreference(field, value) {
+    state.pending += 1;
+    return call("set_preference", { change: { field: field, value: value } })
+      .then(function (view) {
+        repaintPreferences(view);
+        return view;
+      })
+      .catch(function (error) {
+        notice(
+          "error",
+          "That preference was not kept: " +
+            String(error && error.message ? error.message : error)
+        );
+        return refreshPreferences();
+      })
+      .then(function (view) {
+        state.pending -= 1;
+        return view;
+      });
+  }
+
+  /* What a press on one of the surface's buttons means.
+   *
+   * Written down once. A button whose identifier is missing here would do
+   * nothing when pressed, which is why the window lists the identifiers it
+   * offers and the page's table and that list are checked against each other by
+   * a test in the window.
+   */
+  var PREFERENCE_PRESSES = {
+    preferencesRecheckHardware: function () {
+      return call("recheck_hardware")
+        .then(repaintPreferences)
+        .catch(failed);
+    },
+    preferencesCheckNow: function () {
+      /* This build contacts no release server, so the window closes this control
+         and it cannot be pressed. The press is still routed, because a name on
+         offer that nothing answers is worse than one that says why: if a build
+         ever opens the control, the reason the window gives is shown rather than
+         the press doing nothing. */
+      return call("preferences_view")
+        .then(function (view) {
+          repaintPreferences(view);
+          var found = (view.updates.actions || []).filter(function (action) {
+            return action.id === "preferencesCheckNow";
+          })[0];
+          notice("error", (found && found.reason) || "There is nothing to check.");
+          return view;
+        })
+        .catch(failed);
+    }
+  };
+
+  function runPreferenceAction(action) {
+    var run = PREFERENCE_PRESSES[action.id];
+    if (!run) {
+      return null;
+    }
+    return run();
+  }
+
+  function refreshPreferences() {
+    return call("preferences_view")
+      .then(function (view) {
+        repaintPreferences(view);
+        return view;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  /* Repaint from an answer, whether or not the surface is on screen.
+   *
+   * The strip is rebuilt every time, so focus is restored by hand to whichever
+   * control the reader was on. Losing the caret to the top of the dialog after
+   * every change would make a screen of switches unusable with a keyboard.
+   */
+  function repaintPreferences(view) {
+    state.preferences = view;
+    var shell = shellOf("preferences");
+    if (!shell || shell.hidden) {
+      return view;
+    }
+    var focused = document.activeElement;
+    var focusedId = focused && shell.contains(focused) ? focused.id : "";
+    paintPreferences(shell, view);
+    if (focusedId) {
+      var again = el(focusedId);
+      if (again && !again.disabled) {
+        again.focus();
+      }
+    }
+    return view;
+  }
+
+  function activatePreferenceTab(id) {
+    if (!state.preferences) {
+      return null;
+    }
+    var known = (state.preferences.tabs || []).some(function (tab) {
+      return tab.id === id;
+    });
+    if (!known || state.preferences.active === id) {
+      return null;
+    }
+    return call("set_preference_tab", { tab: id })
+      .then(repaintPreferences)
+      .catch(failed);
+  }
+
+  /* Home and End do not move with the layout: they go to the first and the last
+     tab either way, which is where they sit on screen. */
+  function handlePreferenceTabKeys(event, index, total) {
+    if (!total) {
+      return;
+    }
+    var last = total - 1;
+    var arrows = tabArrows();
+    var next = null;
+    if (event.key === arrows.forwards) {
+      next = index === last ? 0 : index + 1;
+    } else if (event.key === arrows.backwards) {
+      next = index === 0 ? last : index - 1;
+    } else if (event.key === "Home") {
+      next = 0;
+    } else if (event.key === "End") {
+      next = last;
+    }
+    if (next === null) {
+      return;
+    }
+    event.preventDefault();
+    var tabs = (state.preferences && state.preferences.tabs) || [];
+    var target = tabs[next];
+    if (!target) {
+      return;
+    }
+    /* The caret is moved after the answer comes back, because the strip is
+       rebuilt from that answer: focusing the button that is on screen now would
+       focus nothing, since it is the one the rebuild throws away. */
+    var moved = activatePreferenceTab(target.id);
+    var follow = function () {
+      var button = el("prefTab-" + target.id);
+      if (button) {
+        button.focus();
+      }
+    };
+    if (moved) {
+      moved.then(follow);
+    } else {
+      follow();
+    }
+  }
+
 /* -------------------------------------------------------------- appearance */
 
   /* Paint from what the window decided.
@@ -2627,6 +3225,13 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       bridge.event.listen("appearance-changed", function (event) {
         applyAppearance(event && event.payload);
       });
+      /* A question the window asked for itself. The countdown alert is normally
+         opened by the page pressing a control; the queue finishing is not
+         something the user does, so the window pushes the question instead and
+         this is the page answering it through the same two controls. */
+      bridge.event.listen("alert-asked", function (event) {
+        showAskedAlert(event && event.payload);
+      });
     }
     return first;
   }
@@ -2727,7 +3332,11 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       input.value = field.text || "";
     }
     input.placeholder = field.placeholder || "";
-    var hint = field.available ? "" : field.reason;
+    /* The window's explaining line is the hint, for the same reason it is on
+       every other control: it is the reason the control is closed, and a
+       preference nobody can read the reason for is a preference that looks
+       broken. */
+    var hint = field.available ? field.hint : field.reason;
     if (!field.valid && field.problem) {
       hint = field.problem;
     }
@@ -3809,6 +4418,14 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         "Page error: " + String(reason && reason.message ? reason.message : reason)
       );
     });
+    /* The window can ask a question on its own, and it does so when the queue
+       drains with the when-done preferences set to ask. Confirming that question
+       is routed here by the action's name. */
+    state.confirmRunners = {
+      close_window: function () {
+        return call("when_done_confirm").catch(failed);
+      }
+    };
     wire();
     if (!invoke) {
       unavailable("This page needs the desktop window; open it from the application.");

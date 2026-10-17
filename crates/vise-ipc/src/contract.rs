@@ -82,6 +82,48 @@ impl LogLevel {
             LogLevel::Debug => 3,
         }
     }
+
+    /// Every level, least to most verbose.
+    ///
+    /// One list, so the filter control, the row labels, and the preference that
+    /// chooses a level are all built from the same order and cannot disagree
+    /// about which way round it is.
+    pub const ALL: [LogLevel; 4] = [
+        LogLevel::Error,
+        LogLevel::Warning,
+        LogLevel::Info,
+        LogLevel::Debug,
+    ];
+
+    /// Stable identifier the interface layer sends back.
+    pub fn id(self) -> &'static str {
+        match self {
+            LogLevel::Debug => "debug",
+            LogLevel::Info => "info",
+            LogLevel::Warning => "warning",
+            LogLevel::Error => "error",
+        }
+    }
+
+    /// The name shown on a filter option and beside a row.
+    pub fn label(self) -> &'static str {
+        match self {
+            LogLevel::Debug => "Debug",
+            LogLevel::Info => "Info",
+            LogLevel::Warning => "Warning",
+            LogLevel::Error => "Error",
+        }
+    }
+
+    /// Read a level the interface layer sent.
+    ///
+    /// The wire spelling is the one the contract serialises, and the lower-case
+    /// identifier is accepted as well because that is what the preference and the
+    /// page both send.
+    pub fn parse(raw: &str) -> Option<Self> {
+        let wanted = raw.trim().to_ascii_lowercase();
+        LogLevel::ALL.into_iter().find(|level| level.id() == wanted)
+    }
 }
 
 /// One worker log entry.
@@ -227,6 +269,15 @@ pub struct InitCommand {
     pub mode: i32,
     /// Hardware decode preference; zero selects automatic software fallback.
     pub hw_decode: i32,
+    /// Name of the hardware device to decode with when `hw_decode` names one.
+    pub hw_decode_device: String,
+    /// Scheduling priority the worker asks for on itself: zero is inherited,
+    /// negative is below normal, positive is above it.
+    ///
+    /// Sent rather than applied by the parent because the worker is the process
+    /// that needs the priority: it is the one competing with the machine for
+    /// the encoder, and a parent cannot raise a priority it does not hold.
+    pub process_priority: i32,
     /// Keep duplicate title entries instead of collapsing them.
     pub keep_duplicate_titles: bool,
 }
@@ -244,6 +295,8 @@ impl Default for InitCommand {
             exclude_extension_list: Vec::new(),
             mode: 0,
             hw_decode: 0,
+            hw_decode_device: String::new(),
+            process_priority: 0,
             keep_duplicate_titles: false,
         }
     }
@@ -265,7 +318,42 @@ impl InitCommand {
                 self.mode
             ));
         }
+        if !self.hw_decode_device.trim().is_empty() && self.hw_decode == 0 {
+            notes.push(
+                "a hardware decode device was named while hardware decoding is off; decoding in software"
+                    .to_string(),
+            );
+        }
+        if !(-2..=2).contains(&self.process_priority) {
+            notes.push(format!(
+                "process priority {} is outside the range this build applies; keeping the inherited priority",
+                self.process_priority
+            ));
+        }
         notes
+    }
+
+    /// Whether a named hardware decode device should be used.
+    ///
+    /// Hardware decoding has to be asked for as well as named: a device name on
+    /// its own says which one, not whether any is wanted, and the two are
+    /// separate answers in the interface.
+    pub fn uses_hardware_decode(&self) -> bool {
+        self.hw_decode != 0
+    }
+
+    /// The decode device to name, which is nothing when none was asked for.
+    pub fn decode_device(&self) -> Option<&str> {
+        let device = self.hw_decode_device.trim();
+        if !self.uses_hardware_decode() || device.is_empty() {
+            return None;
+        }
+        Some(device)
+    }
+
+    /// The scheduling priority to ask for, clamped to what the worker applies.
+    pub fn priority(&self) -> i32 {
+        self.process_priority.clamp(-2, 2)
     }
 
     /// Resolve the log file path when disk logging is enabled.

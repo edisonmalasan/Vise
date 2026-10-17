@@ -12,6 +12,7 @@ use vise_ipc::WORKER_NAME;
 
 use crate::encode::EncodeService;
 use crate::log::LogService;
+use crate::platform::{self, Priority};
 use crate::scan::ScanService;
 
 /// Everything a request handler needs, shared across connection threads.
@@ -221,11 +222,30 @@ impl WorkerRuntime {
     }
 
     /// Apply an init command to the log service and remember it.
+    ///
+    /// The scheduling priority is asked for on this process rather than being
+    /// recorded and forgotten: a process cannot be created above the priority of
+    /// whoever created it, so the worker is the only place the answer can be
+    /// acted on. A platform that will not do it says so in the log instead of
+    /// quietly leaving the inherited priority in place.
     pub fn apply_init(&self, init: &InitCommand) {
         self.logs.set_verbosity(init.log_verbosity);
         self.logs.set_disk_target(init.log_file_path());
         for note in init.unsupported_notes() {
             self.logs.warn(note);
+        }
+        if init.process_priority != 0 {
+            let priority = Priority::of(init.priority());
+            match platform::set_priority(std::process::id(), priority) {
+                Ok(()) => self.logs.info(format!(
+                    "the worker is running at {} priority",
+                    priority.label()
+                )),
+                Err(e) => self.logs.warn(format!(
+                    "the worker could not change its own priority to {}: {e}",
+                    priority.label()
+                )),
+            }
         }
         self.logs.info(format!(
             "initialised (log verbosity {}, hardware acceleration {}, parent monitoring {})",

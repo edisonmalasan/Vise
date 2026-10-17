@@ -10,6 +10,7 @@
 //! library in-process.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -23,6 +24,7 @@ use vise_ipc::timespan::TimeSpan;
 use vise_ipc::{WorkerClient, WorkerConfig, WorkerSupervisor};
 
 mod appearance;
+mod preferences;
 mod scanflow;
 mod sources;
 mod tabs;
@@ -30,6 +32,7 @@ mod viewmodel;
 mod windows;
 
 use appearance::{AppearanceState, AppearanceViewModel, SystemTheme};
+use preferences::{PreferencesSettings, PreferencesState, PreferencesViewModel};
 use scanflow::{scan_in_process, ScanFlow};
 use sources::{RecentSources, SourceDropReport, SourceViewModel};
 use tabs::{
@@ -55,6 +58,12 @@ const MAIN_WINDOW: &str = "main";
 
 /// Event the page listens to for a theme the operating system changed.
 const APPEARANCE_EVENT: &str = "appearance-changed";
+/// Event carrying a question the window asked for itself.
+///
+/// The countdown alert is normally opened by the page pressing a control; the
+/// when-done preferences open it without one, because the queue finishing is not
+/// something the user does. The answer still travels the same way round.
+const ALERT_EVENT: &str = "alert-asked";
 
 /// How the shell reaches the transcode pipeline.
 enum Backend {
@@ -137,6 +146,16 @@ struct DesktopState {
     /// Theme and layout direction: the preference, the observation, and the
     /// answer both of them add up to.
     appearance: AppearanceState,
+    /// The preferences surface: the choices, what they were read from, and the
+    /// record a reset can be taken back from.
+    preferences: PreferencesState,
+    /// Whether the When-done preferences have already been acted on for the drain
+    /// in progress.
+    ///
+    /// Set when a question is put and cleared the moment the queue has something
+    /// in it again, so two jobs finishing together ask once rather than twice, and
+    /// a queue that drains a second time asks again.
+    when_done_armed: AtomicBool,
 }
 
 type SharedState = Arc<Mutex<DesktopState>>;
@@ -221,10 +240,15 @@ fn take_confirmation(state: &SharedState, action: AlertAction) {
 
 /// Build the backend the application will use.
 ///
-/// Isolation is on unless a portable settings file switches it off, and the
-/// worker executable is looked for next to the application binary first so a
-/// packaged build uses its own copy.
-fn build_backend() -> Backend {
+/// Isolation is on unless a portable settings file switches it off, or the
+/// Advanced preferences ask for it to be off, and the worker executable is looked
+/// for next to the application binary first so a packaged build uses its own
+/// copy.
+///
+/// The preference is consulted here rather than at the one place the backend is
+/// created, because this function is what creates it and a check that lives
+/// elsewhere would be a check that can be forgotten.
+fn build_backend(isolate: bool) -> Backend {
     let executable_dir = std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(PathBuf::from))
@@ -239,6 +263,10 @@ fn build_backend() -> Backend {
     if !settings.should_isolate() {
         let reason = settings.isolation_disabled_reason();
         eprintln!("{reason}");
+        return Backend::InProcess;
+    }
+    if !isolate {
+        eprintln!("process isolation is switched off in the Advanced preferences");
         return Backend::InProcess;
     }
 
@@ -283,14 +311,31 @@ fn worker_client(state: &SharedState) -> Result<Option<WorkerClient>, String> {
         .lock()
         .map_err(|_| "desktop state is unavailable".to_string())?;
     if guard.backend.is_none() {
-        guard.backend = Some(build_backend());
+        let isolate = guard.preferences.settings().advanced.process_isolation;
+        guard.backend = Some(build_backend(isolate));
     }
     Ok(guard.backend.as_mut().and_then(Backend::client))
 }
 
-/// Logging preferences sent with every scan and encode command.
-fn init_command() -> InitCommand {
-    InitCommand::default()
+/// Drop the running backend so the next operation builds it again.
+///
+/// Called after a preference that decides which kind of backend there is. The
+/// worker that is running is not stopped here: it is asked to stop when the
+/// window closes, and a preference that is changed between two encodes should not
+/// cost the queue an encode to take effect on.
+fn rebuild_backend_after_preference(state: &SharedState, why: &str) {
+    let dropped = {
+        let Ok(mut guard) = state.lock() else {
+            return;
+        };
+        guard.backend.take().is_some()
+    };
+    if dropped {
+        push_log(
+            state,
+            format!("the worker process will be rebuilt on the next operation: {why}"),
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -311,22 +356,36 @@ struct ScanOptions {
     min_duration: Option<String>,
     /// Longest acceptable title duration, as `h:mm:ss`.
     max_duration: Option<String>,
-    /// Keep duplicate title entries instead of collapsing them.
-    keep_duplicate_titles: bool,
     /// File names skipped during the scan.
     file_exclusions: Vec<String>,
 }
 
 impl ScanOptions {
     /// Build the worker command for `paths`.
-    fn to_command(&self, paths: Vec<String>) -> Result<ScanCommand, String> {
+    ///
+    /// The preferences fill in what the page did not send, rather than being
+    /// kept beside it: a still count and a duplicate-title switch are answers to
+    /// one question each, and two copies of an answer are two chances to be
+    /// wrong.
+    fn to_command(
+        &self,
+        paths: Vec<String>,
+        settings: &PreferencesSettings,
+    ) -> Result<ScanCommand, String> {
         Ok(ScanCommand {
             initialise_command: InitCommand {
-                keep_duplicate_titles: self.keep_duplicate_titles,
-                ..init_command()
+                keep_duplicate_titles: settings.general.keep_duplicate_titles,
+                ..settings.to_worker_init()
             },
             paths,
-            preview_count: self.preview_count.unwrap_or(0).min(32),
+            // The preview window owns how many stills a scan extracts once the
+            // user has changed it, and the preference is the answer behind that.
+            // The bound is the field's own, so the clamp and the picker cannot
+            // disagree about what the largest allowed number is.
+            preview_count: self
+                .preview_count
+                .unwrap_or(settings.general.preview_count)
+                .min(preferences::general::MAX_PREVIEW_FRAMES),
             min_duration: parse_duration(self.min_duration.as_deref(), "shortest")?,
             max_duration: parse_duration(self.max_duration.as_deref(), "longest")?,
             file_exclusion_list: self
@@ -335,6 +394,7 @@ impl ScanOptions {
                 .map(|name| name.trim().to_string())
                 .filter(|name| !name.is_empty())
                 .collect(),
+            hw_decode: settings.hardware.decode_preference(),
             ..ScanCommand::default()
         })
     }
@@ -382,12 +442,29 @@ fn select_source(
     path: String,
 ) -> Result<SelectionViewModel, String> {
     let source = sources::resolve_source(&path).map_err(|e| e.message().to_string())?;
-    let mut guard = state.lock().map_err(|e| e.to_string())?;
-    guard.recents_stamp = sources::next_stamp(guard.recents_stamp);
-    let stamp = guard.recents_stamp;
-    guard.recents.record(&source, stamp);
-    guard.flow.set_source(Some(source));
-    let _ = guard.recents.save(&guard.settings_path);
+    {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        guard.recents_stamp = sources::next_stamp(guard.recents_stamp);
+        let stamp = guard.recents_stamp;
+        guard.recents.record(&source, stamp);
+        guard.flow.set_source(Some(source));
+        // A newly loaded source starts in the range the General preference
+        // names, so a choice made once is the choice every new title gets.
+        let mode = guard
+            .preferences
+            .settings()
+            .general
+            .default_range_mode
+            .to_range_mode();
+        guard.flow.set_default_range_mode(mode);
+        let _ = guard.recents.save(&guard.settings_path);
+    }
+    if scans_on_open(&state) {
+        // Started outside the lock: it is a worker round trip, and holding the
+        // lock across one would freeze every other control on the window.
+        let _ = begin_scan_with(&state, None);
+    }
+    let guard = state.lock().map_err(|e| e.to_string())?;
     Ok(guard.flow.view_model())
 }
 
@@ -443,28 +520,32 @@ fn source_selection(state: State<'_, SharedState>) -> Result<SelectionViewModel,
     Ok(guard.flow.view_model())
 }
 
-/// Start scanning the loaded source.
+/// Scan a source with the preferences as they stand.
 ///
-/// The command returns as soon as the worker accepted the work, and the
-/// interface polls [`scan_status`] from there, so a long scan never blocks the
-/// window.
-#[tauri::command]
-fn begin_scan(
-    state: State<'_, SharedState>,
+/// Split out from the command so the same scan can be started by the General
+/// preference "scan when a source is opened" without going back through the
+/// command layer, and so the rule about which preferences reach the worker is in
+/// one place.
+fn begin_scan_with(
+    state: &SharedState,
     options: Option<ScanOptions>,
 ) -> Result<ScanStatusViewModel, String> {
-    let worker = worker_client(&state)?;
-    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let worker = worker_client(state)?;
+    let mut guard = state
+        .lock()
+        .map_err(|_| "the window state is unavailable".to_string())?;
     let Some(source) = guard.flow.source().cloned() else {
         return Err("Choose a file or folder to scan.".to_string());
     };
     let mut options = options.unwrap_or_default();
-    // The preview window owns how many stills a scan extracts, so the page does
-    // not have to remember it.
+    // The preview window owns how many stills a scan extracts once it has been
+    // changed, and the General preference is where that count comes from to
+    // begin with.
     if options.preview_count.is_none() {
         options.preview_count = Some(guard.preview.still_count());
     }
-    let command = options.to_command(vec![source.path.clone()])?;
+    let settings = guard.preferences.settings().clone();
+    let command = options.to_command(vec![source.path.clone()], &settings)?;
     match worker {
         Some(client) => {
             let started = client.start_scan(&command).map_err(|e| e.to_string())?;
@@ -475,8 +556,9 @@ fn begin_scan(
             guard.flow.begin();
         }
         None => {
-            // Portable settings switched process isolation off; the same scan
-            // runs here so the window behaves the same either way.
+            // Process isolation is switched off, either by a portable settings
+            // file or by the Advanced preferences; the same scan runs here so
+            // the window behaves the same either way.
             match scan_in_process(std::slice::from_ref(&source)) {
                 Ok(titles) => guard.flow.accept_scan(titles),
                 Err(e) => guard.flow.fail(e),
@@ -484,6 +566,30 @@ fn begin_scan(
         }
     }
     Ok(ScanStatusViewModel::of(&guard.flow))
+}
+
+/// Start scanning the loaded source.
+///
+/// The command returns as soon as the worker accepted the work, and the
+/// interface polls [`scan_status`] from there, so a long scan never blocks the
+/// window.
+#[tauri::command]
+fn begin_scan(
+    state: State<'_, SharedState>,
+    options: Option<ScanOptions>,
+) -> Result<ScanStatusViewModel, String> {
+    begin_scan_with(&state, options)
+}
+
+/// Whether the loaded source should be scanned the moment it is opened.
+///
+/// Read from the General preferences rather than held here, so a preference and
+/// the decision it drives cannot be two copies of one answer.
+fn scans_on_open(state: &SharedState) -> bool {
+    state
+        .lock()
+        .map(|guard| guard.preferences.settings().scans_on_open())
+        .unwrap_or(false)
 }
 
 /// Poll the running scan once.
@@ -1014,7 +1120,11 @@ fn queue_selection(state: State<'_, SharedState>, output_path: String) -> Result
             tabs.problems.join(" ")
         ));
     }
-    let mut spec = guard.tabs.to_job_spec(&source, output_path, &facts)?;
+    let hardware =
+        preferences::hardware::to_hardware_options(&guard.preferences.settings().hardware);
+    let mut spec = guard
+        .tabs
+        .to_job_spec(&source, output_path, &facts, &hardware)?;
     spec.title_index = Some(selection.selected_title_index);
 
     let id = guard.session.add_job(spec);
@@ -1063,15 +1173,44 @@ fn queue_selection_window(
             guard.selection.titles = vec![chosen];
         }
     }
+    // An untouched sheet starts in the folder and with the naming pattern the
+    // Output preferences hold, so a folder chosen once is the folder every batch
+    // starts in. A folder the user has typed into is left alone.
+    if guard.selection.output_directory.trim().is_empty() {
+        guard.selection.output_directory = guard.preferences.settings().output.folder.clone();
+    }
+    if guard.selection.name_pattern.trim().is_empty() {
+        guard.selection.name_pattern = guard.preferences.settings().output.name_pattern.clone();
+    }
     let directory = guard.selection.output_directory.clone();
     let (valid, problem) = check_output_directory(&directory);
+    let policy = collision_policy(&guard);
     Ok(windows::queue::selection_view(
         &guard.selection,
         &titles,
         &extension,
         valid,
         &problem,
+        policy,
+        output_file_exists,
     ))
+}
+
+/// Whether something is already written at `path`.
+///
+/// Asked through a function rather than read inside the planner so the planner
+/// can be tested without writing anything, and so the sheet and the queue ask the
+/// same question of the same file.
+fn output_file_exists(path: &str) -> bool {
+    Path::new(path).is_file()
+}
+
+/// The one answer the two Output preferences add up to.
+///
+/// The sheet and the queue both ask here, so the names on the sheet are the names
+/// the queue writes even when a collision policy renumbers them.
+fn collision_policy(guard: &DesktopState) -> windows::queue::CollisionPolicy {
+    preferences::output::policy(&guard.preferences.settings().output)
 }
 
 /// Whether a folder can be written to, and why not when it cannot.
@@ -1137,14 +1276,18 @@ fn set_queue_selection(
         &extension,
         valid,
         &problem,
+        collision_policy(&guard),
+        output_file_exists,
     ))
 }
 
 /// Queue every title the selection sheet has chosen.
 ///
-/// The whole batch is planned before anything is queued, so two titles that
-/// would write the same file are refused together rather than the second one
-/// quietly overwriting the first.
+/// The whole batch is planned and resolved before anything is queued, using the
+/// one collision policy the Output preferences settle into, so two titles that
+/// would write the same file are numbered, refused, or left out together rather
+/// than the second one quietly overwriting the first. The sheet was built by the
+/// same call, so the names it showed are the names queued here.
 #[tauri::command]
 fn queue_titles(state: State<'_, SharedState>) -> Result<Vec<JobId>, String> {
     let mut guard = state.lock().map_err(|e| e.to_string())?;
@@ -1172,18 +1315,30 @@ fn queue_titles(state: State<'_, SharedState>) -> Result<Vec<JobId>, String> {
             tabs.problems.join(" ")
         ));
     }
-    let planned = windows::queue::plan(&guard.selection, &names, &extension)?;
+    let policy = collision_policy(&guard);
+    let hardware =
+        preferences::hardware::to_hardware_options(&guard.preferences.settings().hardware);
+    let planned = windows::queue::plan(
+        &guard.selection,
+        &names,
+        &extension,
+        policy,
+        output_file_exists,
+    )?;
     let mut queued = Vec::new();
     for (index, output) in planned {
-        let base = guard.tabs.to_job_spec(&source, &output, &facts)?;
+        let base = guard
+            .tabs
+            .to_job_spec(&source, &output, &facts, &hardware)?;
         let spec = windows::queue::titled_spec(&base, index, &output);
         let id = guard.session.add_job(spec);
         guard.queue.push(id);
         queued.push(id);
     }
     guard.activity.record(format!(
-        "queued {} title(s) from the selection sheet",
-        queued.len()
+        "queued {} title(s) from the selection sheet ({})",
+        queued.len(),
+        windows::queue::collision_summary(policy)
     ));
     Ok(queued)
 }
@@ -1271,15 +1426,135 @@ fn set_job_state(
 }
 
 #[tauri::command]
-fn run_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
+fn run_job(app: AppHandle, state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
     let spec = claim_job(&state, id)?;
     let shared: SharedState = state.inner().clone();
     let worker = worker_client(&state)?;
-    thread::spawn(move || match worker {
-        Some(client) => run_through_worker(shared, client, id, spec),
-        None => run_in_process(shared, id, spec),
+    thread::spawn(move || {
+        match worker {
+            Some(client) => run_through_worker(shared.clone(), client, id, spec),
+            None => run_in_process(shared.clone(), id, spec),
+        }
+        // The queue may have drained with this job, and the When-done preference
+        // is acted on the moment the last one finishes rather than the next time
+        // something is queued.
+        apply_when_done(&app, &shared);
     });
     Ok(())
+}
+
+/// Act on the When-done preferences the moment the queue drains.
+///
+/// Called after every job reaches a finished state. The decision is the pure
+/// [`when_done_plan`], so the rule is tested without a window closing itself;
+/// only the carrying-out is here.
+///
+/// A wait is honoured rather than recorded: the window is not closed the instant
+/// the encoder stops, which is what makes an answer the user did not mean to give
+/// recoverable. The window remembers what it has already decided for this drain,
+/// so two jobs finishing together produce one wait and one question rather than
+/// two.
+fn apply_when_done(app: &AppHandle, state: &SharedState) {
+    let plan = {
+        let Ok(guard) = state.lock() else {
+            return;
+        };
+        let jobs = guard.session.jobs();
+        let pending = jobs
+            .iter()
+            .filter(|job| !windows::queue::is_finished(job.status.state))
+            .count();
+        let running = jobs
+            .iter()
+            .filter(|job| job.status.state == JobState::Running)
+            .count();
+        let plan = when_done_plan(guard.preferences.settings(), pending, running);
+        if plan.is_none() {
+            // The queue is not empty, so the next time it drains is a new drain
+            // and may ask again.
+            guard.when_done_armed.store(false, Ordering::SeqCst);
+        }
+        plan
+    };
+    let Some(plan) = plan else {
+        return;
+    };
+    // Two threads can reach a drained queue together when the last two jobs finish
+    // at once; asking twice for one drain would be two questions about the same
+    // answer.
+    if state
+        .lock()
+        .map(|guard| guard.when_done_armed.swap(true, Ordering::SeqCst))
+        .unwrap_or(false)
+    {
+        return;
+    }
+    if plan.delay_seconds == 0 {
+        carry_out_when_done(app, state, plan);
+        return;
+    }
+    push_log(
+        state,
+        format!(
+            "the queue finished; the when-done preference acts in {} second(s)",
+            plan.delay_seconds
+        ),
+    );
+    let app = app.clone();
+    let shared = state.clone();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(u64::from(plan.delay_seconds)));
+        carry_out_when_done(&app, &shared, plan);
+    });
+}
+
+/// Put the when-done question to the user.
+///
+/// Both answers this build can honour end in the same place — the window asks
+/// before it closes, through the same countdown every other destructive action
+/// uses — so there is one question rather than two that mean the same thing.
+///
+/// The question is announced as an event rather than waited to be asked for,
+/// because the window asked it itself: the page has no control to press and
+/// would otherwise sit there looking at a queue that has finished with nothing
+/// happening.
+///
+/// A line is written to the activity log because a window that acts on its own
+/// should say so somewhere the user can read it afterwards.
+fn carry_out_when_done(app: &AppHandle, state: &SharedState, plan: WhenDonePlan) {
+    match plan.action {
+        preferences::whendone::WhenDoneAction::CloseWindow
+        | preferences::whendone::WhenDoneAction::Ask => {
+            push_log(state, "the queue finished; asking before the window closes");
+            let Ok(mut guard) = state.lock() else {
+                return;
+            };
+            if guard.surfaces.open(dialogs::ALERT_SURFACE).is_err() {
+                return;
+            }
+            guard.alerts.request(
+                AlertAction::CloseWindow,
+                "The queue has finished. Close this window?",
+                None,
+                None,
+            );
+            let view = guard.alerts.view();
+            drop(guard);
+            if let Err(e) = app.emit(ALERT_EVENT, &view) {
+                eprintln!("the question could not be shown: {e}");
+            }
+        }
+        // The three actions this build cannot do are refused before they are
+        // stored, so reaching here with one means a record from a newer build
+        // reached the state: it is logged rather than acted on.
+        other => push_log(
+            state,
+            format!(
+                "the queue finished; '{}' is not something this build does.",
+                other.label()
+            ),
+        ),
+    }
 }
 
 /// Mark a queued or paused job as running and hand back its specification.
@@ -1326,7 +1601,10 @@ fn claim_job(state: &SharedState, id: JobId) -> Result<JobSpec, String> {
 /// another rather than starting a thread per job; a job that fails does not
 /// stop the ones behind it.
 #[tauri::command]
-fn start_queue(state: State<'_, SharedState>) -> Result<windows::queue::QueueViewModel, String> {
+fn start_queue(
+    app: AppHandle,
+    state: State<'_, SharedState>,
+) -> Result<windows::queue::QueueViewModel, String> {
     require_confirmation(&state, AlertAction::StartQueue)?;
     let waiting = {
         let mut guard = state.lock().map_err(|e| e.to_string())?;
@@ -1365,6 +1643,9 @@ fn start_queue(state: State<'_, SharedState>) -> Result<windows::queue::QueueVie
                 None => run_in_process(shared.clone(), id, spec),
             }
         }
+        // The whole queue has run, so the When-done preference applies here as
+        // well as after a single job.
+        apply_when_done(&app, &shared);
     });
     queue_window(state)
 }
@@ -1475,8 +1756,14 @@ fn cancel_job_confirmed(state: State<'_, SharedState>, id: JobId) -> Result<(), 
 /// Drive one job through the worker and mirror its progress into the queue.
 fn run_through_worker(shared: SharedState, client: WorkerClient, id: JobId, spec: JobSpec) {
     push_log(&shared, format!("encoding job {}", id));
+    let settings = shared
+        .lock()
+        .map(|guard| guard.preferences.settings().clone())
+        .unwrap_or_default();
     let command = EncodeCommand {
-        initialise_command: init_command(),
+        // The same initialise command a scan would send, so a preference that
+        // was changed between the last scan and this encode takes effect on it.
+        initialise_command: settings.to_worker_init(),
         encode_job: spec,
     };
     match client.start_encode(&command) {
@@ -1866,6 +2153,10 @@ fn alert_headline(
             Some(id) if !id.trim().is_empty() => format!("{} '{id}'?", action.verb()),
             _ => format!("{}?", action.verb()),
         },
+        AlertAction::ResetPreferences => {
+            "Put every preference on every tab back to its default?".to_string()
+        }
+        AlertAction::CloseWindow => "The queue has finished. Close this window?".to_string(),
         _ => format!("{}?", action.verb()),
     }
 }
@@ -2262,7 +2553,216 @@ fn close_window(
 
 /* ----------------------------------------------------------------- appearance */
 
-/// What the window is showing, resolved.
+/* --------------------------------------------------------------- preferences */
+
+/// One change to one preference, as the interface sends it.
+///
+/// The value is JSON rather than a fixed type because the surface has one
+/// control per kind and this is the one place that knows which kind each field
+/// is. A value of the wrong shape is refused by name rather than coerced.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreferenceChange {
+    /// Which preference is being changed.
+    pub field: String,
+    /// What it is being changed to.
+    pub value: serde_json::Value,
+}
+
+/// The preferences surface, as the page renders it.
+#[tauri::command]
+fn preferences_view(state: State<'_, SharedState>) -> Result<PreferencesViewModel, String> {
+    let guard = state.lock().map_err(|e| e.to_string())?;
+    Ok(guard.preferences.view())
+}
+
+/// Show one preferences tab.
+#[tauri::command]
+fn set_preference_tab(
+    state: State<'_, SharedState>,
+    tab: String,
+) -> Result<PreferencesViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.preferences.set_active(&tab)?;
+    Ok(guard.preferences.view())
+}
+
+/// Change one preference.
+///
+/// A change to a preference that decides which kind of backend there is discards
+/// the running worker, so the next operation is built from the answer the user
+/// just gave rather than from the one it was started with. A change to the log
+/// level moves the activity window's floor with it, so the two filters cannot
+/// disagree about what is being kept.
+#[tauri::command]
+fn set_preference(
+    state: State<'_, SharedState>,
+    change: PreferenceChange,
+) -> Result<PreferencesViewModel, String> {
+    // The record is snapshotted before the change and compared after it, so the
+    // window reacts to what actually moved rather than to which field name the
+    // page sent. One preference can move another — the collision switch settles
+    // the collision choice — and this way that is noticed too.
+    let before = {
+        let guard = state.lock().map_err(|e| e.to_string())?;
+        guard.preferences.settings().clone()
+    };
+    let view = {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        guard.preferences.set(&change.field, &change.value)?;
+        guard.preferences.view()
+    };
+    let after = {
+        let guard = state.lock().map_err(|e| e.to_string())?;
+        guard.preferences.settings().clone()
+    };
+    if before.advanced.process_isolation != after.advanced.process_isolation {
+        rebuild_backend_after_preference(&state, "process isolation was switched");
+    }
+    if before.advanced.log_level != after.advanced.log_level {
+        // The activity window's floor moves with the preference so the two
+        // filters cannot disagree about what is being kept.
+        if let Ok(mut guard) = state.lock() {
+            guard.activity.set_min_level(after.advanced.log_level);
+        }
+    }
+    if before.hardware != after.hardware {
+        push_log(
+            &state,
+            "the hardware preferences changed; the next job uses them",
+        );
+    }
+    if before.general != after.general {
+        let stills = after.general.preview_count;
+        // The preview strip follows the preference until the user changes it for
+        // one source, rather than the two holding different answers.
+        if let Ok(mut guard) = state.lock() {
+            let _ = guard.preview.set_still_count(stills);
+        }
+    }
+    Ok(view)
+}
+
+/// Look for hardware again.
+///
+/// Detection is a pair of subprocess calls, so it is not done on every read; it
+/// is done at start-up and whenever the user asks for it here.
+#[tauri::command]
+fn recheck_hardware(state: State<'_, SharedState>) -> Result<PreferencesViewModel, String> {
+    let capabilities = vise_core::HardwareCapabilities::detect();
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.preferences.observe_hardware(&capabilities);
+    Ok(guard.preferences.view())
+}
+
+/// Restore every preference to its default, once the countdown has confirmed it.
+///
+/// The answer can be taken back: the previous record is held for one reset and
+/// [`undo_preference_reset`] puts it back, so a destructive control is offered
+/// here without the user having to trust that they meant to press it.
+#[tauri::command]
+fn reset_preferences(state: State<'_, SharedState>) -> Result<PreferencesViewModel, String> {
+    require_confirmation(&state, AlertAction::ResetPreferences)?;
+    let view = {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        guard.preferences.reset();
+        guard.preferences.observe_portable(&portable_settings());
+        guard.preferences.view()
+    };
+    take_confirmation(&state, AlertAction::ResetPreferences);
+    // Announced rather than left to be noticed: a reset that silently changed
+    // every tab would look like the window losing the user's settings.
+    rebuild_backend_after_preference(&state, "the preferences were restored to their defaults");
+    push_log(
+        &state,
+        format!(
+            "every preference was restored to its default; {}",
+            view.reset.summary
+        ),
+    );
+    Ok(view)
+}
+
+/// Put back the preferences a reset replaced.
+///
+/// One reset is undoable and only one: holding a longer history would let a
+/// take-back be replayed into a record the user has since changed.
+#[tauri::command]
+fn undo_preference_reset(state: State<'_, SharedState>) -> Result<PreferencesViewModel, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.preferences.undo_reset()?;
+    Ok(guard.preferences.view())
+}
+
+/// The portable settings that apply to this build.
+///
+/// Read on demand rather than cached at start-up, so a portable file that is
+/// added or removed while the window is open is seen the next time the isolation
+/// answer is needed.
+fn portable_settings() -> PortableSettings {
+    let executable_dir = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(PathBuf::from))
+        .unwrap_or_else(|| PathBuf::from("."));
+    vise_ipc::portable::load_for(&executable_dir).unwrap_or_default()
+}
+
+/// Act on the When-done preferences once the queue has drained.
+///
+/// Returns what the window should do rather than doing it, so the rule is a plain
+/// function that a test can pin without a window closing itself. `None` is the
+/// answer when the queue has not actually drained, which is the common case: a
+/// job finishes while three more are queued and nothing is acted on.
+pub fn when_done_plan(
+    settings: &PreferencesSettings,
+    pending: usize,
+    running: usize,
+) -> Option<WhenDonePlan> {
+    if pending > 0 || running > 0 {
+        return None;
+    }
+    let action = settings.when_done.action;
+    if action == preferences::whendone::WhenDoneAction::Nothing {
+        return None;
+    }
+    if !action.is_available() {
+        // Refused before it is stored, so reaching here means a record from a
+        // newer build got here; acting on nothing is better than pretending.
+        return None;
+    }
+    Some(WhenDonePlan {
+        action,
+        delay_seconds: settings.when_done.delay_seconds,
+    })
+}
+
+/// What the window is going to do because the queue finished.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WhenDonePlan {
+    /// What to do.
+    pub action: preferences::whendone::WhenDoneAction,
+    /// How long to wait first.
+    pub delay_seconds: u32,
+}
+
+/// Close the window the When-done preferences asked to close.
+///
+/// The confirmation is spent here, and only here, so one answer to the countdown
+/// closes one window and cannot be replayed into something else. The page
+/// reaches this because the window opened the alert itself; a page that pressed
+/// the confirm control without a confirmation behind it is refused.
+#[tauri::command]
+fn when_done_confirm(app: AppHandle, state: State<'_, SharedState>) -> Result<(), String> {
+    require_confirmation(&state, AlertAction::CloseWindow)?;
+    take_confirmation(&state, AlertAction::CloseWindow);
+    let Some(window) = app.get_webview_window(MAIN_WINDOW) else {
+        return Err("There is no window to close.".to_string());
+    };
+    window
+        .close()
+        .map_err(|e| format!("the window could not be closed: {e}"))
+}
+
 #[tauri::command]
 fn appearance_view(
     app: AppHandle,
@@ -2371,17 +2871,35 @@ fn main() {
     // replaces the theme with the platform's own as soon as there is a window
     // to ask.
     let appearance = AppearanceState::load(&settings_path, SystemTheme::Light, None);
+    // The preferences are read before anything else is built, because three of
+    // them decide what gets built: whether there is a worker process, how much
+    // is logged, and how many stills a scan extracts.
+    let portable = portable_settings();
+    let mut preferences = PreferencesState::load(&settings_path, &portable);
+    // Detection is a pair of subprocess calls, so it is done once here rather
+    // than on every read of the hardware tab.
+    preferences.observe_hardware(&vise_core::HardwareCapabilities::detect());
+    let stills = preferences.settings().preview_count();
+    let log_floor = preferences.settings().advanced.log_level;
+    let isolate = preferences.settings().advanced.process_isolation;
     let state: SharedState = Arc::new(Mutex::new(DesktopState {
         // Build the backend before the window opens so the first scan does not
         // pay for process start-up.
-        backend: Some(build_backend()),
+        backend: Some(build_backend(isolate)),
         recents,
         settings_path,
         presets: PresetState::new(preset_path),
         tabs: TabSettings::new(),
         appearance,
+        preferences,
+        preview: windows::preview::PreviewState::with_still_count(stills),
         ..DesktopState::default()
     }));
+    // The activity window's filter floor is the stored preference, so the two
+    // places that decide what is kept start from one answer.
+    if let Ok(mut guard) = state.lock() {
+        guard.activity.set_min_level(log_floor);
+    }
     // The builder needs the state in three places and moves each closure, so each
     // one is handed its own handle to the same lock.
     let start_up = state.clone();
@@ -2500,7 +3018,14 @@ fn main() {
             set_theme_mode,
             set_direction_mode,
             report_system_theme,
-            report_locale
+            report_locale,
+            preferences_view,
+            set_preference_tab,
+            set_preference,
+            recheck_hardware,
+            reset_preferences,
+            undo_preference_reset,
+            when_done_confirm
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -2554,11 +3079,13 @@ mod tests {
     fn scan_options_build_the_worker_command() {
         let options: ScanOptions = serde_json::from_str(
             r#"{"previewCount":99,"minDuration":"","maxDuration":"00:10:00",
-                "keepDuplicateTitles":true,"fileExclusions":[" sample.mkv ","  "]}"#,
+                "fileExclusions":[" sample.mkv ","  "]}"#,
         )
         .expect("options");
+        let mut settings = PreferencesSettings::new();
+        settings.general.keep_duplicate_titles = true;
         let command = options
-            .to_command(vec!["C:\\media\\clips".to_string()])
+            .to_command(vec!["C:\\media\\clips".to_string()], &settings)
             .expect("command");
         assert_eq!(command.paths, vec!["C:\\media\\clips".to_string()]);
         assert_eq!(command.preview_count, 32, "clamped to something sane");
@@ -2568,6 +3095,8 @@ mod tests {
             "an empty value means no limit"
         );
         assert_eq!(command.max_duration.to_string(), "00:10:00");
+        // The duplicate-title switch is one answer, held by the General
+        // preferences rather than sent by the page alongside it.
         assert!(command.initialise_command.keep_duplicate_titles);
         assert_eq!(command.file_exclusion_list, vec!["sample.mkv".to_string()]);
     }
@@ -2575,8 +3104,15 @@ mod tests {
     #[test]
     fn scan_options_default_to_no_previews_and_no_limits() {
         let options: ScanOptions = serde_json::from_str("{}").expect("empty options");
+        let settings = PreferencesSettings {
+            general: preferences::general::GeneralSettings {
+                preview_count: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         let command = options
-            .to_command(vec!["in.mkv".to_string()])
+            .to_command(vec!["in.mkv".to_string()], &settings)
             .expect("command");
         assert_eq!(command.preview_count, 0);
         assert!(command.file_exclusion_list.is_empty());
@@ -2584,12 +3120,36 @@ mod tests {
     }
 
     #[test]
+    fn a_scan_that_says_nothing_about_stills_uses_the_stored_count() {
+        // The preview window overrides this once it has been changed, so the two
+        // are the same answer read from two places rather than two answers.
+        let options: ScanOptions = serde_json::from_str("{}").expect("empty options");
+        let settings = PreferencesSettings::new();
+        assert_eq!(
+            options
+                .to_command(vec!["in.mkv".to_string()], &settings)
+                .expect("command")
+                .preview_count,
+            preferences::general::DEFAULT_PREVIEW_FRAMES
+        );
+        let asked: ScanOptions =
+            serde_json::from_str(r#"{"previewCount":3}"#).expect("asked for three");
+        assert_eq!(
+            asked
+                .to_command(vec!["in.mkv".to_string()], &settings)
+                .expect("command")
+                .preview_count,
+            3,
+            "what the page asked for wins"
+        );
+    }
+
+    #[test]
     fn the_page_sends_scan_options_the_command_accepts() {
         let payload = r#"{"previewCount":0,"minDuration":"","maxDuration":"",
-            "keepDuplicateTitles":false,"fileExclusions":[]}"#;
+            "fileExclusions":[]}"#;
         let options: ScanOptions = serde_json::from_str(payload).expect("camel case options");
         assert_eq!(options.preview_count, Some(0));
-        assert!(!options.keep_duplicate_titles);
         assert!(options.file_exclusions.is_empty());
     }
 
@@ -2764,7 +3324,14 @@ mod tests {
         assert_eq!(input.names.get("2").map(String::as_str), Some("Second"));
 
         let titles = vec![(1u32, "One".to_string()), (2, "One".to_string())];
-        let plan = windows::queue::plan(&input, &titles, "mp4").expect("plan");
+        let plan = windows::queue::plan(
+            &input,
+            &titles,
+            "mp4",
+            windows::queue::CollisionPolicy::Ask,
+            output_file_exists,
+        )
+        .expect("plan");
         assert_eq!(
             plan,
             vec![
@@ -2841,7 +3408,11 @@ mod tests {
         assert!(surfaces.open_surfaces().is_empty());
 
         let catalog = surfaces.catalog();
-        assert_eq!(catalog.surfaces.len(), 8);
+        assert_eq!(catalog.surfaces.len(), 9);
+        assert!(catalog
+            .surfaces
+            .iter()
+            .any(|surface| surface.id == preferences::SURFACE));
         assert!(catalog
             .surfaces
             .iter()
@@ -2908,6 +3479,61 @@ mod tests {
     fn a_preset_file_that_is_not_there_is_refused_before_anything_is_written() {
         assert!(windows::presets::import_path_problem("C:\\nowhere\\mine.json").is_some());
         assert!(windows::presets::export_path_problem("C:\\nowhere\\mine.txt").is_some());
+    }
+
+    #[test]
+    fn the_when_done_answer_only_arrives_once_the_queue_has_nothing_left_to_do() {
+        let mut settings = PreferencesSettings::new();
+        settings.when_done.action = preferences::whendone::WhenDoneAction::CloseWindow;
+        settings.when_done.delay_seconds = 30;
+        // Nothing is decided while there is still work, however the answer is set:
+        // a window that closed itself with three jobs queued would be the wrong
+        // answer to give to anybody who has not asked for it.
+        for (pending, running) in [(0, 1), (1, 0), (3, 2), (1, 1)] {
+            assert!(
+                when_done_plan(&settings, pending, running).is_none(),
+                "{pending} pending, {running} running"
+            );
+        }
+        let plan = when_done_plan(&settings, 0, 0).expect("drained");
+        assert_eq!(
+            plan.action,
+            preferences::whendone::WhenDoneAction::CloseWindow
+        );
+        assert_eq!(plan.delay_seconds, 30, "the wait is carried, not dropped");
+
+        settings.when_done.action = preferences::whendone::WhenDoneAction::Nothing;
+        assert!(
+            when_done_plan(&settings, 0, 0).is_none(),
+            "doing nothing is not a plan"
+        );
+
+        settings.when_done.action = preferences::whendone::WhenDoneAction::SignOut;
+        assert!(
+            when_done_plan(&settings, 0, 0).is_none(),
+            "an action this build cannot do is never acted on, even from a stored record"
+        );
+    }
+
+    #[test]
+    fn asking_before_the_window_closes_and_closing_it_reach_the_same_question() {
+        // Two spellings of one answer are two settings to learn for no reason, so
+        // both reach the same countdown.
+        let mut settings = PreferencesSettings::new();
+        for action in [
+            preferences::whendone::WhenDoneAction::Ask,
+            preferences::whendone::WhenDoneAction::CloseWindow,
+        ] {
+            settings.when_done.action = action;
+            let plan = when_done_plan(&settings, 0, 0).expect("a question");
+            assert_eq!(plan.action, action);
+            assert_eq!(plan.delay_seconds, 0);
+        }
+        assert_eq!(
+            alert_headline(AlertAction::CloseWindow, "", None, None),
+            "The queue has finished. Close this window?"
+        );
+        assert!(AlertAction::CloseWindow.is_destructive());
     }
 
     #[test]

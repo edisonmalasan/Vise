@@ -195,6 +195,13 @@ pub fn surfaces() -> Vec<SurfaceSpec> {
             "Add, edit, copy, import, export, and retire presets.",
             &format!("{}close", presets::SURFACE),
         ),
+        SurfaceSpec::of(
+            SurfaceKind::Window,
+            crate::preferences::SURFACE,
+            "Preferences",
+            "Everything this window is configured with, one tab at a time.",
+            &format!("{}close", crate::preferences::SURFACE),
+        ),
     ]
 }
 
@@ -320,7 +327,7 @@ mod tests {
     #[test]
     fn every_surface_carries_the_focus_and_escape_rules_the_page_needs() {
         let all = surfaces();
-        assert_eq!(all.len(), 8);
+        assert_eq!(all.len(), 9);
         for spec in &all {
             assert!(!spec.id.is_empty());
             assert!(!spec.label.is_empty());

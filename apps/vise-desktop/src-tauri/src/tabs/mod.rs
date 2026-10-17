@@ -270,15 +270,21 @@ impl TabSettings {
         }
     }
 
-    /// Build the job specification these choices describe.
+    /// Build the job specification these choices describe, with the hardware options
+    /// a preference holds.
     ///
     /// Every tab's rules run again here, so a job cannot be queued with a
     /// combination the tabs would have refused.
+    ///
+    /// The hardware options come from the Hardware preferences rather than from a
+    /// tab of their own, so what that surface says and what a queued job is given
+    /// come from the same two stored values.
     pub fn to_job_spec(
         &self,
         input_path: &str,
         output_path: &str,
         facts: &TitleFacts,
+        hardware: &vise_core::HardwareAcceleration,
     ) -> Result<JobSpec, String> {
         let container = compatibility::container_of(&self.summary.container).ok_or_else(|| {
             format!(
@@ -358,6 +364,7 @@ impl TabSettings {
             audio_tracks,
             chapter_processing,
             metadata_processing: self.metadata.to_job_options(),
+            hardware_acceleration: hardware.clone(),
             ..Default::default()
         })
     }
@@ -552,7 +559,12 @@ mod tests {
         assert!(view.can_queue, "{:?}", view.problems);
         assert!(view.tabs.iter().all(|tab| !tab.needs_attention));
         let spec = settings
-            .to_job_spec("in.mkv", "out.mp4", &facts())
+            .to_job_spec(
+                "in.mkv",
+                "out.mp4",
+                &facts(),
+                &vise_core::HardwareAcceleration::default(),
+            )
             .expect("job spec");
         assert_eq!(spec.container, ContainerFormat::Mp4);
         assert_eq!(spec.video_codec, VideoCodec::H264);
@@ -599,7 +611,12 @@ mod tests {
         let view = settings.view(&facts());
         assert!(view.can_queue, "{:?}", view.problems);
         let spec = settings
-            .to_job_spec("in.mkv", "out.mp4", &facts())
+            .to_job_spec(
+                "in.mkv",
+                "out.mp4",
+                &facts(),
+                &vise_core::HardwareAcceleration::default(),
+            )
             .expect("job spec");
         assert_eq!(spec.video_processing.crop, Some((0, 0, 1900, 1000)));
         assert_eq!(spec.video_processing.scale, Some((950, 500)));
@@ -642,7 +659,12 @@ mod tests {
         settings.dimensions.rotate = "90".into();
         settings.filters.deinterlace = true;
         let spec = settings
-            .to_job_spec("in.mkv", "out.mp4", &facts())
+            .to_job_spec(
+                "in.mkv",
+                "out.mp4",
+                &facts(),
+                &vise_core::HardwareAcceleration::default(),
+            )
             .expect("job spec");
         let chain = spec.video_processing.build_filter_chain();
         assert!(chain.contains("yadif"), "{chain}");
@@ -666,7 +688,12 @@ mod tests {
             view.problems
         );
         let error = settings
-            .to_job_spec("in.mkv", "out.mp4", &facts())
+            .to_job_spec(
+                "in.mkv",
+                "out.mp4",
+                &facts(),
+                &vise_core::HardwareAcceleration::default(),
+            )
             .expect_err("no bit rate");
         assert!(error.contains("bit rate"), "{error}");
     }
@@ -690,7 +717,12 @@ mod tests {
         let view = settings.view(&silent);
         assert!(!view.can_queue);
         let error = settings
-            .to_job_spec("in.mkv", "out.mp4", &silent)
+            .to_job_spec(
+                "in.mkv",
+                "out.mp4",
+                &silent,
+                &vise_core::HardwareAcceleration::default(),
+            )
             .expect_err("no duration");
         assert!(error.contains("source duration"), "{error}");
     }

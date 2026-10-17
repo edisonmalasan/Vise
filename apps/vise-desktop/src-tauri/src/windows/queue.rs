@@ -816,11 +816,23 @@ fn title_file(
 
 /// Build the queue plans for `input`, checking every name before anything is
 /// queued so a half-written batch never happens.
-pub fn plan(
+///
+/// `policy` is the answer the Output preferences settle to, and `exists` is asked
+/// whether a file is already there. Both kinds of collision — two titles in the
+/// batch that resolve to one name, and a name that is already a file — go
+/// through the same resolver, so the sheet's plan and the queue that follows it
+/// cannot answer the question differently. The planner itself does not check for
+/// collisions at all: one place resolves them, and that is this call.
+pub fn plan<F>(
     input: &QueueSelectionInput,
     titles: &[(u32, String)],
     extension: &str,
-) -> Result<Vec<(u32, String)>, String> {
+    policy: CollisionPolicy,
+    exists: F,
+) -> Result<Vec<(u32, String)>, String>
+where
+    F: Fn(&str) -> bool,
+{
     let directory = input.output_directory.trim();
     if directory.is_empty() {
         return Err("Choose a folder to write the finished files into.".to_string());
@@ -855,26 +867,208 @@ pub fn plan(
         };
         planned.push((index, output_path(directory, &file)));
     }
-    for (position, (index, path)) in planned.iter().enumerate() {
-        for (other, other_path) in planned.iter().skip(position + 1) {
-            if other_path.eq_ignore_ascii_case(path) {
-                return Err(format!(
-                    "Titles {index} and {other} would both be written to '{path}'; give one of them another name."
-                ));
+    resolve_collisions(planned, policy, exists)
+}
+
+/// What a name collision does.
+///
+/// This is the answer the queue needs, not the two preferences it comes from:
+/// the preferences surface settles a switch and a choice into this one value, so
+/// the queue never has to know how they were spelled, and the two can never
+/// disagree here because there is only one of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CollisionPolicy {
+    /// Refuse the batch and name the file.
+    Ask,
+    /// Add a number to the second and later names.
+    Renumber,
+    /// Leave out the titles whose files are already there.
+    Skip,
+    /// Write over what is there.
+    Replace,
+}
+
+impl CollisionPolicy {
+    /// The policy the output preferences describe.
+    pub fn of(overwrite: bool, collision: crate::preferences::CollisionPreference) -> Self {
+        if overwrite || collision.replaces() {
+            return CollisionPolicy::Replace;
+        }
+        match collision {
+            crate::preferences::CollisionPreference::Renumber => CollisionPolicy::Renumber,
+            crate::preferences::CollisionPreference::Skip => CollisionPolicy::Skip,
+            // `Ask` and `Replace` are the same preference wearing two
+            // spellings, so the switch decides between them here as well.
+            _ => CollisionPolicy::Ask,
+        }
+    }
+
+    /// One line saying what this policy does.
+    ///
+    /// Replacing is worded so a reader of the activity log can see the
+    /// consequence in the sentence itself: two titles may end up writing one file.
+    pub fn describe(self) -> &'static str {
+        match self {
+            CollisionPolicy::Ask => "a collision is refused and nothing is queued",
+            CollisionPolicy::Renumber => "a collision is resolved by numbering the later names",
+            CollisionPolicy::Skip => "a title whose file is already there is left out",
+            CollisionPolicy::Replace => {
+                "an existing file is written over, so two titles may share a name"
             }
         }
     }
-    Ok(planned)
+}
+
+/// Split a file name into its stem and its extension.
+///
+/// The extension keeps its dot and is only what is after the last one, so a name
+/// with no dot has no extension and a name with several is split at the last
+/// rather than the first: `part.1.mkv` numbers to `part.1 (2).mkv`, not
+/// `part (2).1.mkv`.
+fn split_extension(name: &str) -> (&str, &str) {
+    match name.rfind('.') {
+        Some(position) if position > 0 => (&name[..position], &name[position..]),
+        _ => (name, ""),
+    }
+}
+
+/// Add `number` to a file name, before its extension.
+fn numbered(name: &str, number: u32) -> String {
+    let (stem, extension) = split_extension(name);
+    format!("{stem} ({number}){extension}")
+}
+
+/// Resolve a planned batch against everything that already has the name.
+///
+/// `exists` is asked about a path and answers whether a file is there, which is
+/// the one thing about the filesystem this function needs; keeping it a closure
+/// is what lets the rules be tested without writing anything.
+///
+/// The whole batch is resolved before any of it is queued, and both kinds of
+/// collision go through here: two titles in the batch that resolve to one name,
+/// and a title whose name is already a file on disk. The preference decides both
+/// the same way, so choosing "add a number until the name is free" renumbers a
+/// duplicate title and a file that is already there alike, and choosing "ask me"
+/// refuses the whole batch for either rather than queueing half of it.
+///
+/// The refusal names both titles when the clash is inside the batch and the file
+/// when it is on disk, because those are two different mistakes with two
+/// different fixes: one is a naming pattern to change, the other is a choice
+/// about what to do with a file that is already there.
+pub fn resolve_collisions<F>(
+    planned: Vec<(u32, String)>,
+    policy: CollisionPolicy,
+    exists: F,
+) -> Result<Vec<(u32, String)>, String>
+where
+    F: Fn(&str) -> bool,
+{
+    // What has claimed each name: the title that took it, and whether the claim
+    // came from this batch or from a file that was already on disk.
+    let mut claimed: Vec<(String, Option<u32>)> = Vec::new();
+    let mut kept: Vec<(u32, String)> = Vec::new();
+    let mut renumbered = 0usize;
+    let mut skipped = 0usize;
+
+    for (index, path) in planned {
+        let claim_of = |candidate: &str, claimed: &[(String, Option<u32>)]| {
+            claimed
+                .iter()
+                .find(|(other, _)| other.eq_ignore_ascii_case(candidate))
+                .and_then(|(_, owner)| *owner)
+        };
+        let free = claim_of(&path, &claimed).is_none() && !exists(&path);
+        if free {
+            claimed.push((path.clone(), Some(index)));
+            kept.push((index, path));
+            continue;
+        }
+        match policy {
+            CollisionPolicy::Replace => {
+                claimed.push((path.clone(), Some(index)));
+                kept.push((index, path));
+            }
+            CollisionPolicy::Ask => {
+                let owner = claim_of(&path, &claimed);
+                return Err(match owner {
+                    Some(other) => format!(
+                        "Titles {other} and {index} would both be written to '{path}', so nothing from this batch was queued. Give one of them another name, or choose what a name collision should do in the Output preferences."
+                    ),
+                    None => format!(
+                        "'{path}' is already written, so nothing from this batch was queued. Choose what a name collision should do in the Output preferences."
+                    ),
+                });
+            }
+            CollisionPolicy::Skip => {
+                skipped += 1;
+            }
+            CollisionPolicy::Renumber => {
+                // The stem is what gets numbered, so the extension survives. The
+                // count climbs past everything already holding a name rather than
+                // trying the same number twice.
+                let name = path
+                    .rsplit(['\\', '/'])
+                    .next()
+                    .unwrap_or(path.as_str())
+                    .to_string();
+                let folder = path.rsplit_once(['\\', '/']).map(|(head, _)| head);
+                let mut number = 1u32;
+                loop {
+                    number += 1;
+                    if number > 10_000 {
+                        return Err(format!(
+                            "There is no free file name near '{name}' after {renumbered} renames."
+                        ));
+                    }
+                    let candidate = output_path(folder.unwrap_or(""), &numbered(&name, number));
+                    if claim_of(&candidate, &claimed).is_none() && !exists(&candidate) {
+                        claimed.push((candidate.clone(), Some(index)));
+                        kept.push((index, candidate));
+                        renumbered += 1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if kept.is_empty() && skipped > 0 {
+        return Err(
+            "Every title in this batch has already been written; nothing was queued.".to_string(),
+        );
+    }
+    Ok(kept)
+}
+
+/// One line saying what resolving a batch does, for the activity log.
+///
+/// Replacing is called out on its own because it is the one policy that lets two
+/// titles write the same file: a reader of the log needs to see that the batch
+/// was queued knowing that, not infer it from the fact that two rows share a
+/// name.
+pub fn collision_summary(policy: CollisionPolicy) -> String {
+    format!("name collisions: {}", policy.describe())
 }
 
 /// Build the selection sheet for the titles a scan found.
-pub fn selection_view(
+/// Build the selection sheet.
+///
+/// The plan is built by [`plan`] with the same policy and the same answer to
+/// "is that file already there" that the queue will use, so the names on the
+/// sheet are the names the queue writes — including the ones a collision policy
+/// renumbered.
+pub fn selection_view<F>(
     input: &QueueSelectionInput,
     titles: &[(u32, String, String)],
     extension: &str,
     directory_valid: bool,
     directory_problem: &str,
-) -> QueueSelectionViewModel {
+    policy: CollisionPolicy,
+    exists: F,
+) -> QueueSelectionViewModel
+where
+    F: Fn(&str) -> bool,
+{
     let pattern = if input.name_pattern.trim().is_empty() {
         DEFAULT_NAME_PATTERN.to_string()
     } else {
@@ -928,9 +1122,7 @@ pub fn selection_view(
         })
         .collect();
     let chosen = input.titles.len();
-    let planned: Vec<String> = plan(input, &collect(titles), extension)
-        .map(|planned| planned.into_iter().map(|(_, path)| path).collect())
-        .unwrap_or_default();
+    let planned = plan(input, &collect(titles), extension, policy, &exists);
     let mut problems: Vec<String> = Vec::new();
     if !directory_valid {
         problems.push(directory_problem.to_string());
@@ -941,12 +1133,15 @@ pub fn selection_view(
     if chosen == 0 {
         problems.push("Choose at least one title to queue.".to_string());
     }
-    if let Err(problem) = plan(input, &collect(titles), extension) {
-        if !problems.iter().any(|recorded| recorded == &problem) {
-            problems.push(problem);
+    if let Err(problem) = &planned {
+        if !problems.iter().any(|recorded| recorded == problem) {
+            problems.push(problem.clone());
         }
     }
     let can_queue = problems.is_empty();
+    let planned: Vec<String> = planned
+        .map(|planned| planned.into_iter().map(|(_, path)| path).collect())
+        .unwrap_or_default();
     QueueSelectionViewModel {
         summary: if titles.is_empty() {
             "Scan a source to see the titles it contains.".to_string()
@@ -1413,6 +1608,11 @@ mod tests {
             .contains("120"));
     }
 
+    /// Nothing is on disk, which is the ordinary case for a planner test.
+    fn nothing_there(_path: &str) -> bool {
+        false
+    }
+
     #[test]
     fn two_titles_that_would_write_the_same_file_are_refused_together() {
         let titles = vec![(1, "Episode".to_string()), (2, "Episode".to_string())];
@@ -1422,21 +1622,79 @@ mod tests {
             names: BTreeMap::new(),
             titles: vec![1, 2],
         };
-        let error = plan(&input, &titles, "mp4").expect_err("same file");
+        let error = plan(&input, &titles, "mp4", CollisionPolicy::Ask, nothing_there)
+            .expect_err("same file");
         assert!(error.contains("would both be written"), "{error}");
         assert!(error.contains("C:\\out\\Episode.mp4"), "{error}");
+        assert!(error.contains("Titles 1 and 2"), "{error}");
 
         let mut distinct = input.clone();
         distinct
             .names
             .insert("2".to_string(), "Episode two".to_string());
-        let planned = plan(&distinct, &titles, "mp4").expect("distinct");
+        let planned = plan(
+            &distinct,
+            &titles,
+            "mp4",
+            CollisionPolicy::Ask,
+            nothing_there,
+        )
+        .expect("distinct");
         assert_eq!(
             planned,
             vec![
                 (1, "C:\\out\\Episode.mp4".to_string()),
                 (2, "C:\\out\\Episode two.mp4".to_string())
             ]
+        );
+    }
+
+    #[test]
+    fn a_policy_that_numbers_the_names_shows_the_numbered_names_on_the_sheet() {
+        // The sheet's plan and the queue's plan are the same call, so a preference
+        // that renumbers is visible before the button is pressed rather than only
+        // afterwards.
+        let titles = vec![
+            (1u32, "Episode".to_string(), "facts".to_string()),
+            (2, "Episode".to_string(), "facts".to_string()),
+        ];
+        let input = QueueSelectionInput {
+            output_directory: "C:\\out".to_string(),
+            name_pattern: "{title}".to_string(),
+            names: BTreeMap::new(),
+            titles: vec![1, 2],
+        };
+        let view = selection_view(
+            &input,
+            &titles,
+            "mp4",
+            true,
+            "",
+            CollisionPolicy::Renumber,
+            nothing_there,
+        );
+        assert_eq!(
+            view.planned,
+            vec![
+                "C:\\out\\Episode.mp4".to_string(),
+                "C:\\out\\Episode (2).mp4".to_string()
+            ]
+        );
+        assert!(view.can_queue, "{:?}", view.problems);
+        assert_eq!(
+            plan(
+                &input,
+                &collect(&titles),
+                "mp4",
+                CollisionPolicy::Renumber,
+                nothing_there
+            )
+            .expect("renumbered"),
+            vec![
+                (1, "C:\\out\\Episode.mp4".to_string()),
+                (2, "C:\\out\\Episode (2).mp4".to_string())
+            ],
+            "what the sheet showed is what the queue writes"
         );
     }
 
@@ -1449,18 +1707,24 @@ mod tests {
             names: BTreeMap::new(),
             titles: vec![1],
         };
-        assert!(plan(&input, &titles, "mp4")
-            .expect_err("no folder")
-            .contains("folder"));
+        assert!(
+            plan(&input, &titles, "mp4", CollisionPolicy::Ask, nothing_there)
+                .expect_err("no folder")
+                .contains("folder")
+        );
         input.output_directory = "C:\\out".to_string();
         input.titles.clear();
-        assert!(plan(&input, &titles, "mp4")
-            .expect_err("no titles")
-            .contains("at least one title"));
+        assert!(
+            plan(&input, &titles, "mp4", CollisionPolicy::Ask, nothing_there)
+                .expect_err("no titles")
+                .contains("at least one title")
+        );
         input.titles = vec![9];
-        assert!(plan(&input, &titles, "mp4")
-            .expect_err("unknown title")
-            .contains("no title 9"));
+        assert!(
+            plan(&input, &titles, "mp4", CollisionPolicy::Ask, nothing_there)
+                .expect_err("unknown title")
+                .contains("no title 9")
+        );
     }
 
     #[test]
@@ -1475,7 +1739,15 @@ mod tests {
             names: BTreeMap::new(),
             titles: vec![2],
         };
-        let view = selection_view(&input, &titles, "mp4", true, "");
+        let view = selection_view(
+            &input,
+            &titles,
+            "mp4",
+            true,
+            "",
+            CollisionPolicy::Ask,
+            nothing_there,
+        );
         assert_eq!(view.titles.len(), 2);
         assert!(!view.titles[0].chosen);
         assert!(view.titles[1].chosen);
@@ -1508,7 +1780,15 @@ mod tests {
             names: BTreeMap::new(),
             titles: vec![1, 2],
         };
-        let view = selection_view(&input, &titles, "mp4", true, "");
+        let view = selection_view(
+            &input,
+            &titles,
+            "mp4",
+            true,
+            "",
+            CollisionPolicy::Ask,
+            nothing_there,
+        );
         assert!(view.titles[0].output_collides);
         assert!(view.titles[1].output_collides);
         assert!(!view.can_queue);
@@ -1518,6 +1798,10 @@ mod tests {
                 .any(|p| p.contains("would both be written")),
             "{:?}",
             view.problems
+        );
+        assert!(
+            view.planned.is_empty(),
+            "nothing is planned from a batch that was refused"
         );
     }
 
@@ -1536,6 +1820,8 @@ mod tests {
             "mp4",
             false,
             "Choose a folder to write into.",
+            CollisionPolicy::Ask,
+            nothing_there,
         );
         assert!(!view.can_queue);
         assert!(!view.directory_valid);
@@ -1547,7 +1833,15 @@ mod tests {
     #[test]
     fn a_source_with_no_titles_tells_the_user_to_scan_first() {
         let input = QueueSelectionInput::default();
-        let view = selection_view(&input, &[], "mp4", true, "");
+        let view = selection_view(
+            &input,
+            &[],
+            "mp4",
+            true,
+            "",
+            CollisionPolicy::Ask,
+            nothing_there,
+        );
         assert!(view.titles.is_empty());
         assert!(view.summary.contains("Scan a source"));
         assert!(!view.can_queue);
@@ -1571,5 +1865,178 @@ mod tests {
         assert_eq!(file_name("C:\\media\\a.mkv"), "a.mkv");
         assert_eq!(file_name("a.mkv"), "a.mkv");
         assert_eq!(file_name("  "), "(no source)");
+    }
+
+    // ------------------------------------------------------------- collisions
+
+    fn batch() -> Vec<(u32, String)> {
+        vec![
+            (1, "C:\\out\\Film.mp4".to_string()),
+            (2, "C:\\out\\Film.mp4".to_string()),
+        ]
+    }
+
+    #[test]
+    fn asking_about_a_collision_refuses_the_whole_batch_and_names_the_file() {
+        let error = resolve_collisions(batch(), CollisionPolicy::Ask, |_| false)
+            .expect_err("two titles, one name");
+        assert!(error.contains("Film.mp4"), "{error}");
+        assert!(error.contains("Output preferences"), "{error}");
+        assert!(error.contains("nothing from this batch"), "{error}");
+    }
+
+    #[test]
+    fn a_collision_inside_the_batch_names_both_titles_and_one_on_disk_names_the_file() {
+        // Two different mistakes with two different fixes, so the refusal says
+        // which one it is: a naming pattern to change, or a file that is there.
+        let inside =
+            resolve_collisions(batch(), CollisionPolicy::Ask, |_| false).expect_err("in the batch");
+        assert!(inside.contains("Titles 1 and 2"), "{inside}");
+
+        let on_disk = resolve_collisions(
+            vec![(1, "C:\\out\\Film.mp4".to_string())],
+            CollisionPolicy::Ask,
+            |path| path.ends_with("Film.mp4"),
+        )
+        .expect_err("already written");
+        assert!(on_disk.contains("already written"), "{on_disk}");
+        assert!(!on_disk.contains("Titles"), "{on_disk}");
+    }
+
+    #[test]
+    fn renumbering_resolves_the_batch_together_and_keeps_the_extension() {
+        let resolved =
+            resolve_collisions(batch(), CollisionPolicy::Renumber, |_| false).expect("resolved");
+        assert_eq!(resolved.len(), 2, "nothing is left out");
+        assert_eq!(resolved[0].1, "C:\\out\\Film.mp4");
+        assert_eq!(resolved[1].1, "C:\\out\\Film (2).mp4");
+    }
+
+    #[test]
+    fn renumbering_climbs_past_the_names_that_are_already_taken() {
+        // Nothing is written over: a title whose name is on disk is numbered just
+        // like one whose name an earlier title in the same batch took, because
+        // both would otherwise destroy something.
+        let taken = ["C:\\out\\Film.mp4", "C:\\out\\Film (2).mp4"];
+        let resolved = resolve_collisions(batch(), CollisionPolicy::Renumber, |path| {
+            taken.contains(&path)
+        })
+        .expect("resolved");
+        assert_eq!(resolved[0].1, "C:\\out\\Film (3).mp4");
+        assert_eq!(resolved[1].1, "C:\\out\\Film (4).mp4");
+    }
+
+    #[test]
+    fn renumbering_a_name_with_several_dots_numbers_it_at_the_last_one() {
+        let planned = vec![
+            (1, "C:\\out\\part.1.mkv".to_string()),
+            (2, "C:\\out\\part.1.mkv".to_string()),
+        ];
+        let resolved =
+            resolve_collisions(planned, CollisionPolicy::Renumber, |_| false).expect("resolved");
+        assert_eq!(resolved[1].1, "C:\\out\\part.1 (2).mkv");
+    }
+
+    #[test]
+    fn skipping_leaves_out_the_titles_whose_files_are_there_and_queues_the_rest() {
+        let error = resolve_collisions(batch(), CollisionPolicy::Skip, |path| {
+            path.ends_with("Film.mp4")
+        })
+        .expect_err("nothing is left");
+        assert!(error.contains("already been written"), "{error}");
+
+        let planned = vec![
+            (1, "C:\\out\\Taken.mp4".to_string()),
+            (2, "C:\\out\\Film.mp4".to_string()),
+        ];
+        let resolved = resolve_collisions(planned, CollisionPolicy::Skip, |path| {
+            path.ends_with("Taken.mp4")
+        })
+        .expect("the first is left out");
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].0, 2);
+    }
+
+    #[test]
+    fn a_batch_with_nothing_left_to_queue_is_refused_rather_than_succeeding_with_nothing() {
+        let error = resolve_collisions(batch(), CollisionPolicy::Skip, |_| true)
+            .expect_err("everything is already there");
+        assert!(error.contains("already been written"), "{error}");
+    }
+
+    #[test]
+    fn replacing_keeps_both_titles_pointing_at_the_one_file() {
+        // Replacing is a choice with visible consequences: two titles, one file.
+        // It is honoured because it was asked for, and the summary says what it
+        // means so the log records the decision rather than the outcome.
+        let resolved =
+            resolve_collisions(batch(), CollisionPolicy::Replace, |_| true).expect("replaced");
+        assert_eq!(resolved.len(), 2);
+        assert!(resolved[0].1 == resolved[1].1);
+        assert!(collision_summary(CollisionPolicy::Replace).contains("written over"));
+        assert!(
+            collision_summary(CollisionPolicy::Replace).contains("may share a name"),
+            "the log says what replacing costs, not only what it does"
+        );
+    }
+
+    #[test]
+    fn a_batch_with_no_collisions_is_queued_exactly_as_planned() {
+        let planned = vec![
+            (1, "C:\\out\\One.mp4".to_string()),
+            (2, "C:\\out\\Two.mp4".to_string()),
+        ];
+        for policy in [
+            CollisionPolicy::Ask,
+            CollisionPolicy::Renumber,
+            CollisionPolicy::Skip,
+            CollisionPolicy::Replace,
+        ] {
+            assert_eq!(
+                resolve_collisions(planned.clone(), policy, |_| false).expect("clean"),
+                planned,
+                "{policy:?} leaves a clean batch alone"
+            );
+        }
+    }
+
+    #[test]
+    fn a_name_that_differs_only_in_case_is_still_a_collision() {
+        let planned = vec![
+            (1, "C:\\out\\Film.mp4".to_string()),
+            (2, "C:\\out\\film.mp4".to_string()),
+        ];
+        let error = resolve_collisions(planned.clone(), CollisionPolicy::Ask, |_| false)
+            .expect_err("the same file on a case-insensitive filesystem");
+        assert!(error.contains("would both be written"), "{error}");
+        let resolved =
+            resolve_collisions(planned, CollisionPolicy::Renumber, |_| false).expect("resolved");
+        assert_eq!(resolved[1].1, "C:\\out\\film (2).mp4");
+    }
+
+    #[test]
+    fn the_policy_is_built_from_the_two_preferences_as_one_answer() {
+        use crate::preferences::CollisionPreference;
+        assert_eq!(
+            CollisionPolicy::of(true, CollisionPreference::Ask),
+            CollisionPolicy::Replace,
+            "the switch decides on its own"
+        );
+        assert_eq!(
+            CollisionPolicy::of(false, CollisionPreference::Replace),
+            CollisionPolicy::Replace
+        );
+        assert_eq!(
+            CollisionPolicy::of(false, CollisionPreference::Renumber),
+            CollisionPolicy::Renumber
+        );
+        assert_eq!(
+            CollisionPolicy::of(false, CollisionPreference::Skip),
+            CollisionPolicy::Skip
+        );
+        assert_eq!(
+            CollisionPolicy::of(false, CollisionPreference::Ask),
+            CollisionPolicy::Ask
+        );
     }
 }
