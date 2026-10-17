@@ -51,6 +51,18 @@
       default: false,
       path: ""
     },
+    /* What the window says this window looks like: the theme it resolved and
+       the direction it resolved. Every surface in this document reads these two
+       values, so a dialog cannot end up in a different theme or a different
+       direction from the page behind it.
+
+       Seeded from the document rather than from a pair of constants, because the
+       inline script in the head has already put the window's last answer there
+       and the tab strip answers the arrow keys before the bridge has spoken. */
+    appearance: {
+      theme: document.documentElement.dataset.theme === "dark" ? "dark" : "light",
+      direction: document.documentElement.dir === "rtl" ? "rtl" : "ltr"
+    },
     /* What the countdown alert is holding on the user's behalf. */
     confirm: null,
     alertTimer: null
@@ -168,6 +180,15 @@
   }
 
   /* ---------------------------------------------------------------- bridge */
+
+  /* Where the last answer the window gave is kept.
+   *
+   * The page cannot be told what theme it is in before its first paint, because
+   * the answer arrives over the bridge. The inline script at the top of the
+   * document replays what is stored here so the first frame is already right;
+   * this is a record of what the window said, not a preference of its own.
+   */
+  var APPEARANCE_CACHE_KEY = "vise.appearance";
 
   function unavailable(message) {
     var notice = el("scanNotice");
@@ -1626,6 +1647,15 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       frame.alt = view.titleLabel ? "Still from " + view.titleLabel : "Still frame";
       frame.src = "data:" + view.image.mediaType + ";base64," + view.image.dataBase64;
       stage.appendChild(frame);
+      /* The rectangle the crop is taken from.
+       *
+       * These four are physical on purpose. They place a rectangle drawn over a
+       * picture, and a picture does not mirror when the window does: the left
+       * edge of the frame is the left edge of the frame whichever way the layout
+       * reads, and the drag below reads these same values back to work out what
+       * was drawn. Turning them into logical insets would mirror the rectangle
+       * away from the pixels it names.
+       */
       var overlay = node("div", "crop-overlay");
       overlay.id = "previewCrop";
       overlay.style.left = view.overlay.left * 100 + "%";
@@ -2462,6 +2492,155 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     }
   }
 
+/* -------------------------------------------------------------- appearance */
+
+  /* Paint from what the window decided.
+   *
+   * The page holds the answer and nothing else: the preference, the observation
+   * and the resolution all live in the window, so there is no rule here that
+   * could disagree with what the window would say next. Two attributes go on the
+   * document and the whole page follows them, including every dialog, because
+   * they are all one document reading one pair of values.
+   */
+  function applyAppearance(view) {
+    if (!view) {
+      return null;
+    }
+    state.appearance = view;
+    var root = document.documentElement;
+    root.dataset.theme = view.theme === "dark" ? "dark" : "light";
+    root.dir = view.direction === "rtl" ? "rtl" : "ltr";
+    cacheAppearance(view);
+    renderAppearance(view);
+    return view;
+  }
+
+  function cacheAppearance(view) {
+    try {
+      window.localStorage.setItem(
+        APPEARANCE_CACHE_KEY,
+        JSON.stringify({ theme: view.theme, direction: view.direction })
+      );
+    } catch (error) {
+      // A window with nowhere to keep the answer still paints the theme the
+      // window gave it; the cache only saves the first frame from being wrong.
+    }
+  }
+
+  function refreshAppearance() {
+    return call("appearance_view")
+      .then(applyAppearance)
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function renderAppearance(view) {
+    setText(el("appearanceObservation"), view.observationNote);
+    setText(el("appearanceSummaryText"), view.summary);
+    setText(el("appearanceFlow"), view.flowGlyph);
+    appearanceOptions("appearanceThemeList", "appearanceTheme", view.themeOptions, "set_theme_mode");
+    appearanceOptions(
+      "appearanceDirectionList",
+      "appearanceDirection",
+      view.directionOptions,
+      "set_direction_mode"
+    );
+  }
+
+  /* One renderer for both appearance questions.
+   *
+   * Native radios, so the group gets arrow-key navigation, one tab stop, and the
+   * platform's own announcement, and so the arrow that moves the selection
+   * points the way the row it is in is laid out. The window says which option is
+   * in force and what each one would mean; the page chooses none of them.
+   */
+  function appearanceOptions(listId, group, options, command) {
+    var list = el(listId);
+    if (!list) {
+      return;
+    }
+    clear(list);
+    (options || []).forEach(function (option) {
+      list.appendChild(
+        choiceRow(
+          {
+            id: option.id,
+            label: option.label,
+            facts: option.available ? option.facts : option.reason
+          },
+          group,
+          Boolean(option.selected),
+          !option.available,
+          function () {
+            call(command, { mode: option.id })
+              .then(applyAppearance)
+              .catch(function (error) {
+                notice("error", "That could not be saved: " + error);
+                // The window refused it, so the control goes back to where the
+                // window says it is: the page does not keep a preference that was
+                // not accepted.
+                refreshAppearance();
+              });
+          }
+        )
+      );
+    });
+  }
+
+  /* Report what this machine is doing, and take the answer.
+   *
+   * Two sensors on the same question, both of them reporters: the media query
+   * tells the window which way `prefers-color-scheme` is pointing, and the
+   * window pushes a change of its own on the platforms that report one to the
+   * window rather than to the page. Neither decides anything; both arrive at the
+   * same observation in the window, so the two cannot produce two themes.
+   */
+  function watchSystem() {
+    var first = reportLocale().then(function (view) {
+      /* A locale report that never arrived must not cost the window its pickers,
+         and asking for the answer on its own needs no locale, so the one call
+         that has no dependency stands in for it. */
+      return view || refreshAppearance();
+    });
+    if (window.matchMedia) {
+      var query = window.matchMedia("(prefers-color-scheme: dark)");
+      var report = function () {
+        call("report_system_theme", { dark: query.matches })
+          .then(applyAppearance)
+          .catch(function () {
+            return null;
+          });
+      };
+      if (typeof query.addEventListener === "function") {
+        query.addEventListener("change", report);
+      } else if (typeof query.addListener === "function") {
+        query.addListener(report);
+      }
+      /* The query is reported once as well as on every change: the window is the
+         authority from the moment the page has spoken once, so a machine that
+         already had its dark theme set before the window opened is recorded as
+         the page reading it rather than as the platform having said so. */
+      report();
+    }
+    if (bridge && bridge.event && typeof bridge.event.listen === "function") {
+      bridge.event.listen("appearance-changed", function (event) {
+        applyAppearance(event && event.payload);
+      });
+    }
+    return first;
+  }
+
+  function reportLocale() {
+    var languages = window.navigator && navigator.languages;
+    var locale = (languages && languages[0]) || (window.navigator && navigator.language) || "";
+    return call("report_locale", { locale: locale })
+      .then(applyAppearance)
+      .catch(function () {
+        return null;
+      });
+  }
+
 /* ------------------------------------------------------------------- tabs */
 
   /* Fill a single-choice control from the view model.
@@ -2703,7 +2882,9 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
    *
    * One tab stop for the whole strip, arrow keys to move between tabs, Home and
    * End for the ends: that is what the platform does, so it is what a keyboard
-   * here expects to do.
+   * here expects to do. The arrows are the platform's too, which means they point
+   * the way the strip is laid out, so a mirrored strip swaps them rather than
+   * becoming unreachable with one of them.
    */
   function renderTabStrip(tabs) {
     var list = el("tabList");
@@ -2731,9 +2912,23 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
   }
 
   function activateTab(id) {
-    if (!state.tabs || state.tabs.active === id) {
+    if (!state.tabs) {
       return;
     }
+    var known = state.tabs.tabs.some(function (tab) {
+      return tab.id === id;
+    });
+    if (!known || state.tabs.active === id) {
+      return;
+    }
+    /* What is on screen is the answer to "which tab am I on", so the stored copy
+       is moved to it rather than left naming the tab the window last reported.
+       Left naming the old one means the strip can be walked off a tab but never
+       back onto it: the arrow key homewards is compared against a tab that is
+       no longer showing, matches, and does nothing. The next read from the
+       window replaces this anyway, and it is the window that decides which tab
+       is active in the first place. */
+    state.tabs.active = id;
     showPanels({ tabs: state.tabs.tabs, active: id });
     run("set_active_tab", { tab: id }, "Could not switch tabs.");
   }
@@ -2751,12 +2946,26 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     });
   }
 
+  /* Which way the strip is laid out, from what the window resolved.
+   *
+   * Home and End do not move: they go to the first and last tab either way,
+   * which is where they sit on screen.
+   */
+  function tabArrows() {
+    var mirrored = state.appearance.direction === "rtl";
+    return {
+      forwards: mirrored ? "ArrowLeft" : "ArrowRight",
+      backwards: mirrored ? "ArrowRight" : "ArrowLeft"
+    };
+  }
+
   function handleTabKeys(event, list, index) {
     var last = list.length - 1;
     var next = null;
-    if (event.key === "ArrowRight") {
+    var arrows = tabArrows();
+    if (event.key === arrows.forwards) {
       next = index === last ? 0 : index + 1;
-    } else if (event.key === "ArrowLeft") {
+    } else if (event.key === arrows.backwards) {
       next = index === 0 ? last : index - 1;
     } else if (event.key === "Home") {
       next = 0;
@@ -3616,6 +3825,11 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       .catch(function (error) {
         notice("error", "The windows could not be read: " + error);
       });
+    /* The theme and the direction are independent of the rest of the window, so
+       they are asked for alongside it rather than in front of it: the inline
+       script has already put the last answer on the document, so nothing waits
+       on this to be readable. */
+    watchSystem();
     window.setInterval(pollWindows, 1500);
   }
 

@@ -1,10 +1,64 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Vise Transcoder</title>
 <link rel="stylesheet" href="styles.css" />
+<script>
+/* Put the theme and the direction on the document before anything is painted.
+ *
+ * The window decides both and the page is told them, but the page cannot be told
+ * them before its first paint: the answer arrives over the bridge, which is a
+ * round trip later. So the last answer the window gave is kept here and replayed
+ * synchronously, which means a window that has been opened before opens in the
+ * theme it was left in rather than flashing the other one.
+ *
+ * This is a record of what the window said, not a preference of its own. There is
+ * no rule in this file: a cached answer is applied exactly as it was given, a
+ * missing one falls back to the media query the stylesheet already follows, and
+ * the first answer from the window replaces both.
+ *
+ * The locale read below is a report of what this machine is set to, not a
+ * decision about it — the same fact the window reads from the environment, read
+ * here only because it is available before the first paint. It is used only when
+ * there is no cached answer, so the first ever launch in a right-to-left locale
+ * mirrors immediately rather than after a round trip.
+ */
+(function () {
+  var root = document.documentElement;
+  var cached = null;
+  try {
+    cached = window.localStorage.getItem("vise.appearance");
+  } catch (error) {
+    cached = null;
+  }
+  if (cached) {
+    try {
+      var answer = JSON.parse(cached);
+      if (answer && (answer.theme === "light" || answer.theme === "dark")) {
+        root.dataset.theme = answer.theme;
+      }
+      if (answer && (answer.direction === "ltr" || answer.direction === "rtl")) {
+        root.dir = answer.direction;
+      }
+    } catch (error) {
+      cached = null;
+    }
+  }
+  if (!root.dataset.theme) {
+    /* Right-to-left languages, spelled the way the window spells them. A locale
+       this does not know reads left to right, which is what the window does for
+       one it cannot name. */
+    var language = (window.navigator && navigator.language) || "";
+    var first = String(language).split("-")[0].toLowerCase();
+    var mirrored = ["ar", "fa", "he", "ur", "ps", "yi", "dv", "sd", "ug", "ku", "ckb"];
+    if (mirrored.indexOf(first) !== -1) {
+      root.dir = "rtl";
+    }
+  }
+})();
+</script>
 </head>
 <body>
 <header class="masthead">
@@ -16,6 +70,32 @@
      offers gets a control that opens it, and a surface it does not offer has
      no control at all. -->
 <nav class="toolbar" id="toolbar" aria-label="Windows and dialogs"></nav>
+
+<!-- Theme and layout direction. Every control here is a preference the window
+     holds and resolves; the line underneath says what the window resolved and
+     why, so the user never has to work out which of the two systems the colours
+     on screen came from. -->
+<section class="card full" aria-labelledby="appearanceHeading">
+  <div class="card-head">
+    <h2 id="appearanceHeading">Appearance</h2>
+    <span class="hint" id="appearanceObservation"></span>
+  </div>
+
+  <div class="appearance">
+    <fieldset>
+      <legend>Theme</legend>
+      <div class="rules" id="appearanceThemeList"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Layout direction</legend>
+      <div class="rules" id="appearanceDirectionList"></div>
+    </fieldset>
+  </div>
+
+  <p class="appearance-summary" id="appearanceSummary" role="status" aria-live="polite"><span
+       class="icon-flow" id="appearanceFlow" aria-hidden="true"></span><span
+       id="appearanceSummaryText"></span></p>
+</section>
 
 <main class="layout">
   <section class="card" aria-labelledby="sourceHeading">
@@ -32,7 +112,7 @@
     <div class="row">
       <div class="grow">
         <label for="pathInput">Source path</label>
-        <input type="text" id="pathInput" spellcheck="false" autocomplete="off"
+        <input type="text" id="pathInput" spellcheck="false" autocomplete="off" dir="ltr"
                placeholder="C:\media\movie.mkv" aria-describedby="pathHint" />
       </div>
       <button type="button" id="openBtn">Open</button>
@@ -42,8 +122,8 @@
 
     <div class="source-current" id="sourceCurrent" hidden>
       <span class="chip" id="sourceKind"></span>
-      <span class="name" id="sourceName"></span>
-      <span class="location" id="sourceLocation"></span>
+      <span class="name ltr" id="sourceName"></span>
+      <span class="location ltr" id="sourceLocation"></span>
     </div>
 
     <div class="status" role="status" aria-live="polite" aria-atomic="true">
@@ -350,7 +430,7 @@
             <div class="row">
               <div class="grow">
                 <label for="externalSubtitle">Subtitle file path</label>
-                <input type="text" id="externalSubtitle" spellcheck="false" autocomplete="off"
+                <input type="text" id="externalSubtitle" spellcheck="false" autocomplete="off" dir="ltr"
                        placeholder="C:\media\extra.srt" aria-describedby="externalSubtitleHint" />
               </div>
               <button type="button" id="importSubtitlesBtn">Import</button>
@@ -436,7 +516,7 @@
       <div class="row queue-row">
             <div class="grow">
               <label for="outPath">Output path</label>
-              <input type="text" id="outPath" spellcheck="false" autocomplete="off"
+              <input type="text" id="outPath" spellcheck="false" autocomplete="off" dir="ltr"
                      placeholder="C:\media\out.mp4" />
             </div>
             <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
