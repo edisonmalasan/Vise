@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::preferences::{
     want_one_of, ActionViewModel, ChoiceGroupViewModel, FactViewModel, PreferenceTabViewModel,
+    TextViewModel,
 };
 use crate::tabs::common::ChoiceOption;
 
@@ -26,6 +27,8 @@ use crate::tabs::common::ChoiceOption;
 pub const FREQUENCY: &str = "updates.frequency";
 /// Field identifier for the release channel.
 pub const CHANNEL: &str = "updates.channel";
+/// Field identifier for where the release feed is.
+pub const FEED_URL: &str = "updates.feed_url";
 
 /// How often a newer release is looked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -189,6 +192,12 @@ pub struct UpdateSettings {
     pub frequency: CheckFrequency,
     /// Which releases are followed.
     pub channel: UpdateChannel,
+    /// Where the release feed is, when one has been configured.
+    ///
+    /// Empty by default and refused unless it is an https address: a build with no
+    /// feed contacts nobody, which is the only safe answer for a machine that has
+    /// never been asked about this.
+    pub feed_url: String,
 }
 
 impl Default for UpdateSettings {
@@ -202,13 +211,38 @@ impl UpdateSettings {
     ///
     /// A weekly look on the stable channel: often enough that a security fix is
     /// not months away, rarely enough that an application that opens every day
-    /// is not asking the network every day for nothing.
+    /// is not asking the network every day for nothing. No feed, because a build
+    /// that invented one would be a build contacting a server nobody chose.
     pub fn new() -> Self {
         Self {
             frequency: CheckFrequency::Weekly,
             channel: UpdateChannel::Stable,
+            feed_url: String::new(),
         }
     }
+
+    /// Whether a feed has been configured at all.
+    pub fn has_feed(&self) -> bool {
+        !self.feed_url.trim().is_empty()
+    }
+}
+
+/// Read a feed address, refusing one this build will not fetch.
+///
+/// Refused here rather than at the check, because the whole point of the rule is
+/// that a control cannot store an answer nothing will act on.
+pub fn read_feed(value: &serde_json::Value) -> Result<String, String> {
+    let text = crate::preferences::want_text(FEED_URL, value)?;
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Ok(String::new());
+    }
+    if !crate::system::updates::is_allowed_url(trimmed) {
+        return Err(format!(
+            "A release feed has to be an https address, not '{trimmed}'."
+        ));
+    }
+    Ok(trimmed.to_string())
 }
 
 /// The problems these preferences have.
@@ -314,15 +348,37 @@ pub fn civil_from_days(days: i64) -> (u32, u32, u32) {
     )
 }
 
-/// Why the control that would fetch a release is closed.
+/// Why the control that would fetch a release is closed when nothing has been
+/// configured.
 ///
-/// Named rather than hidden, because a preferences tab that stops halfway down
-/// its list reads as an oversight, and a reason turns it into an answer.
-pub const NO_CHECKER_REASON: &str =
-    "This build does not contact a release server, so there is nothing to check yet. The frequency and the channel are stored and are what a checker would read.";
+/// Named rather than hidden, because a preferences tab that stops halfway down its
+/// list reads as an oversight, and a reason turns it into an answer.
+pub const NO_FEED_REASON: &str =
+    "No release feed is configured, so there is nothing to look at. The frequency and the channel are stored and are what a checker would read.";
+
+/// Why the control is closed when this build cannot fetch anything.
+///
+/// Two answers rather than one: a build with no way to reach the network and a
+/// build whose network tool is not installed are different problems, and a user who
+/// installs the tool should be told that rather than told the build is incapable.
+pub fn no_source_reason(source: &crate::system::updates::CurlSource) -> String {
+    format!(
+        "{}, and it is {} on this machine, so there is nothing to check yet.",
+        crate::system::updates::AppcastSource::describe(source),
+        if source.installed() {
+            "available"
+        } else {
+            "not installed"
+        }
+    )
+}
 
 /// Build the updates tab.
-pub fn tab_view(settings: &UpdateSettings, today: (u32, u32, u32)) -> PreferenceTabViewModel {
+pub fn tab_view(
+    settings: &UpdateSettings,
+    today: (u32, u32, u32),
+    last: &crate::system::updates::UpdateState,
+) -> PreferenceTabViewModel {
     let mut tab = PreferenceTabViewModel::empty(
         "updates",
         "Updates",
@@ -383,14 +439,57 @@ pub fn tab_view(settings: &UpdateSettings, today: (u32, u32, u32)) -> Preference
             "The frequency is never, so no release is looked for.",
         ),
     });
-    tab.actions.push(
-        ActionViewModel::new(
-            "preferencesCheckNow",
-            "Look for a release now",
-            "Asks the release server what the newest build is.",
+    // The feed is the only address this build will ever contact, so it is a field
+    // the user types rather than one this build ships: a build that invented an
+    // address would be a build contacting a server nobody chose.
+    tab.texts.push(
+        TextViewModel::new(
+            "updatesFeedUrl",
+            "Release feed",
+            &settings.feed_url,
+            "https://example.invalid/vise/appcast.xml",
         )
-        .blocked(NO_CHECKER_REASON),
+        .with_hint(
+            "Where the list of releases is fetched from. Only https is accepted, and an empty value means nothing is contacted at all.",
+        ),
     );
+    tab.facts.push(match settings.has_feed() {
+        true => FactViewModel::present(
+            "updatesFeed",
+            "Release feed",
+            settings.feed_url.trim().to_string(),
+        ),
+        false => FactViewModel::unknown(
+            "updatesFeed",
+            "Release feed",
+            "no feed is configured, so no release is looked for",
+        ),
+    });
+    tab.facts.push(match &last.outcome {
+        Some(_) if !last.summary.is_empty() => {
+            FactViewModel::present("updatesLast", "Last check", last.summary.clone())
+        }
+        _ => FactViewModel::unknown(
+            "updatesLast",
+            "Last check",
+            "nothing has been looked for yet",
+        ),
+    });
+    // The control is on offer only when there is somewhere to look and this build
+    // can reach it: a button that is pressed and does nothing is the one thing
+    // worse than a button that is not there.
+    let source = crate::system::updates::CurlSource::default();
+    let mut check = ActionViewModel::new(
+        "preferencesCheckNow",
+        "Look for a release now",
+        "Fetches the release feed and says what it offers. Nothing is downloaded and nothing is installed.",
+    );
+    if !settings.has_feed() {
+        check = check.blocked(NO_FEED_REASON);
+    } else if !crate::system::updates::AppcastSource::available(&source) {
+        check = check.blocked(no_source_reason(&source));
+    }
+    tab.actions.push(check);
     tab.problems = validate(settings);
     tab.ready = tab.problems.is_empty();
     tab
@@ -511,12 +610,16 @@ mod tests {
     fn the_control_that_would_fetch_something_is_closed_with_the_reason() {
         // Storing a frequency nobody reads would be the defect this closes
         // against, so the reason says what is missing rather than apologising.
-        let view = tab_view(&UpdateSettings::new(), (2026, 10, 17));
+        let view = tab_view(
+            &UpdateSettings::new(),
+            (2026, 10, 17),
+            &crate::system::updates::UpdateState::new(),
+        );
         let control = &view.actions[0];
         assert_eq!(control.id, "preferencesCheckNow");
         assert!(!control.available);
         assert!(
-            control.reason.contains("release server"),
+            control.reason.contains("release feed"),
             "{}",
             control.reason
         );
@@ -538,7 +641,11 @@ mod tests {
             "the stored frequency becomes a date"
         );
         assert!(view.numbers.is_empty(), "{:?}", view.numbers);
-        assert!(view.texts.is_empty(), "{:?}", view.texts);
+        // The one text field is the feed: everything else on this tab is a choice or
+        // a read-out, because those are all this build decides for itself.
+        assert_eq!(view.texts.len(), 1, "{:?}", view.texts);
+        assert_eq!(view.texts[0].id, "updatesFeedUrl");
+        assert_eq!(view.texts[0].text, "", "no feed by default");
         assert!(view.ready, "{:?}", view.problems);
     }
 
@@ -548,7 +655,11 @@ mod tests {
             frequency: CheckFrequency::Never,
             ..UpdateSettings::new()
         };
-        let view = tab_view(&settings, (2026, 10, 17));
+        let view = tab_view(
+            &settings,
+            (2026, 10, 17),
+            &crate::system::updates::UpdateState::new(),
+        );
         assert!(
             !view.facts[0].available,
             "no interval when nothing is checked"

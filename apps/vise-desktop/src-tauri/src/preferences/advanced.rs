@@ -23,8 +23,8 @@ use serde::{Deserialize, Serialize};
 use vise_ipc::contract::LogLevel;
 
 use crate::preferences::{
-    want_one_of, ChoiceGroupViewModel, FactViewModel, IsolationAvailability,
-    PreferenceTabViewModel, ToggleViewModel,
+    want_one_of, ChoiceGroupViewModel, FactViewModel, IsolationAvailability, NumberViewModel,
+    PreferenceTabViewModel, TextViewModel, ToggleViewModel,
 };
 use crate::tabs::common::ChoiceOption;
 
@@ -34,6 +34,45 @@ pub const PROCESS_ISOLATION: &str = "advanced.process_isolation";
 pub const LOG_LEVEL: &str = "advanced.log_level";
 /// Field identifier for the worker priority.
 pub const PROCESS_PRIORITY: &str = "advanced.process_priority";
+/// Field identifier for keeping the machine awake while an encode runs.
+pub const PREVENT_SLEEP: &str = "advanced.prevent_sleep";
+/// Field identifier for what the machine keeps doing while it is held awake.
+pub const POWER_SCOPE: &str = "advanced.power_scope";
+/// Field identifier for where the worker is placed on a machine with several
+/// processor groups.
+pub const NUMA_MODE: &str = "advanced.numa_mode";
+/// Field identifier for the command run before an encode.
+pub const PRE_ACTION: &str = "advanced.pre_action";
+/// Field identifier for the command run after an encode.
+pub const POST_ACTION: &str = "advanced.post_action";
+/// Field identifier for how long either command may run.
+pub const ACTION_TIMEOUT: &str = "advanced.action_timeout_seconds";
+/// Field identifier for what happens when a pre-encode command does not work.
+pub const ACTION_ON_FAILURE: &str = "advanced.action_on_failure";
+/// Field identifier for whether notifications are shown at all.
+pub const NOTIFICATIONS: &str = "advanced.notifications";
+/// Field identifier for which events become notifications.
+pub const NOTIFICATION_SCOPE: &str = "advanced.notification_scope";
+
+/// The names `POWER_SCOPE` accepts.
+pub const POWER_VALUES: [&str; 2] = ["system", "system_and_display"];
+
+/// The names `NOTIFICATION_SCOPE` accepts.
+pub const NOTIFICATION_SCOPES: [&str; 3] = ["never", "failures", "all"];
+
+/// The names `NUMA_MODE` accepts on a machine that reported its layout.
+///
+/// Built from the layout rather than written down, because offering a group the
+/// machine does not have is a control that cannot be honoured — and a machine that
+/// could not be asked gets only the two answers that do not need one.
+pub fn numa_values(groups: u16) -> Vec<String> {
+    let mut values = vec![vise_ipc::numa::NumaMode::Auto.id()];
+    for group in 0..groups {
+        values.push(vise_ipc::numa::pin_id(group));
+    }
+    values.push(vise_ipc::numa::NumaMode::Off.id());
+    values
+}
 
 /// Read a log level the interface layer sent.
 ///
@@ -155,6 +194,24 @@ pub struct AdvancedSettings {
     pub log_level: LogLevel,
     /// What the worker asks the platform for.
     pub process_priority: PriorityPreference,
+    /// Whether the machine is held awake while an encode runs.
+    pub prevent_sleep: bool,
+    /// What the machine keeps doing while it is held awake.
+    pub power_scope: String,
+    /// Where the worker is placed on a machine with several processor groups.
+    pub numa_mode: String,
+    /// The command run before each encode.
+    pub pre_action: String,
+    /// The command run after each encode.
+    pub post_action: String,
+    /// How long either command may run, in seconds.
+    pub action_timeout_seconds: u32,
+    /// What happens when a pre-encode command does not work.
+    pub action_on_failure: i32,
+    /// Whether notifications are shown outside the window.
+    pub notifications: bool,
+    /// Which events are turned into notifications.
+    pub notification_scope: String,
 }
 
 impl Default for AdvancedSettings {
@@ -170,31 +227,119 @@ impl AdvancedSettings {
     /// it. The log level is `info`, which is what keeps a failure explainable
     /// without turning a long encode into thousands of lines. The priority is
     /// normal, because a build that takes more of the machine than it was given
-    /// is a build nobody leaves running.
+    /// is a build nobody leaves running. The machine is held awake while encoding,
+    /// because a sleep halfway through a five-hour encode costs the five hours;
+    /// the display is not held, because nobody watches a progress bar for that
+    /// long. There are no commands around the encode, because a build that ran
+    /// something nobody asked for would be a build nobody could reason about.
     pub fn new() -> Self {
         Self {
             process_isolation: true,
             log_level: LogLevel::Info,
             process_priority: PriorityPreference::Normal,
+            prevent_sleep: true,
+            power_scope: vise_ipc::power::PowerScope::System.id().to_string(),
+            numa_mode: vise_ipc::numa::NumaMode::Auto.id(),
+            pre_action: String::new(),
+            post_action: String::new(),
+            action_timeout_seconds: 300,
+            action_on_failure: 0,
+            notifications: true,
+            notification_scope: crate::system::notify::NotifyScope::All.id().to_string(),
+        }
+    }
+
+    /// What the machine should keep doing while it is held awake.
+    pub fn power(&self) -> vise_ipc::power::PowerScope {
+        vise_ipc::power::PowerScope::of(&self.power_scope)
+    }
+
+    /// Where the worker should be placed.
+    pub fn numa(&self) -> vise_ipc::numa::NumaMode {
+        vise_ipc::numa::read_mode(&self.numa_mode)
+    }
+
+    /// Which events are turned into notifications.
+    pub fn notification_scope(&self) -> crate::system::notify::NotifyScope {
+        crate::system::notify::NotifyScope::of(&self.notification_scope)
+    }
+
+    /// The resolved action settings, as the encode paths read them.
+    pub fn actions(&self) -> ActionSettings {
+        ActionSettings {
+            pre: self.pre_action.clone(),
+            post: self.post_action.clone(),
+            timeout: self.action_timeout_seconds,
+            on_failure: self.action_on_failure,
+        }
+    }
+}
+
+/// The commands that run around an encode, as one value.
+///
+/// Gathered here rather than read field by field at three call sites, so that the
+/// timeout and the failure rule that apply to one apply to the other.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ActionSettings {
+    /// The command run before each encode.
+    pub pre: String,
+    /// The command run after each encode.
+    pub post: String,
+    /// How long either command may run, in seconds.
+    pub timeout: u32,
+    /// What happens when a pre-encode command does not work.
+    pub on_failure: i32,
+}
+
+impl Default for ActionSettings {
+    fn default() -> Self {
+        Self {
+            pre: String::new(),
+            post: String::new(),
+            timeout: 300,
+            on_failure: 0,
         }
     }
 }
 
 /// The problems these preferences have.
 ///
-/// There are none this build can find, and that is a fact rather than an omission:
-/// all three are stored as closed enumerations or as a boolean, so a record that
-/// held a value this build cannot use was already refused as unreadable when it
-/// was read. The rule is kept because the tab builds its problem list from it and
-/// because it is where the next rule belongs.
-pub fn validate(_settings: &AdvancedSettings) -> Vec<String> {
-    Vec::new()
+/// Two rules, both about commands rather than about switches. A command that does
+/// not tokenise is a command the user has not finished writing, and storing it as
+/// though it worked would make the encode fail later with a message about the
+/// encode; and a timeout of no seconds is not a timeout at all.
+pub fn validate(settings: &AdvancedSettings) -> Vec<String> {
+    let mut problems = Vec::new();
+    for (label, command) in [
+        ("the pre-encode command", &settings.pre_action),
+        ("the post-encode command", &settings.post_action),
+    ] {
+        if command.trim().is_empty() {
+            continue;
+        }
+        if let Err(reason) = crate::system::actions::tokenize(command) {
+            problems.push(format!("{label} cannot be read: {reason}."));
+        }
+    }
+    if settings.action_timeout_seconds == 0 {
+        problems
+            .push("A command around an encode needs a timeout of at least one second.".to_string());
+    }
+    problems
 }
 
 /// Build the advanced tab.
+///
+/// The controls here are the ones this build can carry out: what the machine is
+/// held awake for, where the worker is placed, the two commands around an encode,
+/// and what is turned into a notification. Each names the code path that reads it,
+/// and the read-outs under them are values rather than fields, so there is no
+/// second answer to the same question anywhere on the tab.
 pub fn tab_view(
     settings: &AdvancedSettings,
     isolation: &IsolationAvailability,
+    machine: &MachineFacts,
 ) -> PreferenceTabViewModel {
     let mut tab = PreferenceTabViewModel::empty(
         "advanced",
@@ -273,9 +418,240 @@ pub fn tab_view(
         ),
     ));
 
+    tab.toggles.push(ToggleViewModel::new(
+        "advancedPreventSleep",
+        "Keep the machine awake while an encode runs",
+        "The machine is held awake for as long as the pipeline is running, and let go the moment it stops. The worker holds it when the encoder is a separate process, and this window does when the pipeline runs inside it.",
+        settings.prevent_sleep,
+    ));
+    let scope = vise_ipc::power::PowerScope::of(&settings.power_scope);
+    tab.choices.push(
+        ChoiceGroupViewModel::build(
+            POWER_SCOPE,
+            "What stays on",
+            "Only used while the machine is being held awake.",
+            scope.id(),
+            &[
+                vise_ipc::power::PowerScope::System,
+                vise_ipc::power::PowerScope::SystemAndDisplay,
+            ]
+            .iter()
+            .map(|value| ChoiceOption::new(value.id(), value.label()))
+            .collect::<Vec<_>>(),
+            power_available(),
+            if power_available() {
+                ""
+            } else {
+                "this platform cannot hold the machine awake, so what stays on has nothing to do"
+            },
+        )
+        .with_hint(scope.effect()),
+    );
+
+    let topology = machine.topology.clone();
+    let off = vise_ipc::numa::NumaMode::Off;
+    let auto = vise_ipc::numa::NumaMode::Auto;
+    let placement_options: Vec<ChoiceOption> = [ChoiceOption::new(&auto.id(), "Let Vise decide")]
+        .into_iter()
+        .chain((0..topology.groups).map(|group| {
+            let id = vise_ipc::numa::pin_id(group);
+            let label = vise_ipc::numa::NumaMode::PinTo(group).label();
+            ChoiceOption::new(&id, &label)
+        }))
+        .chain([{
+            let label = off.label();
+            ChoiceOption::new("off", &label)
+        }])
+        .collect();
+    tab.choices.push(
+        ChoiceGroupViewModel::build(
+            NUMA_MODE,
+            "Where the worker runs",
+            "Asked for on the worker itself, because a process can restrict itself where nothing else can restrict it reliably.",
+            &settings.numa_mode,
+            &placement_options,
+            topology.measured(),
+            if topology.measured() {
+                ""
+            } else {
+                "this machine did not report its processor layout, so there is nothing to choose"
+            },
+        )
+        .with_hint(settings.numa().effect()),
+    );
+    tab.facts.push(match machine.topology.measured() {
+        true => FactViewModel::present(
+            "advancedTopology",
+            "Processor layout",
+            machine.topology.describe(),
+        ),
+        false => FactViewModel::unknown(
+            "advancedTopology",
+            "Processor layout",
+            machine.topology.describe(),
+        ),
+    });
+    let placement = vise_ipc::numa::placement_for(
+        &machine.topology,
+        settings.numa(),
+        vise_ipc::numa::WorkerPriority::of(settings.process_priority.level()),
+    );
+    tab.facts.push(FactViewModel::present(
+        "advancedPlacement",
+        "Where it will run",
+        placement.reason,
+    ));
+
+    tab.texts.push(
+        TextViewModel::new(
+            "advancedPreAction",
+            "Command to run before an encode",
+            &settings.pre_action,
+            "notify.exe %output%",
+        )
+        .with_hint(
+            "The program and its arguments, with %output%, %input%, %title%, %job_id%, %container%, and %folder% replaced. There is no shell: the program is started directly, so a title containing & or ; is only a file name.",
+        ),
+    );
+    tab.texts.push(
+        TextViewModel::new(
+            "advancedPostAction",
+            "Command to run after an encode",
+            &settings.post_action,
+            r#"copy.exe %output% %folder%\library"#,
+        )
+        .with_hint(
+            "Runs after the file is written, whether the encode worked or not. Nothing it does can fail an encode that is already finished.",
+        ),
+    );
+    tab.numbers.push(
+        NumberViewModel::new(
+            "advancedActionTimeout",
+            "How long either command may run",
+            &settings.action_timeout_seconds.to_string(),
+            "seconds",
+        )
+        .with_hint("A command that takes longer is stopped so the queue is not held up."),
+    );
+    tab.choices.push(
+        ChoiceGroupViewModel::build(
+            ACTION_ON_FAILURE,
+            "When the command before an encode does not work",
+            "A command that fails can either be reported and carried on past, or stop the encode before it starts.",
+            if settings.action_on_failure < 0 {
+                "stop_encode"
+            } else {
+                "continue"
+            },
+            &[
+                ChoiceOption::new("continue", "Carry on and say what happened"),
+                ChoiceOption::new("stop_encode", "Do not start the encode"),
+            ],
+            true,
+            "",
+        )
+        .with_hint(
+            "A command that cannot be read at all always stops the encode: running nothing is not what a command is for.",
+        ),
+    );
+    let pre = settings.pre_action.trim();
+    let post = settings.post_action.trim();
+    tab.facts.push(FactViewModel::present(
+        "advancedActions",
+        "Commands around an encode",
+        if pre.is_empty() && post.is_empty() {
+            "none are configured".to_string()
+        } else {
+            format!(
+                "{} before, {} after",
+                if pre.is_empty() { "none" } else { "one" },
+                if post.is_empty() { "none" } else { "one" }
+            )
+        },
+    ));
+
+    tab.toggles.push(ToggleViewModel::new(
+        "advancedNotifications",
+        "Show notifications outside the window",
+        "A notification reaches somebody who is not looking at this window. Everything decided is written to the activity log either way.",
+        settings.notifications,
+    ));
+    tab.choices.push(
+        ChoiceGroupViewModel::build(
+            NOTIFICATION_SCOPE,
+            "What a notification is about",
+            "A queue that finishes where you can see it finishing is not a notification.",
+            settings.notification_scope().id(),
+            &crate::system::notify::NotifyScope::ALL
+                .iter()
+                .map(|scope| ChoiceOption::new(scope.id(), scope.label()))
+                .collect::<Vec<_>>(),
+            true,
+            "",
+        )
+        .with_hint(settings.notification_scope().hint()),
+    );
+    tab.facts.push(match machine.notifications.available {
+        true => FactViewModel::present(
+            "advancedNotifier",
+            "Where notifications are shown",
+            machine.notifications.description.clone(),
+        ),
+        false => FactViewModel::missing(
+            "advancedNotifier",
+            "Where notifications are shown",
+            machine.notifications.description.clone(),
+        ),
+    });
+
     tab.problems = validate(settings);
     tab.ready = tab.problems.is_empty();
     tab
+}
+
+/// What the machine was found to be, as the Advanced tab shows it.
+///
+/// Detection is asked once and held, like the hardware tab's: a layout and a
+/// notification area are both things a window asks the platform about rather than
+/// something it can work out for itself on every paint.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MachineFacts {
+    /// The processor layout the machine reported.
+    pub topology: vise_ipc::numa::Topology,
+    /// Whether this platform can hold the machine awake.
+    pub power_available: bool,
+    /// The notifications this window can show.
+    pub notifications: crate::system::notify::NotificationState,
+}
+
+impl Default for MachineFacts {
+    fn default() -> Self {
+        MachineFacts {
+            topology: vise_ipc::numa::topology(),
+            power_available: vise_ipc::power::available(),
+            notifications: crate::system::notify::NotificationState {
+                available: false,
+                description: "the window has not looked yet".to_string(),
+                scope: crate::system::notify::NotifyScope::All,
+                window_visible: false,
+            },
+        }
+    }
+}
+
+impl MachineFacts {
+    /// The facts of a window that has found out what this machine can do.
+    pub fn of(notifications: crate::system::notify::NotificationState) -> MachineFacts {
+        MachineFacts {
+            notifications,
+            ..MachineFacts::default()
+        }
+    }
+}
+
+/// Whether this platform can hold the machine awake.
+pub fn power_available() -> bool {
+    vise_ipc::power::available()
 }
 
 /// What a log level keeps, in words, for the line under the control.
@@ -306,6 +682,10 @@ mod tests {
 
     fn available() -> IsolationAvailability {
         IsolationAvailability { blocked: None }
+    }
+
+    fn machine() -> MachineFacts {
+        MachineFacts::default()
     }
 
     fn taken(reason: &str) -> IsolationAvailability {
@@ -371,10 +751,23 @@ mod tests {
 
     #[test]
     fn the_tab_shows_the_log_level_the_window_and_the_worker_share() {
-        let view = tab_view(&AdvancedSettings::new(), &available());
-        assert_eq!(view.toggles.len(), 1);
-        assert_eq!(view.toggles[0].id, "advancedProcessIsolation");
-        assert!(view.toggles[0].available);
+        let view = tab_view(&AdvancedSettings::new(), &available(), &machine());
+        // Three switches, each a thing the window acts on: isolation, the hold on
+        // the machine, and whether notifications are shown at all.
+        let switches: Vec<&str> = view
+            .toggles
+            .iter()
+            .map(|toggle| toggle.id.as_str())
+            .collect();
+        assert_eq!(
+            switches,
+            vec![
+                "advancedProcessIsolation",
+                "advancedPreventSleep",
+                "advancedNotifications",
+            ]
+        );
+        assert!(view.toggles.iter().all(|toggle| toggle.available));
         let level = view
             .choices
             .iter()
@@ -390,7 +783,12 @@ mod tests {
         assert_eq!(ranks, vec![0, 1, 2, 3], "the list is least to most verbose");
         // The rank is a read-out, not a field: there is no way to type a second
         // answer to the question the picker above has already answered.
-        assert!(view.numbers.is_empty(), "{:?}", view.numbers);
+        // The only number on the tab is the timeout of a command around an encode,
+        // and it is a field because it is a thing the user can change; the log rank
+        // above is a read-out because it is not.
+        assert_eq!(view.numbers.len(), 1, "{:?}", view.numbers);
+        assert_eq!(view.numbers[0].id, "advancedActionTimeout");
+        assert_eq!(view.numbers[0].text, "300");
         let rank = &view.facts[0];
         assert_eq!(rank.id, "advancedLogRank");
         assert!(rank.value.contains('2'), "{}", rank.value);
@@ -402,6 +800,7 @@ mod tests {
         let view = tab_view(
             &AdvancedSettings::new(),
             &taken("process isolation is disabled in the portable settings file"),
+            &machine(),
         );
         let toggle = &view.toggles[0];
         assert!(!toggle.available);
@@ -418,7 +817,7 @@ mod tests {
 
     #[test]
     fn the_priority_control_is_closed_on_a_platform_that_cannot_move_a_process() {
-        let view = tab_view(&AdvancedSettings::new(), &available());
+        let view = tab_view(&AdvancedSettings::new(), &available(), &machine());
         let priority = view
             .choices
             .iter()

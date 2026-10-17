@@ -58,6 +58,15 @@ pub enum NumaMode {
     PinTo(u16),
 }
 
+/// The stored identifier of a pinned processor group.
+///
+/// A function rather than a constant because the identifier is a number this
+/// build does not have until somebody names a group, and it is read in two places:
+/// the mode's own identifier and the list of names a machine's layout allows.
+pub fn pin_id(group: u16) -> String {
+    format!("group:{group}")
+}
+
 impl NumaMode {
     /// Stable identifier the preferences record.
     ///
@@ -68,7 +77,7 @@ impl NumaMode {
         match self {
             NumaMode::Auto => "auto".to_string(),
             NumaMode::Off => "off".to_string(),
-            NumaMode::PinTo(group) => format!("group:{group}"),
+            NumaMode::PinTo(group) => pin_id(group),
         }
     }
 

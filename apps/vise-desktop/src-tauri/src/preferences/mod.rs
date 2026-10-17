@@ -49,7 +49,7 @@ pub const PREFERENCES_KEY: &str = "preferences";
 /// for reasons that have nothing to do with what a control means, while this
 /// number only moves when a preference changes shape. A record stamped with a
 /// higher number than this build understands is left untouched.
-pub const PREFERENCES_VERSION: u32 = 1;
+pub const PREFERENCES_VERSION: u32 = 2;
 
 /// Identifier of the preferences surface.
 pub const SURFACE: &str = "preferences";
@@ -172,10 +172,20 @@ impl PreferencesSettings {
             (advanced::PROCESS_ISOLATION, "advanced"),
             (advanced::LOG_LEVEL, "advanced"),
             (advanced::PROCESS_PRIORITY, "advanced"),
+            (advanced::PREVENT_SLEEP, "advanced"),
+            (advanced::POWER_SCOPE, "advanced"),
+            (advanced::NUMA_MODE, "advanced"),
+            (advanced::PRE_ACTION, "advanced"),
+            (advanced::POST_ACTION, "advanced"),
+            (advanced::ACTION_TIMEOUT, "advanced"),
+            (advanced::ACTION_ON_FAILURE, "advanced"),
+            (advanced::NOTIFICATIONS, "advanced"),
+            (advanced::NOTIFICATION_SCOPE, "advanced"),
             (hardware::ACCELERATION, "hardware"),
             (hardware::DECODE_DEVICE, "hardware"),
             (updates::FREQUENCY, "updates"),
             (updates::CHANNEL, "updates"),
+            (updates::FEED_URL, "updates"),
             (whendone::ACTION, "whendone"),
             (whendone::DELAY_SECONDS, "whendone"),
         ]
@@ -192,6 +202,15 @@ impl PreferencesSettings {
             hw_decode: self.hardware.decode_preference(),
             hw_decode_device: self.hardware.decode_device.clone(),
             process_priority: self.advanced.process_priority.level(),
+            // The hold and the placement are the worker's to take on itself: the
+            // worker is the process that outlives an encode thread, and it is the
+            // only process that can restrict its own placement.
+            prevent_sleep: self.advanced.prevent_sleep,
+            power_scope: match self.advanced.power() {
+                vise_ipc::power::PowerScope::System => 0,
+                vise_ipc::power::PowerScope::SystemAndDisplay => 1,
+            },
+            numa_mode: self.advanced.numa().level(),
             ..Default::default()
         }
     }
@@ -682,8 +701,23 @@ pub struct PreferencesState {
     /// afterwards recoverable: the previous record is kept for exactly one reset,
     /// and the view model says whether a take-back is on offer.
     undo: Option<PreferencesSettings>,
+    /// What the last release check found, as the Updates tab shows it.
+    ///
+    /// Held on the preferences rather than on the integration so that this surface
+    /// has one owner for everything it shows: the tab asks for the answer it has
+    /// and gets it, rather than reaching into the desktop state that happens to hold
+    /// it.
+    updates: crate::system::updates::UpdateState,
     /// What hardware detection found the last time it was asked.
     hardware: hardware::HardwareAvailability,
+    /// What the machine was found to be: the processor layout, whether the
+    /// machine can be held awake, and where notifications are shown.
+    ///
+    /// Detection is held rather than asked for on every paint, for the same reason
+    /// the hardware tab's is: a processor layout and a notification area are
+    /// questions for the platform, and a window that asked four times per second
+    /// would be asking the operating system more often than it answers.
+    machine: advanced::MachineFacts,
     /// Where the settings live.
     settings_path: PathBuf,
     /// Whether the portable settings file has taken isolation away.
@@ -716,6 +750,8 @@ impl Default for PreferencesState {
             },
             undo: None,
             hardware: hardware::HardwareAvailability::unchecked(),
+            machine: advanced::MachineFacts::default(),
+            updates: crate::system::updates::UpdateState::new(),
             settings_path: PathBuf::new(),
             isolation_block: None,
             active: PREFERENCE_TABS[0].0.to_string(),
@@ -754,6 +790,29 @@ impl PreferencesState {
     /// everything between those two asks paints the same list.
     pub fn observe_hardware(&mut self, capabilities: &vise_core::HardwareCapabilities) {
         self.hardware = hardware::HardwareAvailability::of(capabilities);
+    }
+
+    /// Record what the platform told this window about the machine.
+    ///
+    /// The Advanced tab shows a processor layout, whether the machine can be held
+    /// awake, and where a notification would go; none of those can be worked out from
+    /// a settings file, so the window asks once and hands the answer here.
+    pub fn observe_machine(&mut self, facts: advanced::MachineFacts) {
+        self.machine = facts;
+    }
+
+    /// Record what a release check found, so the Updates tab shows it.
+    ///
+    /// The outcome is copied in rather than read back out of the desktop state that
+    /// performed the check, because this surface has one owner for what it shows and a
+    /// second path to it would be a second thing to keep in step.
+    pub fn observe_update_check(&mut self, state: crate::system::updates::UpdateState) {
+        self.updates = state;
+    }
+
+    /// The last release check's answer.
+    pub fn integration_updates(&self) -> &crate::system::updates::UpdateState {
+        &self.updates
     }
 
     /// Record what the portable settings file decided about process isolation.
@@ -827,6 +886,57 @@ impl PreferencesState {
             advanced::PROCESS_PRIORITY => {
                 next.advanced.process_priority = advanced::PriorityPreference::read(value)?
             }
+            advanced::PREVENT_SLEEP => next.advanced.prevent_sleep = want_switch(field, value)?,
+            advanced::POWER_SCOPE => {
+                next.advanced.power_scope =
+                    want_one_of_names(field, value, &advanced::POWER_VALUES)?
+            }
+            advanced::NUMA_MODE => {
+                // The groups this build offers are the ones this machine reported:
+                // a control for a group that does not exist is a preference
+                // nothing reads, which is the one thing this surface refuses.
+                let topology = vise_ipc::numa::topology();
+                let names = advanced::numa_values(topology.groups);
+                let allowed: Vec<&str> = names.iter().map(String::as_str).collect();
+                next.advanced.numa_mode = want_one_of_names(field, value, &allowed)?;
+            }
+            advanced::PRE_ACTION => {
+                next.advanced.pre_action = want_text(field, value)?;
+                // A command that cannot be read is refused here rather than at the
+                // start of the next encode, where the user has a queue to think
+                // about and no time to read a message about punctuation.
+                crate::system::actions::tokenize(&next.advanced.pre_action)
+                    .map_err(|reason| format!("{field} cannot be read: {reason}."))?;
+            }
+            advanced::POST_ACTION => {
+                next.advanced.post_action = want_text(field, value)?;
+                crate::system::actions::tokenize(&next.advanced.post_action)
+                    .map_err(|reason| format!("{field} cannot be read: {reason}."))?;
+            }
+            advanced::ACTION_TIMEOUT => {
+                next.advanced.action_timeout_seconds = want_seconds(field, value)?;
+            }
+            advanced::ACTION_ON_FAILURE => {
+                let wanted = want_one_of_names(
+                    field,
+                    value,
+                    &[
+                        crate::system::actions::OnFailure::Continue.id(),
+                        crate::system::actions::OnFailure::StopEncode.id(),
+                    ],
+                )?;
+                next.advanced.action_on_failure =
+                    if wanted == crate::system::actions::OnFailure::StopEncode.id() {
+                        -1
+                    } else {
+                        0
+                    };
+            }
+            advanced::NOTIFICATIONS => next.advanced.notifications = want_switch(field, value)?,
+            advanced::NOTIFICATION_SCOPE => {
+                next.advanced.notification_scope =
+                    want_one_of_names(field, value, &advanced::NOTIFICATION_SCOPES)?
+            }
             hardware::ACCELERATION => {
                 next.hardware.acceleration = hardware::AccelerationPreference::read(value)?
             }
@@ -843,6 +953,7 @@ impl PreferencesState {
             }
             updates::FREQUENCY => next.updates.frequency = updates::CheckFrequency::read(value)?,
             updates::CHANNEL => next.updates.channel = updates::UpdateChannel::read(value)?,
+            updates::FEED_URL => next.updates.feed_url = updates::read_feed(value)?,
             whendone::ACTION => next.when_done.action = whendone::WhenDoneAction::read(value)?,
             whendone::DELAY_SECONDS => next.when_done.delay_seconds = whendone::read_delay(value)?,
             _ => {
@@ -980,9 +1091,14 @@ impl PreferencesState {
         };
         let general = general::tab_view(&self.settings.general);
         let output = output::tab_view(&self.settings.output);
-        let advanced_tab = advanced::tab_view(&self.settings.advanced, &availability);
+        let advanced_tab =
+            advanced::tab_view(&self.settings.advanced, &availability, &self.machine);
         let hardware = hardware::tab_view(&self.settings.hardware, &self.hardware);
-        let updates = updates::tab_view(&self.settings.updates, updates::today());
+        let updates = updates::tab_view(
+            &self.settings.updates,
+            updates::today(),
+            self.integration_updates(),
+        );
         let when_done = whendone::tab_view(&self.settings.when_done);
         let mut problems = Vec::new();
         // A record this build cannot read is shown as the newer build left it and
@@ -1246,6 +1362,49 @@ fn want_switch(field: &str, value: &serde_json::Value) -> Result<bool, String> {
     })
 }
 
+/// A text value from a closed set of names.
+///
+/// The set is named in the message rather than silently accepted, because a stored
+/// value this build cannot honour is a preference nothing reads — and a closed set
+/// is how a field says which names exist without a second table somewhere else.
+pub fn want_one_of_names(
+    field: &str,
+    value: &serde_json::Value,
+    allowed: &[&str],
+) -> Result<String, String> {
+    let text = want_text(field, value)?;
+    if !allowed.is_empty() && !allowed.iter().any(|name| *name == text.trim()) {
+        return Err(format!(
+            "'{text}' is not one of the choices for {}: choose {}.",
+            field_label(field),
+            allowed.join(", ")
+        ));
+    }
+    Ok(text.trim().to_string())
+}
+
+/// A count of seconds, refused when it is not a number at all.
+pub fn want_seconds(field: &str, value: &serde_json::Value) -> Result<u32, String> {
+    let number = value.as_i64().or_else(|| match value {
+        serde_json::Value::String(text) => text.trim().parse::<i64>().ok(),
+        _ => None,
+    });
+    let Some(number) = number else {
+        return Err(format!(
+            "{} has to be a number of seconds, not {}.",
+            field_label(field),
+            describe(value)
+        ));
+    };
+    if !(1..=3_600).contains(&number) {
+        return Err(format!(
+            "{} has to be between 1 and 3600 seconds, not {number}.",
+            field_label(field)
+        ));
+    }
+    Ok(number as u32)
+}
+
 /// The names of every tab, for an error that has to list them.
 fn tab_names() -> String {
     PREFERENCE_TABS
@@ -1282,10 +1441,20 @@ fn field_label(field: &str) -> &'static str {
         advanced::PROCESS_ISOLATION => "Run the worker as a separate process",
         advanced::LOG_LEVEL => "How much is logged",
         advanced::PROCESS_PRIORITY => "Worker priority",
+        advanced::PREVENT_SLEEP => "Keeping the machine awake while encoding",
+        advanced::POWER_SCOPE => "What stays on",
+        advanced::NUMA_MODE => "Where the worker runs",
+        advanced::PRE_ACTION => "The command to run before an encode",
+        advanced::POST_ACTION => "The command to run after an encode",
+        advanced::ACTION_TIMEOUT => "How long either command may run",
+        advanced::ACTION_ON_FAILURE => "When the command before an encode does not work",
+        advanced::NOTIFICATIONS => "Notifications outside the window",
+        advanced::NOTIFICATION_SCOPE => "What a notification is about",
         hardware::ACCELERATION => "Hardware acceleration",
         hardware::DECODE_DEVICE => "Decode on",
         updates::FREQUENCY => "Check for updates",
         updates::CHANNEL => "Update channel",
+        updates::FEED_URL => "Release feed",
         whendone::ACTION => "When the queue finishes",
         whendone::DELAY_SECONDS => "Wait before finishing",
         _ => "That preference",

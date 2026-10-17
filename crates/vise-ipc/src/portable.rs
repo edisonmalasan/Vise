@@ -310,6 +310,31 @@ pub struct StorageRoots {
     pub refusals: Vec<String>,
 }
 
+impl Default for StorageRoots {
+    /// Every kind of state in the working directory, with nothing portable about
+    /// it.
+    ///
+    /// The default is only what a caller that never resolved anything gets; the
+    /// window resolves through [`resolve_storage`] before it reads or writes.
+    fn default() -> StorageRoots {
+        let base = PathBuf::new();
+        let place = |kind: StorageKind| StorageLocation {
+            directory: base.clone(),
+            file: base.join(kind.file_name()),
+            from_key: None,
+            refusal: None,
+        };
+        StorageRoots {
+            portable: false,
+            root: base.clone(),
+            settings: place(StorageKind::Settings),
+            queue: place(StorageKind::Queue),
+            presets: place(StorageKind::Presets),
+            refusals: Vec::new(),
+        }
+    }
+}
+
 impl StorageRoots {
     /// The location for `kind`.
     pub fn of(&self, kind: StorageKind) -> &StorageLocation {

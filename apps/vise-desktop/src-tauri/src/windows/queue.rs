@@ -171,6 +171,18 @@ impl QueueState {
         self.priority.get(&id).copied().unwrap_or_default()
     }
 
+    /// Every priority that was set, by identifier.
+    ///
+    /// Read by the queue snapshot so that the priority a user gave a job is part
+    /// of what is written down, rather than something re-derived from an order
+    /// that no longer says which band a job was in.
+    pub fn priorities(&self) -> Vec<(JobId, JobPriority)> {
+        self.priority
+            .iter()
+            .map(|(id, value)| (*id, *value))
+            .collect()
+    }
+
     /// Set the priority of `id`.
     pub fn set_priority(&mut self, id: JobId, priority: JobPriority) {
         self.priority.insert(id, priority);

@@ -11,11 +11,12 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use tauri::menu::IsMenuItem;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use vise_core::{Job, JobId, JobSpec, JobState, Progress, Session};
 use vise_ipc::contract::{CommandResult, EncodeCommand, InitCommand, ScanCommand, WorkState};
@@ -27,6 +28,7 @@ mod appearance;
 mod preferences;
 mod scanflow;
 mod sources;
+mod system;
 mod tabs;
 mod viewmodel;
 mod windows;
@@ -35,6 +37,8 @@ use appearance::{AppearanceState, AppearanceViewModel, SystemTheme};
 use preferences::{PreferencesSettings, PreferencesState, PreferencesViewModel};
 use scanflow::{scan_in_process, ScanFlow};
 use sources::{RecentSources, SourceDropReport, SourceViewModel};
+use system::tray::{TrayAction, TrayItemKind, TrayModel};
+use system::{Integration, SystemFacts};
 use tabs::{
     AudioDefaultsInput, AudioTrackInput, ChaptersInput, DimensionsInput, FilterInput, MarkerInput,
     MetadataInput, SubtitleTrackInput, SubtitlesInput, SummaryInput, TabSetViewModel, TabSettings,
@@ -64,6 +68,12 @@ const APPEARANCE_EVENT: &str = "appearance-changed";
 /// when-done preferences open it without one, because the queue finishing is not
 /// something the user does. The answer still travels the same way round.
 const ALERT_EVENT: &str = "alert-asked";
+/// Event carrying a surface the notification-area icon asked the page to open.
+///
+/// A tray item is pressed by somebody who is not looking at the page, so the window
+/// decides what is open and tells the page, rather than the page being asked to
+/// open it.
+const TRAY_EVENT: &str = "tray-action";
 
 /// How the shell reaches the transcode pipeline.
 enum Backend {
@@ -156,6 +166,24 @@ struct DesktopState {
     /// in it again, so two jobs finishing together ask once rather than twice, and
     /// a queue that drains a second time asks again.
     when_done_armed: AtomicBool,
+    /// Everything that integrates the application with the desktop: the tray, the
+    /// notifications, the hold on the machine, the update check, and where the
+    /// queue is written.
+    integration: Integration,
+    /// Why the queue has stopped, when something in the way stopped it.
+    ///
+    /// Held rather than derived, because the reason is a sentence the window
+    /// composed — there was not enough room on the disk — and a tray line that
+    /// recomputed it from a number would read like a database column.
+    queue_pause: Option<String>,
+    /// Where the preferences and the queue are written.
+    storage: vise_ipc::portable::StorageRoots,
+    /// Whether the window is on screen and in front.
+    ///
+    /// An observation rather than a preference, and it is the difference between a
+    /// notification about a finished queue and a line in the activity log: somebody
+    /// watching the window has already seen it finish.
+    window_visible: AtomicBool,
 }
 
 type SharedState = Arc<Mutex<DesktopState>>;
@@ -238,6 +266,627 @@ fn take_confirmation(state: &SharedState, action: AlertAction) {
     }
 }
 
+/* ------------------------------------------------------- desktop integration */
+
+/// The facts the system module decides on, read out of the window.
+///
+/// Everything here is read rather than remembered: the queue's own methods say
+/// what is waiting, what is running, and what has finished, so the tray and the
+/// notifications cannot describe a queue that the queue window is not showing.
+fn system_facts(guard: &DesktopState) -> SystemFacts {
+    let jobs = guard.session.jobs();
+    let finished: Vec<&Job> = jobs
+        .iter()
+        .filter(|job| windows::queue::is_finished(job.status.state))
+        .collect();
+    // The last failure is carried rather than recomputed, because the notification
+    // about it is about a change that happened once: reading "the most recent
+    // failed job" on every poll would announce the same failure for as long as it
+    // stayed in the queue.
+    let last_failure = finished
+        .iter()
+        .rev()
+        .find(|job| job.status.state == JobState::Failed)
+        .map(|job| {
+            (
+                job.spec.output_path.clone(),
+                job.status.message.clone().unwrap_or_default(),
+            )
+        });
+    SystemFacts {
+        queued: guard.queue.pending(jobs).len(),
+        running: guard.queue.active(jobs).len(),
+        finished: finished.len(),
+        completed: finished
+            .iter()
+            .filter(|job| job.status.state == JobState::Completed)
+            .count(),
+        failed: finished
+            .iter()
+            .filter(|job| job.status.state == JobState::Failed)
+            .count(),
+        last_failure,
+        window_visible: guard.window_visible.load(Ordering::SeqCst),
+        in_process: !matches!(guard.backend.as_ref(), Some(Backend::Worker(_))),
+        portable: guard.storage.portable,
+        update_available: guard.integration.updates().available,
+        queue_paused: guard.queue_pause.clone(),
+    }
+}
+
+/// What the preferences and the window say about notifications.
+fn notify_policy(guard: &DesktopState) -> system::notify::NotifyPolicy {
+    let advanced = &guard.preferences.settings().advanced;
+    system::notify::NotifyPolicy {
+        enabled: advanced.notifications,
+        scope: system::notify::NotifyScope::of(advanced.notification_scope.as_str()),
+    }
+}
+
+/// Carry one effect out.
+///
+/// The decisions are made by [`Integration`] as plain values and acted on here, so
+/// that what the integration decided can be checked in a test without a window and
+/// without an operating system.
+fn carry_out(state: &SharedState, effect: system::Effect) {
+    match effect {
+        system::Effect::Log(line) => push_log(state, line),
+        system::Effect::Notify(notification) => {
+            if let Ok(mut guard) = state.lock() {
+                guard.integration.show(notification);
+            }
+        }
+        system::Effect::HoldPower(scope) => {
+            let request = vise_ipc::PowerRequest::Hold(vise_ipc::PowerScope::of(&scope));
+            if let Err(e) = vise_ipc::power::request(request) {
+                push_log(state, format!("power management: {e}"));
+            }
+        }
+        system::Effect::ReleasePower => {
+            if let Err(e) = vise_ipc::power::request(vise_ipc::PowerRequest::Release) {
+                push_log(state, format!("power management: {e}"));
+            }
+        }
+        system::Effect::Tray(model) => publish_tray(&model),
+        system::Effect::CheckForUpdates => {
+            let shared: SharedState = state.clone();
+            thread::spawn(move || check_for_releases(&shared));
+        }
+    }
+}
+
+/// Decide everything the desktop integration needs, and carry it out.
+///
+/// Called wherever the queue or the window has changed, rather than on a timer: a
+/// tray tooltip that lags behind the queue is worse than one that is a moment out
+/// of date, and there is no cost in asking when the answer is the same — the
+/// integration only produces effects for what actually changed.
+fn refresh_system(state: &SharedState) {
+    let effects = {
+        let Ok(mut guard) = state.lock() else {
+            return;
+        };
+        let facts = system_facts(&guard);
+        let advanced = guard.preferences.settings().advanced.clone();
+        let policy = system::power::PowerPolicy {
+            prevent_sleep: advanced.prevent_sleep,
+            scope: vise_ipc::PowerScope::of(&advanced.power_scope),
+        };
+        let notify = notify_policy(&guard);
+        guard.integration.refresh(&facts, policy, notify)
+    };
+    for effect in effects {
+        carry_out(state, effect);
+    }
+}
+
+/// The application handle, once there is a window.
+///
+/// A `OnceLock` rather than an argument on every function, because the tray, the
+/// notification area, and the update check all happen away from the command that
+/// started them and all need the window that owns them.
+static HANDLE: OnceLock<AppHandle> = OnceLock::new();
+
+/// The application handle, when the window exists.
+fn app_handle() -> Option<AppHandle> {
+    HANDLE.get().cloned()
+}
+
+/// The tray icon, once the platform has given the window one.
+static TRAY: OnceLock<Mutex<Option<tauri::tray::TrayIcon<tauri::Wry>>>> = OnceLock::new();
+
+/// The tray icon, when there is one.
+fn tray_icon() -> Option<tauri::tray::TrayIcon<tauri::Wry>> {
+    TRAY.get()
+        .and_then(|slot| slot.lock().ok().and_then(|guard| guard.clone()))
+}
+
+/// Publish the tray menu and its tooltip.
+///
+/// The menu is rebuilt rather than edited: the model is small, and rebuilding is
+/// the one way a row cannot be left showing what was true when it was created. The
+/// set happens on its own thread because the platform wants the menu thread and the
+/// page thread to be different.
+fn publish_tray(model: &TrayModel) {
+    let (Some(app), Some(tray)) = (app_handle(), tray_icon()) else {
+        return;
+    };
+    let mut items: Vec<tauri::menu::MenuItemKind<tauri::Wry>> = Vec::new();
+    for item in &model.items {
+        // A separator is not a row, and a row that cannot be pressed is published
+        // as a disabled one rather than left out, so the menu does not change shape
+        // from one poll to the next.
+        if item.kind == TrayItemKind::Separator {
+            continue;
+        }
+        let built = match item.kind {
+            TrayItemKind::Tick => tauri::menu::CheckMenuItem::with_id(
+                &app,
+                item.id.clone(),
+                item.label.clone(),
+                item.available,
+                item.ticked,
+                None::<&str>,
+            )
+            .map(|menu_item| menu_item.kind()),
+            _ => tauri::menu::MenuItem::with_id(
+                &app,
+                item.id.clone(),
+                item.label.clone(),
+                item.available,
+                None::<&str>,
+            )
+            .map(|menu_item| menu_item.kind()),
+        };
+        if let Ok(kind) = built {
+            items.push(kind);
+        }
+    }
+    let borrowed: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = items
+        .iter()
+        .map(|item| item as &dyn tauri::menu::IsMenuItem<tauri::Wry>)
+        .collect();
+    let tooltip = model.tooltip.clone();
+    match tauri::menu::MenuBuilder::new(&app).items(&borrowed).build() {
+        Ok(menu) => {
+            thread::spawn(move || {
+                let _ = tray.set_menu(Some(menu));
+                let _ = tray.set_tooltip(Some(tooltip));
+            });
+        }
+        Err(e) => eprintln!("the tray menu could not be built: {e}"),
+    }
+}
+
+/// Write the queue where the storage settings say it goes.
+///
+/// Written after anything that changes it rather than on a timer, because a queue
+/// file that is a moment out of date is a queue that comes back without a job the
+/// user just queued.
+fn persist_queue(state: &SharedState) {
+    let result = {
+        let Ok(mut guard) = state.lock() else {
+            return;
+        };
+        sync_queue(&mut guard);
+        let path = guard.integration.queue_path().to_path_buf();
+        system::persistence::save(&path, guard.session.jobs(), &guard.queue)
+    };
+    if let Err(problem) = result {
+        push_log(state, problem);
+    }
+}
+
+/// Ask whether there is room for `spec`, and pause the queue when there is not.
+///
+/// Asked per job rather than once for the queue: a queue of forty jobs can run out
+/// of room halfway through, and the job that would have run out is the one that has
+/// to be refused rather than discovered half-written.
+fn gate_disk_space(state: &SharedState, id: JobId, spec: &JobSpec) -> Result<(), String> {
+    let reading = match system::diskspace::read_free_space(&spec.output_path) {
+        Ok(reading) => reading,
+        Err(e) => {
+            push_log(state, format!("the free space could not be read: {e}"));
+            system::diskspace::SpaceReading::unknown()
+        }
+    };
+    let duration = state
+        .lock()
+        .ok()
+        .map(|guard| title_facts(&guard).duration_seconds);
+    let existing = std::fs::metadata(&spec.output_path)
+        .ok()
+        .map(|meta| meta.len());
+    match system::diskspace::gate(spec, reading, duration, existing) {
+        system::diskspace::Gate::Proceed { free } => {
+            let was_paused = {
+                let Ok(mut guard) = state.lock() else {
+                    return Ok(());
+                };
+                let was_paused = guard.queue_pause.take();
+                if let Some(free) = free {
+                    guard.activity.record(format!(
+                        "{} free before job {id}",
+                        system::diskspace::format_bytes(free)
+                    ));
+                }
+                was_paused
+            };
+            if was_paused.is_some() {
+                push_log(
+                    state,
+                    "there is room again, so the queue is no longer paused",
+                );
+            }
+            Ok(())
+        }
+        system::diskspace::Gate::Pause { reason, .. } => {
+            if let Ok(mut guard) = state.lock() {
+                guard.queue_pause = Some(reason.clone());
+            }
+            Err(format!(
+                "Job {id} cannot start: {reason}. The queue has paused; make room and start it again."
+            ))
+        }
+    }
+}
+
+/// Run the pre-encode action, and say whether the encode may go ahead.
+fn run_pre_action(state: &SharedState, id: JobId, spec: &JobSpec) -> Result<(), String> {
+    let (command, timeout, on_failure, title) = {
+        let Ok(guard) = state.lock() else {
+            return Ok(());
+        };
+        let advanced = &guard.preferences.settings().advanced;
+        (
+            advanced.pre_action.clone(),
+            system::actions::Timeout::seconds(advanced.action_timeout_seconds),
+            system::actions::OnFailure::read(advanced.action_on_failure),
+            title_facts(&guard).name,
+        )
+    };
+    let variables = system::actions::Variables::of(spec, &title, id);
+    match system::actions::run_pre(&command, &variables, timeout, on_failure) {
+        Err(problem) => Err(format!(
+            "the pre-encode action could not be read: {problem}"
+        )),
+        Ok(system::actions::Verdict::Refuse { reason }) => Err(reason),
+        Ok(system::actions::Verdict::Proceed { log }) => {
+            for line in log {
+                push_log(state, line);
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Run the post-encode action.
+///
+/// Every outcome is a line in the activity log: the file has already been written,
+/// so there is nothing left for this to spoil, and a copy program that fails must
+/// not be able to fail an encode that is already done.
+fn run_post_action(state: &SharedState, id: JobId, spec: &JobSpec) {
+    let (command, timeout, title) = {
+        let Ok(guard) = state.lock() else {
+            return;
+        };
+        let advanced = &guard.preferences.settings().advanced;
+        (
+            advanced.post_action.clone(),
+            system::actions::Timeout::seconds(advanced.action_timeout_seconds),
+            title_facts(&guard).name,
+        )
+    };
+    let variables = system::actions::Variables::of(spec, &title, id);
+    match system::actions::run_post(&command, &variables, timeout) {
+        Ok(lines) => {
+            for line in lines {
+                push_log(state, line);
+            }
+        }
+        Err(problem) => push_log(
+            state,
+            format!("the post-encode action could not be read: {problem}"),
+        ),
+    }
+}
+
+/// Build the notification-area icon, if this platform has one.
+///
+/// Built once and then only re-published: the menu is replaced as the queue
+/// changes, so rebuilding the icon each time would leave a trail of icons behind
+/// it. A platform that has no notification area is not an error — the window runs,
+/// the tray says so in the log, and the queue behaves the same.
+fn build_tray(app: &mut tauri::App) {
+    let handle = app.handle().clone();
+    let app = &handle;
+    let menu = match tauri::menu::MenuBuilder::new(app).build() {
+        Ok(menu) => menu,
+        Err(e) => {
+            eprintln!("the notification area is unavailable: {e}");
+            return;
+        }
+    };
+    let icon = match app.default_window_icon().cloned() {
+        Some(icon) => icon,
+        None => {
+            eprintln!("no application icon is bundled, so there is no notification-area icon");
+            return;
+        }
+    };
+    let pressed = {
+        let pressed = app.state::<SharedState>().inner().clone();
+        let shared = pressed.clone();
+        move |app: &tauri::AppHandle, event: tauri::menu::MenuEvent| {
+            tray_action(app, event.id().as_ref());
+            let _ = &shared;
+        }
+    };
+    match tauri::tray::TrayIconBuilder::with_id("vise-tray")
+        .icon(icon)
+        .tooltip("Vise Transcoder")
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .on_menu_event(pressed)
+        .build(app)
+    {
+        Ok(tray) => {
+            let _ = TRAY.set(Mutex::new(Some(tray)));
+        }
+        Err(e) => eprintln!("the notification-area icon could not be built: {e}"),
+    }
+}
+
+/// The directory this executable is in, which is where a portable install keeps
+/// its state.
+fn executable_dir() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|executable| executable.parent().map(PathBuf::from))
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+/// Look for a newer release, and record what was found.
+///
+/// Nothing is downloaded and nothing is installed by this build: the availability,
+/// the version, and the feed it came from are recorded so that the tray and the
+/// Updates preferences can show them, and the decision is the user's.
+fn check_for_releases(state: &SharedState) {
+    let (feed, channel, installed, policy) = {
+        let Ok(guard) = state.lock() else {
+            return;
+        };
+        let updates = &guard.preferences.settings().updates;
+        (
+            updates.feed_url.trim().to_string(),
+            updates.channel.id().to_string(),
+            vise_core::VISE_VERSION.to_string(),
+            notify_policy(&guard),
+        )
+    };
+    let outcome = system::updates::check(&feed, &channel, &installed);
+    let version = outcome.version().unwrap_or_default();
+    let available = outcome.available();
+    let notification = if available {
+        system::notify::decide(&system::notify::Event::UpdateAvailable { version }, policy)
+    } else {
+        None
+    };
+    let mut summary = None;
+    if let Ok(mut guard) = state.lock() {
+        guard
+            .integration
+            .observe_update(outcome, preferences::updates::today());
+        // The answer is copied into the preferences as well as kept by the
+        // integration, because the Updates tab is built by the preferences and
+        // nothing else: one owner for what the tab shows.
+        let answer = guard.integration.updates().clone();
+        guard.preferences.observe_update_check(answer);
+        summary = Some(guard.integration.updates().summary.clone());
+    }
+    if let Some(summary) = summary {
+        push_log(state, format!("release check: {summary}"));
+    }
+    if let Some(notification) = notification {
+        carry_out(state, system::Effect::Notify(notification));
+    }
+    refresh_system(state);
+}
+
+/// Leave every waiting job where it is, and say why.
+fn pause_queue(state: &SharedState) {
+    if let Ok(mut guard) = state.lock() {
+        sync_queue(&mut guard);
+        let jobs = guard.session.jobs().to_vec();
+        let waiting = guard.queue.pending(&jobs);
+        for id in &waiting {
+            let _ = guard.session.update_status(
+                *id,
+                vise_core::JobStatus {
+                    state: JobState::Paused,
+                    progress: vise_core::Progress::new(0.0),
+                    message: Some("paused from the notification area".into()),
+                },
+            );
+        }
+        guard.queue_pause = Some("the queue was paused from the notification area".to_string());
+        guard
+            .activity
+            .record(format!("paused {waiting:?} from the notification area"));
+    }
+    persist_queue(state);
+    refresh_system(state);
+}
+
+/// Start the queue again after a pause.
+///
+/// The pause reason goes with it: the thing that was in the way may still be in the
+/// way, and the next job asks the question again rather than assuming the answer
+/// has changed.
+fn resume_queue(state: &SharedState) {
+    if let Ok(mut guard) = state.lock() {
+        sync_queue(&mut guard);
+        let jobs = guard.session.jobs().to_vec();
+        let waiting = guard.queue.pending(&jobs);
+        for id in &waiting {
+            let _ = guard.session.update_status(
+                *id,
+                vise_core::JobStatus {
+                    state: JobState::Queued,
+                    progress: vise_core::Progress::new(0.0),
+                    message: Some("queued again".into()),
+                },
+            );
+        }
+        guard.queue_pause = None;
+        guard.activity.record("resumed the queue");
+    }
+    persist_queue(state);
+    refresh_system(state);
+}
+
+/// Ask the worker to stop whatever it is encoding.
+fn cancel_running(state: &SharedState) {
+    let client = match worker_client(state) {
+        Ok(Some(client)) => client,
+        _ => {
+            push_log(state, "cancelling an encode requires the worker process");
+            return;
+        }
+    };
+    let running = {
+        let Ok(mut guard) = state.lock() else {
+            return;
+        };
+        sync_queue(&mut guard);
+        guard.queue.active(guard.session.jobs())
+    };
+    for id in running {
+        match client.stop_encode() {
+            Ok(result) if result.was_successful => set_job_state(
+                state,
+                id,
+                JobState::Cancelled,
+                current_progress(state, id),
+                Some("cancelled".into()),
+            ),
+            Ok(result) => record_problem(
+                state,
+                "worker",
+                format!("cancelling job {id}"),
+                result.error.clone(),
+            ),
+            Err(e) => record_problem(
+                state,
+                "worker",
+                format!("cancelling job {id}"),
+                e.to_string(),
+            ),
+        }
+    }
+    take_confirmation(state, AlertAction::CancelQueue);
+    refresh_system(state);
+}
+
+/// Carry out one press of a tray item.
+///
+/// Every press is answered by the same code the toolbar button uses, so a tray item
+/// and a window control cannot mean two different things. The window is told about
+/// the surfaces it is asked to open as an event, because a tray item is pressed by
+/// somebody who is not looking at the page.
+fn tray_action(app: &AppHandle, id: &str) {
+    let Some(action) = TrayAction::parse(id) else {
+        return;
+    };
+    let state: SharedState = Arc::clone(app.state::<SharedState>().inner());
+    match action {
+        TrayAction::ShowWindow => {
+            if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }
+        TrayAction::OpenQueue => {
+            open_surface(app, &state, windows::queue::SURFACE);
+        }
+        TrayAction::PauseQueue => pause_queue(&state),
+        TrayAction::ResumeQueue => resume_queue(&state),
+        TrayAction::CancelCurrent => {
+            if require_confirmation(&state, AlertAction::CancelQueue).is_ok() {
+                cancel_running(&state);
+            }
+        }
+        TrayAction::PreventSleep => {
+            let wanted = {
+                let Ok(guard) = state.lock() else {
+                    return;
+                };
+                !guard.preferences.settings().advanced.prevent_sleep
+            };
+            if let Ok(mut guard) = state.lock() {
+                let changed = guard.preferences.set(
+                    preferences::advanced::PREVENT_SLEEP,
+                    &serde_json::Value::Bool(wanted),
+                );
+                match changed {
+                    Ok(()) => guard
+                        .activity
+                        .record("the notification area changed the sleep preference"),
+                    Err(problem) => guard.activity.record(problem),
+                };
+            }
+            refresh_system(&state);
+        }
+        TrayAction::CheckForUpdates => {
+            let shared = state.clone();
+            thread::spawn(move || check_for_releases(&shared));
+        }
+        TrayAction::About => open_surface(app, &state, windows::dialogs::ABOUT_SURFACE),
+        TrayAction::Quit => {
+            // The queue is written before the window goes: quitting from the
+            // notification area is not a reason to lose a queued job.
+            persist_queue(&state);
+            app.exit(0);
+        }
+    }
+}
+
+/// Open one of the window's own surfaces and tell the page about it.
+///
+/// The state is changed here and the page is told, rather than the page being asked
+/// to open it: a tray item is pressed by somebody who cannot see the page, and the
+/// window is the one that knows what is open.
+fn open_surface(app: &AppHandle, state: &SharedState, id: &str) {
+    let opened = {
+        let Ok(mut guard) = state.lock() else {
+            return;
+        };
+        guard.surfaces.open(id).is_ok()
+    };
+    if !opened {
+        return;
+    }
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    let _ = app.emit(
+        TRAY_EVENT,
+        &TrayRequest {
+            surface: id.to_string(),
+        },
+    );
+    refresh_system(state);
+}
+
+/// What the tray asked the page to open.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrayRequest {
+    /// The surface to open.
+    pub surface: String,
+}
 /// Build the backend the application will use.
 ///
 /// Isolation is on unless a portable settings file switches it off, or the
@@ -1423,6 +2072,12 @@ fn set_job_state(
             },
         );
     }
+    // A job that has finished is the thing the tray, the notifications, and the
+    // saved queue all care about, so it is refreshed here rather than at each of
+    // the places a job can end — which are several, and one that was forgotten
+    // would be a queue that never says it has finished.
+    persist_queue(state);
+    refresh_system(state);
 }
 
 #[tauri::command]
@@ -1562,6 +2217,20 @@ fn carry_out_when_done(app: &AppHandle, state: &SharedState, plan: WhenDonePlan)
 /// The state change happens under the lock and the work happens after it, so two
 /// clicks cannot both pick up the same job.
 fn claim_job(state: &SharedState, id: JobId) -> Result<JobSpec, String> {
+    // The room the file needs is asked for before the job is claimed, because a
+    // job that has been marked running and then refused is a queue that looks as
+    // though it is doing something.
+    {
+        let spec = state
+            .lock()
+            .map_err(|e| e.to_string())?
+            .session
+            .job(id)
+            .map(|job| job.spec.clone())
+            .ok_or_else(|| format!("job {id} not found"))?;
+        gate_disk_space(state, id, &spec)?;
+        run_pre_action(state, id, &spec)?;
+    }
     let mut guard = state.lock().map_err(|e| e.to_string())?;
     let jobs = guard.session.jobs().to_vec();
     let Some(job) = jobs.iter().find(|job| job.id == id) else {
@@ -1631,8 +2300,12 @@ fn start_queue(
             let spec = match claim_job(&shared, id) {
                 Ok(spec) => spec,
                 Err(reason) => {
+                    // Something in the way — no room on the disk, or a pre-encode
+                    // action that refused — stops the queue rather than costing
+                    // every job behind this one the same refusal.
                     record_problem(&shared, "queue", format!("starting job {id}"), &reason);
-                    continue;
+                    refresh_system(&shared);
+                    break;
                 }
             };
             // A client per job, because a worker that dies mid-queue is
@@ -1764,7 +2437,7 @@ fn run_through_worker(shared: SharedState, client: WorkerClient, id: JobId, spec
         // The same initialise command a scan would send, so a preference that
         // was changed between the last scan and this encode takes effect on it.
         initialise_command: settings.to_worker_init(),
-        encode_job: spec,
+        encode_job: spec.clone(),
     };
     match client.start_encode(&command) {
         Ok(result) if result.was_successful => {}
@@ -1834,6 +2507,12 @@ fn run_through_worker(shared: SharedState, client: WorkerClient, id: JobId, spec
                             format!("job {id} failed: {}", done.message)
                         },
                     );
+                    // The post-action runs whether the encode worked or not: a
+                    // program that was told to tidy up after a failed encode is
+                    // exactly the program that wants to know about it.
+                    run_post_action(&shared, id, &spec);
+                    persist_queue(&shared);
+                    refresh_system(&shared);
                     return;
                 }
             }
@@ -1866,6 +2545,7 @@ fn run_in_process(shared: SharedState, id: JobId, spec: JobSpec) {
                 Some(result.output_path.display().to_string()),
             );
             push_log(&shared, format!("completed job {id}"));
+            run_post_action(&shared, id, &spec);
         }
         Err(e) => {
             set_job_state(
@@ -2993,6 +3673,26 @@ fn report_locale(
     Ok(guard.appearance.view())
 }
 
+/// Look for a newer release now, and answer with the Updates tab.
+///
+/// The button is closed with a reason when there is nothing to look at, so this is
+/// only reachable when a feed has been configured. The fetch is done on its own
+/// thread because a network call is not something a window can wait on while
+/// painting, and the view it answers with is the one from before the fetch: the
+/// last check is a row on the tab, and the page reads it again when it repaints.
+#[tauri::command]
+fn check_for_updates_now(state: State<'_, SharedState>) -> Result<PreferencesViewModel, String> {
+    let shared: SharedState = state.inner().clone();
+    if shared
+        .lock()
+        .map(|guard| guard.preferences.settings().updates.has_feed())
+        .unwrap_or(false)
+    {
+        thread::spawn(move || check_for_releases(&shared));
+    }
+    let guard = state.lock().map_err(|e| e.to_string())?;
+    Ok(guard.preferences.view())
+}
 /// Ask the platform what theme it is in, and record the answer.
 ///
 /// Not every platform answers, and one that does not is left at the light theme
@@ -3009,9 +3709,21 @@ fn observe_platform_theme(app: &AppHandle, appearance: &mut AppearanceState) {
 }
 
 fn main() {
-    let settings_path = sources::default_settings_path();
+    // Where state is written is decided before anything reads any of it: a portable
+    // build keeps its settings, its queue, and its presets beside the executable,
+    // and an installed build keeps them in the configuration directory. The rules
+    // are in `vise_ipc::portable` and are tested there, so this is a resolution
+    // rather than a decision.
+    let portable = portable_settings();
+    let installed_root = sources::default_settings_path()
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let storage =
+        vise_ipc::portable::resolve_storage(&portable, &executable_dir(), &installed_root);
+    let settings_path = storage.settings.file.clone();
     let recents = RecentSources::load(&settings_path);
-    let preset_path = preset_file(&settings_path);
+    let preset_path = storage.presets.file.clone();
     // The theme starts light and the locale comes from the environment, so a
     // window has an answer before the page has said anything. The setup hook
     // replaces the theme with the platform's own as soon as there is a window
@@ -3020,7 +3732,6 @@ fn main() {
     // The preferences are read before anything else is built, because three of
     // them decide what gets built: whether there is a worker process, how much
     // is logged, and how many stills a scan extracts.
-    let portable = portable_settings();
     let mut preferences = PreferencesState::load(&settings_path, &portable);
     // Detection is a pair of subprocess calls, so it is done once here rather
     // than on every read of the hardware tab.
@@ -3028,6 +3739,17 @@ fn main() {
     let stills = preferences.settings().preview_count();
     let log_floor = preferences.settings().advanced.log_level;
     let isolate = preferences.settings().advanced.process_isolation;
+    let check_on_start = preferences.settings().updates.has_feed()
+        && system::updates::UpdateState::new().due(
+            preferences.settings().updates.frequency,
+            preferences::updates::today(),
+        );
+    // The queue comes back before the window opens, so the queue window shows the
+    // truth rather than an empty list that fills in a moment later. A job that was
+    // interrupted comes back waiting, marked, and is never started on its own.
+    let recovered = system::persistence::load(&storage.queue.file);
+    let mut session = vise_core::Session::new();
+    let recovered_queue = recovered.install(&mut session);
     let state: SharedState = Arc::new(Mutex::new(DesktopState {
         // Build the backend before the window opens so the first scan does not
         // pay for process start-up.
@@ -3039,17 +3761,51 @@ fn main() {
         appearance,
         preferences,
         preview: windows::preview::PreviewState::with_still_count(stills),
+        integration: Integration::new(storage.queue.file.clone()),
+        storage,
+        queue: recovered_queue,
+        session,
         ..DesktopState::default()
     }));
     // The activity window's filter floor is the stored preference, so the two
     // places that decide what is kept start from one answer.
     if let Ok(mut guard) = state.lock() {
         guard.activity.set_min_level(log_floor);
+        // What this machine can do is asked once here rather than on every paint of
+        // the Advanced tab: a processor layout and a notification area are
+        // questions for the platform, and the window keeps the answers.
+        let notifications = system::notify::NotificationState {
+            available: guard.integration.notifier_available(),
+            description: guard.integration.notifier_description(),
+            scope: notify_policy(&guard).scope,
+            window_visible: false,
+        };
+        let refusals = guard.storage.refusals.clone();
+        let storage_summary = guard.storage.summary();
+        guard
+            .preferences
+            .observe_machine(preferences::advanced::MachineFacts::of(notifications));
+        for refusal in refusals {
+            guard.activity.record(refusal);
+        }
+        guard
+            .activity
+            .record(format!("state is written: {storage_summary}"));
+        for note in &recovered.notes {
+            guard.activity.record(note.clone());
+        }
+        if !recovered.items.is_empty() {
+            guard
+                .activity
+                .record(format!("queue recovery: {}", recovered.summary()));
+        }
     }
-    // The builder needs the state in three places and moves each closure, so each
+    // The builder needs the state in several places and moves each closure, so each
     // one is handed its own handle to the same lock.
     let start_up = state.clone();
     let observing = state.clone();
+    let focusing = state.clone();
+    let start_check = state.clone();
     tauri::Builder::default()
         .manage(state)
         .setup(move |app| {
@@ -3064,13 +3820,55 @@ fn main() {
                             .observe_theme(SystemTheme::of_window(theme), false);
                     }
                 }
+                // The notification area needs the window to show against, so the
+                // notifier is built here rather than before the window existed.
+                if let Ok(handle) = window.hwnd() {
+                    if let Ok(mut guard) = start_up.lock() {
+                        guard.integration.use_notifier(std::sync::Arc::new(
+                            system::notify::BalloonNotifier::new(
+                                handle.0 as isize,
+                                "Vise Transcoder",
+                            ),
+                        ));
+                        let described = guard.integration.notifier_description();
+                        guard.activity.record(described);
+                    }
+                }
+            }
+            build_tray(app);
+            let _ = HANDLE.set(app.handle().clone());
+            // The tray is published once here, so the icon is never sitting there
+            // with an empty menu while the first refresh works out what it says.
+            refresh_system(&start_up);
+            // The first look for a release is on its own thread: it is a network
+            // call, and by this point the window is already open.
+            if check_on_start {
+                let shared = start_check.clone();
+                thread::spawn(move || check_for_releases(&shared));
             }
             Ok(())
         })
-        // The operating system can change theme while the window is open. The
-        // page watches the same media query and reports it too; both arrive at
-        // the same observation, so the two answers cannot produce two themes.
+        // The operating system can change theme while the window is open, and the
+        // window itself can come to the front or go behind another one. Both are
+        // read here, because both decide whether a notification is worth showing:
+        // somebody watching the window has already seen what happened.
         .on_window_event(move |window, event| {
+            let focus_state = focusing.clone();
+            match event {
+                WindowEvent::Focused(focused) => {
+                    if let Ok(guard) = focus_state.lock() {
+                        guard.window_visible.store(*focused, Ordering::SeqCst);
+                    }
+                    let shared = focus_state.clone();
+                    thread::spawn(move || refresh_system(&shared));
+                }
+                WindowEvent::Destroyed => {
+                    // The queue is written as the window goes, so a closed window is
+                    // never the reason a queued job is gone tomorrow.
+                    persist_queue(&focus_state);
+                }
+                _ => {}
+            }
             let WindowEvent::ThemeChanged(theme) = event else {
                 return;
             };
@@ -3172,18 +3970,11 @@ fn main() {
             recheck_hardware,
             reset_preferences,
             undo_preference_reset,
-            when_done_confirm
+            when_done_confirm,
+            check_for_updates_now
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-/// Where the stored presets live, beside the other settings.
-fn preset_file(settings_path: &Path) -> PathBuf {
-    settings_path
-        .parent()
-        .map(|folder| folder.join("presets.json"))
-        .unwrap_or_else(|| PathBuf::from("presets.json"))
 }
 
 #[cfg(test)]
@@ -3683,63 +4474,6 @@ mod tests {
         assert!(AlertAction::CloseWindow.is_destructive());
     }
 
-    #[test]
-    fn the_preset_file_lives_beside_the_other_settings() {
-        let path = preset_file(std::path::Path::new("C:/app/settings.json"));
-        assert_eq!(path, std::path::PathBuf::from("C:/app/presets.json"));
-        assert_eq!(
-            preset_file(std::path::Path::new("settings.json")),
-            std::path::PathBuf::from("presets.json")
-        );
-    }
-
-    /// The page paints from the resolved pair, so the answer it is handed has to
-    /// name the theme and the direction rather than the preference behind them.
-    #[test]
-    fn the_page_is_handed_the_theme_and_direction_it_paints_from() {
-        let payload = r#"{
-            "themeMode":"system",
-            "directionMode":"auto",
-            "theme":"dark",
-            "direction":"rtl",
-            "followsSystemTheme":true,
-            "followsLocale":true,
-            "systemTheme":"dark",
-            "locale":"ar-EG",
-            "themeOptions":[
-                {"id":"system","label":"Match the system","facts":"","available":true,"reason":"","selected":true},
-                {"id":"light","label":"Light","facts":"","available":true,"reason":"","selected":false},
-                {"id":"dark","label":"Dark","facts":"","available":true,"reason":"","selected":false}
-            ],
-            "directionOptions":[
-                {"id":"auto","label":"Match my language","facts":"","available":true,"reason":"","selected":true},
-                {"id":"ltr","label":"Left to right","facts":"","available":true,"reason":"","selected":false},
-                {"id":"rtl","label":"Right to left","facts":"","available":true,"reason":"","selected":false}
-            ],
-            "summary":"Showing the dark theme, laid out right to left because ar-EG reads right to left.",
-            "flowGlyph":"\u2192",
-            "observationNote":"Your system is in its dark theme, reported by this window; your locale is ar-EG, reported by this window."
-        }"#;
-        let view: AppearanceViewModel = serde_json::from_str(payload).expect("appearance answer");
-        assert_eq!(view.theme, "dark");
-        assert_eq!(view.direction, "rtl");
-        assert_eq!(view.system_theme, "dark");
-        assert_eq!(view.locale, "ar-EG");
-        assert_eq!(view.theme_options.len(), 3);
-        assert_eq!(view.direction_options.len(), 3);
-        assert_eq!(view.flow_glyph, "\u{2192}");
-        assert!(
-            view.observation_note.contains("ar-EG"),
-            "{}",
-            view.observation_note
-        );
-
-        // The stylesheet keys its colours and its mirroring off exactly these two
-        // values, so neither may be spelled any other way.
-        assert!(["light", "dark"].contains(&view.theme.as_str()));
-        assert!(["ltr", "rtl"].contains(&view.direction.as_str()));
-    }
-
     /// A theme the page reports is a fact about the media query, not a request.
     #[test]
     fn a_reported_system_theme_is_a_media_query_answer() {
@@ -3821,6 +4555,52 @@ mod tests {
         assert_eq!(state.lock().expect("state").activity.view().lines.len(), 0);
     }
 
+    /// The page paints from the resolved pair, so the answer it is handed has to
+    /// name the theme and the direction rather than the preference behind them.
+    #[test]
+    fn the_page_is_handed_the_theme_and_direction_it_paints_from() {
+        let payload = r#"{
+            "themeMode":"system",
+            "directionMode":"auto",
+            "theme":"dark",
+            "direction":"rtl",
+            "followsSystemTheme":true,
+            "followsLocale":true,
+            "systemTheme":"dark",
+            "locale":"ar-EG",
+            "themeOptions":[
+                {"id":"system","label":"Match the system","facts":"","available":true,"reason":"","selected":true},
+                {"id":"light","label":"Light","facts":"","available":true,"reason":"","selected":false},
+                {"id":"dark","label":"Dark","facts":"","available":true,"reason":"","selected":false}
+            ],
+            "directionOptions":[
+                {"id":"auto","label":"Match my language","facts":"","available":true,"reason":"","selected":true},
+                {"id":"ltr","label":"Left to right","facts":"","available":true,"reason":"","selected":false},
+                {"id":"rtl","label":"Right to left","facts":"","available":true,"reason":"","selected":false}
+            ],
+            "summary":"Showing the dark theme, laid out right to left because ar-EG reads right to left.",
+            "flowGlyph":"\u2192",
+            "observationNote":"Your system is in its dark theme, reported by this window; your locale is ar-EG, reported by this window."
+        }"#;
+        let view: AppearanceViewModel = serde_json::from_str(payload).expect("appearance answer");
+        assert_eq!(view.theme, "dark");
+        assert_eq!(view.direction, "rtl");
+        assert_eq!(view.system_theme, "dark");
+        assert_eq!(view.locale, "ar-EG");
+        assert_eq!(view.theme_options.len(), 3);
+        assert_eq!(view.direction_options.len(), 3);
+        assert_eq!(view.flow_glyph, "\u{2192}");
+        assert!(
+            view.observation_note.contains("ar-EG"),
+            "{}",
+            view.observation_note
+        );
+
+        // The stylesheet keys its colours and its mirroring off exactly these two
+        // values, so neither may be spelled any other way.
+        assert!(["light", "dark"].contains(&view.theme.as_str()));
+        assert!(["ltr", "rtl"].contains(&view.direction.as_str()));
+    }
     /// A preset built for a machine this one does not resemble still has to reach
     /// the output settings rather than being half-applied, because a preset that
     /// silently sets nothing is a control that lies about what it did.
