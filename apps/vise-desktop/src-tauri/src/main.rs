@@ -4863,6 +4863,46 @@ mod tests {
         state
     }
 
+    #[test]
+    fn every_name_the_page_asks_for_is_a_key_this_build_has() {
+        // The page holds no text: an element names the message it wants and the
+        // window's language answers. That only works while both sides agree on the
+        // names, so the markup is checked against the catalog here rather than
+        // leaving a rename on one side to be found on screen.
+        let page = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/index.html");
+        let markup = std::fs::read_to_string(&page).expect("the page");
+        let names: Vec<&str> = markup
+            .match_indices("data-i18n=\"")
+            .map(|(at, found)| {
+                let rest = &markup[at + found.len()..];
+                let end = rest.find('"').expect("a closed attribute");
+                &rest[..end]
+            })
+            .collect();
+        assert!(!names.is_empty(), "the page marks nothing at all");
+        for name in &names {
+            assert!(
+                vise_core::MessageKey::of_name(name).is_some(),
+                "the page asks for '{name}', which is not a key this build has"
+            );
+            assert!(!vise_core::Catalog::base()
+                .text(vise_core::MessageKey::of_name(name).expect(name))
+                .is_empty());
+        }
+        // And every shipped language answers every one of them.
+        for table in vise_core::message_tables() {
+            let resolved = vise_core::resolve_catalog(table.tag);
+            for name in &names {
+                let key = vise_core::MessageKey::of_name(name).expect(name);
+                assert!(
+                    resolved.catalog.message(key).source.is_translated(),
+                    "{}: '{name}' falls back in a shipped locale",
+                    table.tag
+                );
+            }
+        }
+    }
+
     /// A window whose configuration tabs hold work in progress.
     fn window_with_typed_input() -> SharedState {
         let state = ready_state("vise-desktop-language-switch");
