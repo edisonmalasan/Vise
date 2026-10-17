@@ -2,14 +2,14 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use vise_core::{JobSpec, Transcoder};
+use vise_core::{JobSpec, MessageKey, Transcoder};
 
-use crate::cli::{BatchArgs, TranscodeArgs};
+use crate::cli::{BatchArgs, Say, TranscodeArgs};
 use crate::preset;
 
 static CANCEL_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
 
-pub fn setup_cancel_handler() {
+pub fn setup_cancel_handler(say: &Say) {
     let _ = ::ctrlc::set_handler(|| {
         if let Ok(mut guard) = CANCEL_PATH.lock() {
             if let Some(path) = guard.take() {
@@ -19,18 +19,43 @@ pub fn setup_cancel_handler() {
         eprintln!("cancelled");
         std::process::exit(130);
     });
+    if let Some(line) = say.fallback_line() {
+        // The language asked for is not one this build ships, so one line says
+        // which language is being used instead rather than leaving the reader to
+        // work it out from the refusals.
+        eprintln!("{line}");
+    }
 }
 
-pub fn transcode_command(args: TranscodeArgs) -> Result<(), (i32, String)> {
-    setup_cancel_handler();
+/// What the user asked the file itself to be, apart from the settings a preset
+/// carries.
+///
+/// Grouped because these three are one question — what shape the finished file
+/// takes — and because a refusal about any of them is one sentence with the same
+/// three answers.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Choices<'a> {
+    /// The container to write.
+    pub format: Option<&'a str>,
+    /// The video codec to write.
+    pub video_codec: Option<&'a str>,
+    /// The audio codec to write.
+    pub audio_codec: Option<&'a str>,
+}
+
+pub fn transcode_command(args: TranscodeArgs, say: &mut Say) -> Result<(), (i32, String)> {
+    setup_cancel_handler(say);
     transcode_one(
         &args.input,
         &args.output,
         args.title,
         args.preset.as_deref(),
-        args.format.as_deref(),
-        args.video_codec.as_deref(),
-        args.audio_codec.as_deref(),
+        Choices {
+            format: args.format.as_deref(),
+            video_codec: args.video_codec.as_deref(),
+            audio_codec: args.audio_codec.as_deref(),
+        },
+        say,
     )
 }
 
@@ -39,9 +64,8 @@ pub fn transcode_one(
     output: &std::path::Path,
     title: Option<u32>,
     preset_path: Option<&std::path::Path>,
-    format: Option<&str>,
-    video_codec: Option<&str>,
-    audio_codec: Option<&str>,
+    choices: Choices<'_>,
+    say: &mut Say,
 ) -> Result<(), (i32, String)> {
     let transcoder = Transcoder::default();
 
@@ -56,26 +80,29 @@ pub fn transcode_one(
         preset::apply(&mut spec, &preset);
     }
 
-    if let Some(f) = format {
+    if let Some(f) = choices.format {
         if let Some(c) = preset::parse_container(f) {
             spec.container = c;
         } else {
-            return Err((2, format!("unknown format: {f}")));
+            let sentence = say.line(MessageKey::CliUnknownFormat, &[("value", f)]);
+            return Err((2, sentence));
         }
     }
 
-    if let Some(v) = video_codec {
+    if let Some(v) = choices.video_codec {
         if let Some(c) = preset::parse_video(v) {
             spec.video_codec = c;
         } else {
-            return Err((2, format!("unknown video codec: {v}")));
+            let sentence = say.line(MessageKey::CliUnknownVideoCodec, &[("value", v)]);
+            return Err((2, sentence));
         }
     }
-    if let Some(a) = audio_codec {
+    if let Some(a) = choices.audio_codec {
         if let Some(c) = preset::parse_audio(a) {
             spec.audio_codec = c;
         } else {
-            return Err((2, format!("unknown audio codec: {a}")));
+            let sentence = say.line(MessageKey::CliUnknownAudioCodec, &[("value", a)]);
+            return Err((2, sentence));
         }
     }
     if let Some(t) = title {
@@ -119,11 +146,22 @@ pub fn transcode_one(
     match result {
         Ok(_) => {
             if final_output.exists() {
-                fs::remove_file(final_output.clone())
-                    .map_err(|e| (1, format!("removing old output: {e}")))?;
+                let problem = fs::remove_file(final_output.clone()).err();
+                if let Some(e) = problem {
+                    let sentence = say.line(
+                        MessageKey::CliRemovingOutput,
+                        &[("problem", &e.to_string())],
+                    );
+                    return Err((1, sentence));
+                }
             }
-            fs::rename(temp_output.clone(), final_output.clone())
-                .map_err(|e| (1, format!("renaming output: {e}")))?;
+            if let Err(e) = fs::rename(temp_output.clone(), final_output.clone()) {
+                let sentence = say.line(
+                    MessageKey::CliRenamingOutput,
+                    &[("problem", &e.to_string())],
+                );
+                return Err((1, sentence));
+            }
             println!(
                 "transcode: completed output={} progress=100%",
                 final_output.display()
@@ -132,7 +170,11 @@ pub fn transcode_one(
         }
         Err(e) => {
             let _ = fs::remove_file(temp_output.clone());
-            Err((1, format!("transcode failed: {e}")))
+            let sentence = say.line(
+                MessageKey::CliTranscodeFailed,
+                &[("problem", &e.to_string())],
+            );
+            Err((1, sentence))
         }
     }
 }
@@ -159,14 +201,22 @@ struct BatchJob {
     audio_codec: Option<String>,
 }
 
-pub fn batch_command(args: BatchArgs) -> Result<(), (i32, String)> {
-    setup_cancel_handler();
-    let raw = fs::read_to_string(&args.jobs).map_err(|e| (2, format!("reading jobs file: {e}")))?;
+pub fn batch_command(args: BatchArgs, say: &mut Say) -> Result<(), (i32, String)> {
+    setup_cancel_handler(say);
+    let raw = fs::read_to_string(&args.jobs).map_err(|e| {
+        let sentence = say.line(MessageKey::CliReadingJobs, &[("problem", &e.to_string())]);
+        (2, sentence)
+    })?;
     let jobs: Vec<BatchJob> = if raw.trim_start().starts_with('[') {
-        serde_json::from_str(&raw).map_err(|e| (2, format!("parsing jobs file: {e}")))?
+        serde_json::from_str(&raw).map_err(|e| {
+            let sentence = say.line(MessageKey::CliReadingJobs, &[("problem", &e.to_string())]);
+            (2, sentence)
+        })?
     } else {
-        let batch: BatchFile =
-            serde_json::from_str(&raw).map_err(|e| (2, format!("parsing jobs file: {e}")))?;
+        let batch: BatchFile = serde_json::from_str(&raw).map_err(|e| {
+            let sentence = say.line(MessageKey::CliReadingJobs, &[("problem", &e.to_string())]);
+            (2, sentence)
+        })?;
         batch.jobs
     };
 
@@ -183,9 +233,12 @@ pub fn batch_command(args: BatchArgs) -> Result<(), (i32, String)> {
             &output,
             job.title,
             preset_path.as_deref(),
-            job.format.as_deref(),
-            job.video_codec.as_deref(),
-            job.audio_codec.as_deref(),
+            Choices {
+                format: job.format.as_deref(),
+                video_codec: job.video_codec.as_deref(),
+                audio_codec: job.audio_codec.as_deref(),
+            },
+            say,
         ) {
             Ok(()) => println!("batch: job {}/{} completed", idx + 1, total),
             Err(e) => {
@@ -199,12 +252,13 @@ pub fn batch_command(args: BatchArgs) -> Result<(), (i32, String)> {
         println!("batch: all {} jobs completed", total);
         Ok(())
     } else {
-        let msg = failures
+        let summary = failures
             .into_iter()
             .map(|(n, m)| format!("job {n}: {m}"))
             .collect::<Vec<_>>()
             .join("; ");
-        Err((1, format!("batch finished with failures: {msg}")))
+        let sentence = say.line(MessageKey::CliBatchFailures, &[("summary", &summary)]);
+        Err((1, sentence))
     }
 }
 

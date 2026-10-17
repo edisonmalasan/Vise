@@ -1,0 +1,14 @@
+{
+  "general-very-fast-480-30-h264": "Die schnellste Umwandlung in der Leiter: kleinste Datei und wenig Rechenaufwand, dafür die sichtbarsten Verluste. H.264 läuft überall. Auf 854 mal 480 skaliert.",
+  "general-very-fast-1080-30-hevc": "Die schnellste Umwandlung in der Leiter: kleinste Datei und wenig Rechenaufwand, dafür die sichtbarsten Verluste. H.265 braucht bei gleicher Qualität etwa die Hälfte von H.264. Auf 1920 mal 1080 skaliert.",
+  "general-fast-720-30-h264": "Ein schnelles Profil, das trotzdem sinnvoll kodiert; die übliche Wahl für einen ersten Durchgang durch einen langen Titel. H.264 läuft überall. Auf 1280 mal 720 skaliert.",
+  "general-hq-1080-30-h264": "Langsamer und größer als Fast, dafür bleibt mehr Detail erhalten, wenn man genau hinsieht, und das Kodieren ist weiterhin schnell. H.264 läuft überall. Auf 1920 mal 1080 skaliert.",
+  "web-creator-1080-60": "Eine H.264-Datei mit hoher Bildrate für eine Plattform, die das Gelieferte noch einmal umkodiert: Bildrate und Größe sind das Wichtige, also wird die Qualität so eingestellt, dass die Bewegung flüssig bleibt und nicht das Detail.",
+  "web-social-10mb-60s": "So kodiert, dass es in 10 MB passt. Die Größe ist das Ziel und nicht die Qualität, das ehrliche Bild gilt also nur für einen Titel von rund 60 Sekunden: ein längerer wird stärker gepresst, ein kürzerer nutzt den Spielraum nicht aus.",
+  "device-fire-720-30-h264": "So gewählt, dass Fire TV die Datei ohne Umwandlung abspielt: H.264 in MP4, passend für diesen Bildschirm und für keinen größeren.",
+  "device-apple-2160-60-hevc": "So gewählt, dass Apple-Geräte die Datei ohne Umwandlung abspielen: H.264 in MP4, passend für diesen Bildschirm und für keinen größeren.",
+  "matroska-hevc-1080-30": "Matroska mit H.265-Video und FLAC-Audio. Der Container fasst jeden Codec dieser Seite auf, sodass die Datei lesbar bleibt, was ein späterer Rechner auch dekodieren kann.",
+  "hardware-nvenc-hevc-1080-30": "Kodiert vom NVIDIA-NVENC-Teil der Grafikkarte statt vom Prozessor, der bei gleicher Dateigröße um ein Vielfaches schneller ist. Es lohnt sich, wenn die Karte vorhanden ist; wo sie fehlt, weicht dieses Profil auf den Software-Kodierer aus und sagt das.",
+  "professional-prores-422-hq": "Vollständige Auflösung, 10 Bit, 4:2:2: der übliche Austauschformat für den Schnitt. Der Ton ist unkomprimiertes PCM, damit ein Schnitt nie erst einen verlustbehafteten Schritt zurücknehmen muss.",
+  "professional-ffv1-pcm": "FFV1 ist verlustfrei und bildintern, damit jedes Bild für sich steht und ein Archiv an jeder Stelle geschnitten werden kann, ohne eine neue Datei zu erzeugen. PCM hält den Ton bitgenau, und genau darum geht es bei einer Sicherungskopie."
+}

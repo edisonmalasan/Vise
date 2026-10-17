@@ -820,6 +820,41 @@ pub fn category_counts() -> Vec<(PresetCategory, usize)> {
         .collect()
 }
 
+/// A preset's description in one language, with the fallback recorded.
+///
+/// The catalog carries the base text for every preset it ships, so that text is
+/// the last rung rather than a special case: a locale that has not translated a
+/// preset shows the catalog's own words for it, and `translated` says so
+/// instead of the row quietly claiming to be localized. A preset this build
+/// does not ship at all has no description in any language, and says that too.
+pub fn localized_description(id: &str, locale_tag: &str) -> Option<LocalizedDescription> {
+    let entry = builtin_entry(id)?;
+    let translated = crate::i18n::preset_description(locale_tag, &entry.id);
+    Some(match translated {
+        Some(found) => LocalizedDescription {
+            text: found.text,
+            source: found.source,
+            translated: true,
+        },
+        None => LocalizedDescription {
+            text: entry.description.clone(),
+            source: crate::i18n::MessageSource::Base,
+            translated: false,
+        },
+    })
+}
+
+/// One preset description, as the caller reads it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalizedDescription {
+    /// The sentence to show.
+    pub text: String,
+    /// Which file answered.
+    pub source: crate::i18n::MessageSource,
+    /// Whether this is a translation rather than the catalog's base text.
+    pub translated: bool,
+}
+
 /// What the machine can do with one preset.
 ///
 /// The answer is an encoder rather than a yes or a no, because "available" on its

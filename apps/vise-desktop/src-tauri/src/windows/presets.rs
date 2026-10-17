@@ -400,6 +400,38 @@ pub struct CatalogInput {
     pub entry: String,
 }
 
+/// One built-in preset's description, in the language in force.
+///
+/// Three answers rather than one, because the catalog carries the base sentence
+/// for every preset it ships and a locale carries translations of a subset of
+/// them: a translated sentence where there is one, the catalog's own words where
+/// there is not, and the preset's name where the catalog has neither. A user who
+/// cannot read the base sentence gets the base sentence and a language picker
+/// rather than an empty row.
+fn described_in(
+    id: &str,
+    locale: &str,
+    entry: &vise_core::PresetEntry,
+    preset: &PresetSpec,
+) -> String {
+    if let Some(found) = vise_core::localized_description(id, locale) {
+        if found.translated {
+            return found.text;
+        }
+        if !found.text.trim().is_empty() {
+            return found.text;
+        }
+    }
+    if entry.description.trim().is_empty() {
+        preset
+            .name
+            .clone()
+            .unwrap_or_else(|| "A preset that ships with this build.".to_string())
+    } else {
+        entry.description.clone()
+    }
+}
+
 /// The window's own bookkeeping of the preset library.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PresetState {
@@ -420,6 +452,14 @@ pub struct PresetState {
     pub capabilities: vise_core::HardwareCapabilities,
     /// What the user has asked the machine to use.
     pub acceleration: vise_core::HardwareAcceleration,
+    /// The language the catalog's descriptions are shown in.
+    ///
+    /// Empty until the language module says which one, and empty means the base
+    /// language: the fallback chain answers for a tag nothing is known about, which
+    /// is the right answer for a state that has not been told anything. Held here
+    /// rather than read from a global so a window has one owner for what it shows
+    /// and a second path cannot disagree with it.
+    pub locale: String,
 }
 
 impl PresetState {
@@ -433,7 +473,22 @@ impl PresetState {
             catalog_entry: String::new(),
             capabilities: vise_core::HardwareCapabilities::default(),
             acceleration: vise_core::HardwareAcceleration::auto(),
+            locale: vise_core::i18n::BASE_LOCALE.to_string(),
         }
+    }
+
+    /// Show the catalog's descriptions in another language.
+    ///
+    /// Reports whether the language moved, so a caller that repaints on every
+    /// change is not repainting a browser that did not change.
+    pub fn use_language(&mut self, tag: &str) -> bool {
+        let resolved = vise_core::resolve_locale(tag);
+        let wanted = resolved.locale.tag().to_string();
+        if self.locale == wanted {
+            return false;
+        }
+        self.locale = wanted;
+        true
     }
 
     /// Record what the media tools were found to offer.
@@ -632,12 +687,16 @@ impl PresetState {
         PresetViewModel {
             id: entry.id.clone(),
             name: entry.name.clone(),
-            description: if entry.description.trim().is_empty() {
+            description: if built_in {
+                described_in(&entry.id, &self.locale, entry, preset)
+            } else if entry.description.trim().is_empty() {
                 preset
                     .name
                     .clone()
                     .unwrap_or_else(|| "A preset that ships with this build.".to_string())
             } else {
+                // A stored preset's description is the user's own words, so there
+                // is nothing here to translate and nothing to fall back from.
                 entry.description.clone()
             },
             category: entry.category.label().to_string(),
@@ -1552,6 +1611,114 @@ mod tests {
         caps.encoders
             .retain(|name| name.starts_with("lib") || name == "ffv1");
         caps
+    }
+
+    #[test]
+    fn a_translated_description_is_used_and_the_rest_fall_back_to_the_catalog() {
+        // The catalog ships 138 descriptions and the locale files translate a
+        // subset of them. Both answers have to be readable: a row is never empty
+        // because nobody has translated it yet, and never shows an identifier
+        // because it has no text at all.
+        let base = {
+            let mut state = PresetState::new("presets.json");
+            state.observe_hardware(&everything(), &vise_core::HardwareAcceleration::auto());
+            state.catalog_view()
+        };
+        let translated_id = "general-very-fast-480-30-h264";
+        let untranslated_id = "general-super-hq-2160-60-h264";
+
+        let mut state = PresetState::new("presets.json");
+        state.observe_hardware(&everything(), &vise_core::HardwareAcceleration::auto());
+        assert_eq!(state.locale, "en", "the base language to begin with");
+        assert!(state.use_language("es"), "the first change moves");
+        assert!(!state.use_language("es"), "the second one does not");
+        assert_eq!(state.locale, "es");
+        let spanish = state.catalog_view();
+
+        // The translated row is in Spanish and is still the same preset.
+        let row = spanish
+            .entries
+            .iter()
+            .find(|entry| entry.id == translated_id)
+            .expect("the preset is in the browser");
+        let same = base
+            .entries
+            .iter()
+            .find(|entry| entry.id == translated_id)
+            .expect("the preset is in the browser");
+        assert_ne!(row.description, same.description, "it was translated");
+        assert!(
+            row.description.starts_with("La codificación"),
+            "{}",
+            row.description
+        );
+        assert!(
+            !row.description.contains("quickest encode"),
+            "{}",
+            row.description
+        );
+
+        // The untranslated one is the catalog's own sentence, unchanged.
+        let row = spanish
+            .entries
+            .iter()
+            .find(|entry| entry.id == untranslated_id)
+            .expect("the preset is in the browser");
+        let same = base
+            .entries
+            .iter()
+            .find(|entry| entry.id == untranslated_id)
+            .expect("the preset is in the browser");
+        assert_eq!(row.description, same.description);
+        assert!(!row.description.trim().is_empty());
+        assert_eq!(
+            same.description,
+            vise_core::builtin_entry(untranslated_id)
+                .expect("the preset")
+                .description
+        );
+
+        // Every row has a sentence in every shipped locale.
+        for tag in ["en", "es", "de", "fr", "ja", "ar", "kl"] {
+            let mut state = PresetState::new("presets.json");
+            state.observe_hardware(&everything(), &vise_core::HardwareAcceleration::auto());
+            state.use_language(tag);
+            for entry in state.catalog_view().entries {
+                assert!(!entry.description.trim().is_empty(), "{tag}: {}", entry.id);
+                assert!(
+                    !entry.description.contains(&entry.id),
+                    "{} {}",
+                    tag,
+                    entry.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_user_presets_own_description_is_left_alone() {
+        // It is the user's words, so there is nothing here to translate and
+        // nothing to fall back from.
+        let mut state = PresetState::new("presets.json");
+        state.observe_hardware(&everything(), &vise_core::HardwareAcceleration::auto());
+        state.use_language("ja");
+        let mine = vise_core::UserPreset {
+            id: "general-very-fast-480-30-h264".to_string(),
+            name: "Mine".to_string(),
+            description: Some("what I want".to_string()),
+            preset: vise_core::PresetSpec::default(),
+        };
+        let view = state.view(
+            &[mine],
+            &vise_core::builtin_presets(),
+            form_view(&input("create"), &[], None),
+        );
+        let row = view
+            .user
+            .iter()
+            .find(|entry| entry.name == "Mine")
+            .expect("the stored preset is listed");
+        assert_eq!(row.description, "what I want");
     }
 
     #[test]

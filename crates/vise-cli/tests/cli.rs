@@ -104,3 +104,94 @@ fn batch_transcode() {
     assert!(out1.exists());
     assert!(out2.exists());
 }
+
+/// A refusal is written in the language the run was asked for.
+///
+/// The pipeline is shared with the desktop, so this is the same resolution the
+/// window uses: an exact tag gets that language's sentence, and a tag this build
+/// does not ship falls back to the base language and says so.
+#[test]
+fn a_refusal_is_written_in_the_language_that_was_asked_for() {
+    let dir = std::env::temp_dir().join("vise-cli-language");
+    let _ = std::fs::create_dir_all(&dir);
+    let input = dir.join("in.mkv");
+    let out = dir.join("out.mkv");
+    let _ = std::fs::remove_file(&input);
+
+    let mut english = Command::cargo_bin("vise").unwrap();
+    english.args([
+        "--language",
+        "en",
+        "transcode",
+        "--input",
+        input.to_str().unwrap(),
+        "--output",
+        out.to_str().unwrap(),
+        "--format",
+        "not-a-container",
+    ]);
+    let refusal = english.output().expect("runs");
+    let said = String::from_utf8_lossy(&refusal.stderr);
+    assert!(said.contains("not a container this build writes"), "{said}");
+
+    let mut german = Command::cargo_bin("vise").unwrap();
+    german.args([
+        "--language",
+        "de",
+        "transcode",
+        "--input",
+        input.to_str().unwrap(),
+        "--output",
+        out.to_str().unwrap(),
+        "--format",
+        "not-a-container",
+    ]);
+    let refusal = german.output().expect("runs");
+    let said = String::from_utf8_lossy(&refusal.stderr);
+    assert!(said.contains("kein Container"), "{said}");
+
+    let mut arabic = Command::cargo_bin("vise").unwrap();
+    arabic.args([
+        "--language",
+        "ar",
+        "transcode",
+        "--input",
+        input.to_str().unwrap(),
+        "--output",
+        out.to_str().unwrap(),
+        "--audio-codec",
+        "not-a-codec",
+    ]);
+    let refusal = arabic.output().expect("runs");
+    let said = String::from_utf8_lossy(&refusal.stderr);
+    assert!(said.contains("ليست مرمّز صوت"), "{said}");
+}
+
+/// A language this build does not ship is not an error: the run goes ahead in the
+/// base language and says which one it used.
+#[test]
+fn a_language_this_build_does_not_ship_falls_back_and_says_so() {
+    let dir = std::env::temp_dir().join("vise-cli-language-fallback");
+    let _ = std::fs::create_dir_all(&dir);
+    let input = dir.join("in.mkv");
+    let out = dir.join("out.mkv");
+    let _ = std::fs::remove_file(&input);
+
+    let mut cmd = Command::cargo_bin("vise").unwrap();
+    cmd.args([
+        "--language",
+        "kl",
+        "transcode",
+        "--input",
+        input.to_str().unwrap(),
+        "--output",
+        out.to_str().unwrap(),
+        "--format",
+        "not-a-container",
+    ]);
+    let refusal = cmd.output().expect("runs");
+    let said = String::from_utf8_lossy(&refusal.stderr);
+    assert!(said.contains("kl"), "{said}");
+    assert!(said.contains("English"), "{said}");
+    assert!(said.contains("not a container this build writes"), "{said}");
+}

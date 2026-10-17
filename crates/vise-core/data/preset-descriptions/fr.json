@@ -1,0 +1,14 @@
+{
+  "general-very-fast-480-30-h264": "L'encodage le plus rapide de l'échelle : fichier le plus petit et travail le plus léger, au prix de la perte la plus visible. H.264 se lit partout. Mis à l'échelle en 854 sur 480.",
+  "general-very-fast-1080-30-hevc": "L'encodage le plus rapide de l'échelle : fichier le plus petit et travail le plus léger, au prix de la perte la plus visible. H.265 occupe à qualité égale environ la moitié de H.264. Mis à l'échelle en 1920 sur 1080.",
+  "general-fast-720-30-h264": "Un préréglage rapide qui encode malgré tout correctement ; le choix habituel pour un premier passage sur un long titre. H.264 se lit partout. Mis à l'échelle en 1280 sur 720.",
+  "general-hq-1080-30-h264": "Plus lent et plus gros que Fast, pour un détail qui résiste à un regard de près, et toujours rapide à encoder. H.264 se lit partout. Mis à l'échelle en 1920 sur 1080.",
+  "web-creator-1080-60": "Un fichier H.264 à haute fréquence d'images pour une plateforme qui réencode ce qu'on lui donne : la fréquence et la taille sont l'essentiel, donc la qualité est réglée pour que le mouvement reste fluide plutôt que pour le détail.",
+  "web-social-10mb-60s": "Encodé pour tenir dans 10 Mo. C'est la taille qui est visée, pas la qualité, donc l'honnêteté ne vaut que pour un titre d'une minute environ : plus long, il est comprimé plus fort pour tenir ; plus court, il n'utilisera pas toute la marge.",
+  "device-fire-720-30-h264": "Choisi pour que Fire TV lise le fichier sans le convertir : H.264 dans MP4, dimensionné pour cet écran et pas pour un plus grand.",
+  "device-apple-2160-60-hevc": "Choisi pour que les appareils Apple lisent le fichier sans le convertir : H.264 dans MP4, dimensionné pour cet écran et pas pour un plus grand.",
+  "matroska-hevc-1080-30": "Matroska avec vidéo H.265 et audio FLAC. Le conteneur accepte tous les codecs de cette page, donc le fichier reste lisible quel que soit ce qu'une machine plus récente saura décoder.",
+  "hardware-nvenc-hevc-1080-30": "Encodé par la partie NVIDIA NVENC de la carte graphique plutôt que par le processeur, plusieurs fois plus rapide à taille égale. Cela vaut la peine quand la carte est là ; sinon, ce préréglage revient à l'encodeur logiciel et le dit.",
+  "professional-prores-422-hq": "Pleine résolution, 10 bits, 4:2:2 : l'échange habituel du montage quotidien. Le son est en PCM non compressé, pour qu'un montage n'ait jamais à défaire d'abord une étape avec perte.",
+  "professional-ffv1-pcm": "FFV1 est sans perte et sans prédiction entre images, donc chaque image tient debout seule et une archive peut être coupée n'importe où sans créer un nouveau fichier. PCM conserve le son bit à bit, ce qui est justement l'intérêt d'une copie de sauvegarde."
+}

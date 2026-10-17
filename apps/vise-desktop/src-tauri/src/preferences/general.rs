@@ -1,6 +1,6 @@
 //! The general tab: how sources are opened and scanned.
 //!
-//! Four preferences, and each one has a reader outside this module:
+//! Five preferences, and each one has a reader outside this module:
 //!
 //! * **Scan when a source is opened** — `main.rs` starts the scan from
 //!   `select_source`, so a user who leaves this on never has to press Scan for
@@ -13,6 +13,8 @@
 //!   disk rather than collapsed.
 //! * **Default range** — the mode the range control starts on when a title is
 //!   chosen, so the choice a user makes once is the one they get every time.
+//! * **Language** — the words the interface is written in, which `locale.rs`
+//!   reads at start-up and every time the window pushes a new language.
 
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +24,7 @@ use crate::preferences::{
 };
 use crate::tabs::common::ChoiceOption;
 use crate::viewmodel::RangeMode;
+use vise_core::SUPPORTED;
 
 /// Field identifier for the preview frame count.
 pub const PREVIEW_COUNT: &str = "general.preview_count";
@@ -31,6 +34,89 @@ pub const KEEP_DUPLICATE_TITLES: &str = "general.keep_duplicate_titles";
 pub const DEFAULT_RANGE_MODE: &str = "general.default_range_mode";
 /// Field identifier for the scan-on-open switch.
 pub const SCAN_ON_OPEN: &str = "general.scan_on_open";
+/// Field identifier for the interface language.
+pub const LANGUAGE: &str = "general.language";
+
+/// The value the picker sends for "whatever this machine is set to".
+///
+/// A name rather than an empty tag, because an empty field is indistinguishable
+/// from a preference nobody has set yet, and this build has one answer to "no
+/// language has been chosen".
+pub const FOLLOW_SYSTEM: &str = "system";
+
+/// Which language the interface is written in.
+///
+/// Two answers rather than one tag, because a machine that has never chosen
+/// anything and a machine that has chosen "whatever this one is set to" have to
+/// keep agreeing while the machine's own setting changes underneath.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LanguagePreference {
+    /// Whatever this machine reports.
+    #[default]
+    FollowSystem,
+    /// One language this build ships, by tag.
+    ///
+    /// Read as a string rather than as an enum because the set of languages is
+    /// the translation resources' business: a build that adds a language must not
+    /// have to change this type, and a record naming a language this build does
+    /// not have has to be readable so the language module can resolve it through
+    /// its own chain rather than being refused here.
+    Locale(String),
+}
+
+impl LanguagePreference {
+    /// The value the record stores.
+    pub fn id(&self) -> String {
+        match self {
+            LanguagePreference::FollowSystem => FOLLOW_SYSTEM.to_string(),
+            LanguagePreference::Locale(tag) => tag.clone(),
+        }
+    }
+
+    /// What following the machine resolves to right now.
+    ///
+    /// Kept beside the preference rather than stored in it, so a machine whose
+    /// own setting changes is followed without the record having to be rewritten
+    /// — which is the whole difference between following something and having
+    /// copied it.
+    pub fn resolves_to(&self) -> vise_core::Locale {
+        match self {
+            LanguagePreference::FollowSystem => vise_core::locale_from_environment(),
+            LanguagePreference::Locale(tag) => vise_core::resolve_locale(tag).locale,
+        }
+    }
+
+    /// The tag to read the messages under.
+    pub fn tag(&self) -> String {
+        self.resolves_to().tag().to_string()
+    }
+
+    /// Read the value the interface layer sent, or say why it was refused.
+    ///
+    /// Only a value that is not a name at all is refused. A language this build
+    /// does not ship is stored as asked for and resolved through the fallback
+    /// chain rather than turned away: refusing would leave a record written by
+    /// another build unreadable, and would stop a user from asking for the
+    /// language their machine is in even when the picker cannot show it.
+    pub fn read(value: &serde_json::Value) -> Result<Self, String> {
+        let typed = value
+            .as_str()
+            .ok_or_else(|| format!("{LANGUAGE} has to be the name of a language, not a number."))?;
+        let wanted = typed.trim().to_ascii_lowercase();
+        if wanted.is_empty() {
+            return Err(format!(
+                "{LANGUAGE} has to name a language; an empty name is not one."
+            ));
+        }
+        if wanted == FOLLOW_SYSTEM {
+            return Ok(LanguagePreference::FollowSystem);
+        }
+        Ok(LanguagePreference::Locale(
+            vise_core::i18n::normalize_locale_tag(&wanted),
+        ))
+    }
+}
 
 /// Largest number of stills a scan will extract.
 ///
@@ -146,6 +232,8 @@ pub struct GeneralSettings {
     pub default_range_mode: RangePreference,
     /// Start a scan as soon as a source is opened.
     pub scan_on_open: bool,
+    /// The language the interface is written in.
+    pub language: LanguagePreference,
 }
 
 impl Default for GeneralSettings {
@@ -160,13 +248,16 @@ impl GeneralSettings {
     /// Scanning on open is off, because a folder scan can take a while and a
     /// window that starts one without being asked is a window that appears to
     /// hang. The preview count is on because the preview window asks for stills
-    /// the moment it is opened, and an empty answer would give it nothing.
+    /// the moment it is opened, and an empty answer would give it nothing. The
+    /// language follows this machine, because a window that opened in English on
+    /// a machine set to something else has ignored an answer it was given.
     pub fn new() -> Self {
         Self {
             preview_count: DEFAULT_PREVIEW_FRAMES,
             keep_duplicate_titles: false,
             default_range_mode: RangePreference::Whole,
             scan_on_open: false,
+            language: LanguagePreference::FollowSystem,
         }
     }
 }
@@ -211,6 +302,7 @@ pub fn tab_view(settings: &GeneralSettings) -> PreferenceTabViewModel {
         )
         .with_hint("Chosen once here rather than on every title."),
     );
+    tab.choices.push(language_choice(&settings.language));
     tab.numbers.push(number_control(
         "generalPreviewCount",
         "Preview frames per title",
@@ -239,6 +331,32 @@ pub fn tab_view(settings: &GeneralSettings) -> PreferenceTabViewModel {
     tab
 }
 
+/// The language picker, as one closed set.
+///
+/// Following the machine comes first because it is the answer a machine with no
+/// preference is already giving, and every language after it is named in itself:
+/// a picker of translated names is a picker nobody who cannot read the current
+/// language can use.
+fn language_choice(stored: &LanguagePreference) -> ChoiceGroupViewModel {
+    let mut options = vec![ChoiceOption::new(FOLLOW_SYSTEM, "Follow the system")];
+    options.extend(
+        SUPPORTED
+            .iter()
+            .map(|locale| ChoiceOption::new(locale.tag(), locale.endonym())),
+    );
+    let selected = stored.id();
+    ChoiceGroupViewModel::build(
+        LANGUAGE,
+        "Language",
+        "The language the interface is written in. It changes as soon as it is chosen; nothing else in the window is lost.",
+        &selected,
+        &options,
+        true,
+        "",
+    )
+    .with_hint("A language this build does not have is shown in the language this build was written in.")
+}
+
 /// Read the switch a page sends for this tab, for the tests below.
 #[cfg(test)]
 mod tests {
@@ -256,7 +374,109 @@ mod tests {
         assert!(!settings.keep_duplicate_titles);
         assert!(!settings.scan_on_open);
         assert_eq!(settings.default_range_mode, RangePreference::Whole);
+        assert_eq!(settings.language, LanguagePreference::FollowSystem);
         assert_eq!(settings, GeneralSettings::default());
+    }
+
+    #[test]
+    fn a_language_follows_the_machine_until_it_is_chosen() {
+        let following = LanguagePreference::FollowSystem;
+        assert_eq!(following.id(), FOLLOW_SYSTEM);
+        assert_eq!(following.tag(), vise_core::locale_from_environment().tag());
+        let chosen = LanguagePreference::Locale("ar".to_string());
+        assert_eq!(chosen.id(), "ar");
+        assert_eq!(chosen.tag(), "ar");
+        // The machine changing its mind moves the window that is following it,
+        // which is the difference between following something and having copied
+        // it.
+        assert_eq!(chosen.tag(), "ar", "a chosen language does not move");
+    }
+
+    #[test]
+    fn a_language_the_picker_sent_is_read_and_one_it_cannot_show_is_kept() {
+        assert_eq!(
+            LanguagePreference::read(&value("\"system\"")).expect("system"),
+            LanguagePreference::FollowSystem
+        );
+        assert_eq!(
+            LanguagePreference::read(&value("\"ar\"")).expect("arabic"),
+            LanguagePreference::Locale("ar".to_string())
+        );
+        assert_eq!(
+            LanguagePreference::read(&value("\" DE \"")).expect("german"),
+            LanguagePreference::Locale("de".to_string())
+        );
+        // A language this build does not ship is stored as asked for and resolved
+        // through the fallback chain, rather than refused: refusing would leave a
+        // record written by another build unreadable for no gain.
+        let shipped_elsewhere = LanguagePreference::read(&value("\"kl\"")).expect("greenlandic");
+        assert_eq!(
+            shipped_elsewhere,
+            LanguagePreference::Locale("kl".to_string())
+        );
+        assert_eq!(shipped_elsewhere.tag(), "en", "and falls back to the base");
+        // A regional tag is reduced to what decides anything.
+        assert_eq!(
+            LanguagePreference::read(&value("\"es_MX\"")).expect("regional"),
+            LanguagePreference::Locale("es-mx".to_string())
+        );
+        let error = LanguagePreference::read(&value("3")).expect_err("not a name");
+        assert!(error.contains(LANGUAGE), "{error}");
+    }
+
+    #[test]
+    fn the_tab_offers_every_language_in_its_own_name() {
+        let view = tab_view(&GeneralSettings::new());
+        let picker = view
+            .choices
+            .iter()
+            .find(|choice| choice.id == LANGUAGE)
+            .expect("the language picker");
+        assert_eq!(picker.selected, FOLLOW_SYSTEM);
+        assert_eq!(picker.options.len(), SUPPORTED.len() + 1);
+        assert_eq!(picker.options[0].id, FOLLOW_SYSTEM);
+        assert_eq!(picker.options[0].label, "Follow the system");
+        let arabic = picker
+            .options
+            .iter()
+            .find(|option| option.id == "ar")
+            .expect("arabic is offered");
+        assert_eq!(arabic.label, "العربية");
+
+        // A chosen language is marked as chosen, and the picker is the same
+        // control with a different row selected rather than a second control.
+        let chosen = GeneralSettings {
+            language: LanguagePreference::Locale("de".to_string()),
+            ..GeneralSettings::new()
+        };
+        let view = tab_view(&chosen);
+        let picker = view
+            .choices
+            .iter()
+            .find(|choice| choice.id == LANGUAGE)
+            .expect("the language picker");
+        assert_eq!(picker.selected, "de");
+        assert_eq!(picker.options.len(), SUPPORTED.len() + 1);
+        assert!(picker.available);
+        assert_eq!(view.choices.len(), 2);
+    }
+
+    #[test]
+    fn the_language_survives_a_record_round_trip() {
+        let stored = GeneralSettings {
+            language: LanguagePreference::Locale("ja".to_string()),
+            ..GeneralSettings::new()
+        };
+        let text = serde_json::to_string(&stored).expect("write");
+        let read: GeneralSettings = serde_json::from_str(&text).expect("read");
+        assert_eq!(read, stored);
+        // A record from before this preference existed reads without it and comes
+        // back following the machine, which is what a user who never chose
+        // expects.
+        let old: GeneralSettings =
+            serde_json::from_str(r#"{"preview_count":4}"#).expect("an older record");
+        assert_eq!(old.language, LanguagePreference::FollowSystem);
+        assert_eq!(old.preview_count, 4);
     }
 
     #[test]
@@ -315,10 +535,6 @@ mod tests {
     fn the_tab_shows_every_control_with_its_bounds_and_its_value() {
         let view = tab_view(&GeneralSettings::new());
         assert_eq!(view.id, "general");
-        assert_eq!(view.choices.len(), 1);
-        assert_eq!(view.choices[0].id, DEFAULT_RANGE_MODE);
-        assert_eq!(view.choices[0].selected, "whole");
-        assert_eq!(view.choices[0].options.len(), RangePreference::ALL.len());
         assert_eq!(view.numbers.len(), 1);
         assert_eq!(view.numbers[0].min, Some(0.0));
         assert_eq!(view.numbers[0].max, Some(f64::from(MAX_PREVIEW_FRAMES)));

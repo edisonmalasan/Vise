@@ -25,6 +25,7 @@ use vise_ipc::timespan::TimeSpan;
 use vise_ipc::{WorkerClient, WorkerConfig, WorkerSupervisor};
 
 mod appearance;
+mod locale;
 mod preferences;
 mod scanflow;
 mod sources;
@@ -34,6 +35,7 @@ mod viewmodel;
 mod windows;
 
 use appearance::{AppearanceState, AppearanceViewModel, SystemTheme};
+use locale::{LanguageSwitch, LanguageViewModel, LANGUAGE_EVENT};
 use preferences::{PreferencesSettings, PreferencesState, PreferencesViewModel};
 use scanflow::{scan_in_process, ScanFlow};
 use sources::{RecentSources, SourceDropReport, SourceViewModel};
@@ -3458,6 +3460,46 @@ fn set_preference_tab(
     Ok(guard.preferences.view())
 }
 
+/// What a language switch moved, for the page to apply.
+///
+/// Two answers and not three: the configuration tabs are deliberately absent,
+/// because redrawing them is what would throw away what the user has typed. The
+/// page is told what changed rather than being asked to reload everything, so it
+/// cannot refresh a surface the window did not mean to touch.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LanguageChange {
+    /// Which language is in force, and what it can be drawn with.
+    pub language: LanguageViewModel,
+    /// The appearance answer, because a language can move the layout.
+    pub appearance: AppearanceViewModel,
+    /// The preferences answer, because the picker and every other label on the
+    /// tabs is written in the language that just changed.
+    pub preferences: PreferencesViewModel,
+}
+
+/// Apply a chosen language to the open window.
+///
+/// Split out from the command so the rule that a language switch touches nothing
+/// but the words can be tested without a running application: what this returns
+/// is exactly what the page is sent, and the state behind the configuration tabs
+/// is not read, rebuilt, or reset on the way through.
+fn apply_language(state: &SharedState, requested: &str) -> Result<LanguageChange, String> {
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let direction_mode = guard.appearance.direction_mode();
+    let switched: LanguageSwitch =
+        locale::switch_language(&mut guard.appearance, direction_mode, requested)?;
+    // The catalog's descriptions are in the same language as everything else, so
+    // one switch moves them: a browser showing English descriptions under a
+    // German interface would be two answers to one question.
+    guard.presets.use_language(requested);
+    Ok(LanguageChange {
+        language: switched.view,
+        appearance: switched.appearance,
+        preferences: guard.preferences.view(),
+    })
+}
+
 /// Change one preference.
 ///
 /// A change to a preference that decides which kind of backend there is discards
@@ -3467,6 +3509,7 @@ fn set_preference_tab(
 /// disagree about what is being kept.
 #[tauri::command]
 fn set_preference(
+    app: AppHandle,
     state: State<'_, SharedState>,
     change: PreferenceChange,
 ) -> Result<PreferencesViewModel, String> {
@@ -3509,6 +3552,25 @@ fn set_preference(
         // one source, rather than the two holding different answers.
         if let Ok(mut guard) = state.lock() {
             let _ = guard.preview.set_still_count(stills);
+        }
+    }
+    if before.general.language != after.general.language {
+        // The language is the one preference that changes what is already on
+        // screen, so it is applied here rather than being left for the next read:
+        // the window pushes the two answers that moved and the page applies them.
+        // The record has already been written by the setter above, which is why
+        // this only has to say what to draw.
+        let requested = after.general.language.tag();
+        let change = apply_language(&state, &requested)?;
+        push_log(
+            &state,
+            format!(
+                "the interface language changed: {}",
+                change.language.summary
+            ),
+        );
+        if let Err(e) = app.emit(LANGUAGE_EVENT, &change) {
+            eprintln!("the new language could not be sent to the page: {e}");
         }
     }
     if before.advanced != after.advanced || before.updates != after.updates {
@@ -3726,6 +3788,24 @@ fn report_locale(
     Ok(guard.appearance.view())
 }
 
+/// The language picker, as the window decides it.
+///
+/// Separate from the change itself because a page that only wants to redraw the
+/// picker must not have to send a preference to ask.
+#[tauri::command]
+fn language_view(state: State<'_, SharedState>) -> Result<LanguageViewModel, String> {
+    let guard = state.lock().map_err(|e| e.to_string())?;
+    // Asked of the appearance state rather than of the record, because that is
+    // where the language in force is: the record says what was chosen and the
+    // window says what it resolved to, and those are different answers on a
+    // machine set to a language this build does not ship.
+    let tag = guard.appearance.language().to_string();
+    Ok(locale::language_view(
+        &vise_core::resolve_catalog(&tag),
+        guard.appearance.direction_mode(),
+    ))
+}
+
 /// Look for a newer release now, and answer with the Updates tab.
 ///
 /// The button is closed with a reason when there is nothing to look at, so this is
@@ -3781,11 +3861,22 @@ fn main() {
     // window has an answer before the page has said anything. The setup hook
     // replaces the theme with the platform's own as soon as there is a window
     // to ask.
-    let appearance = AppearanceState::load(&settings_path, SystemTheme::Light, None);
+    let mut appearance = AppearanceState::load(&settings_path, SystemTheme::Light, None);
     // The preferences are read before anything else is built, because three of
     // them decide what gets built: whether there is a worker process, how much
     // is logged, and how many stills a scan extracts.
     let mut preferences = PreferencesState::load(&settings_path, &portable);
+    // The stored language decides the words the window opens in, and the layout
+    // that follows from it, before anything is painted rather than on the first
+    // poll: a window that opens in the wrong language for one frame and then
+    // corrects itself is a window the reader has already read.
+    let stored_language = preferences.settings().general.language.tag();
+    let opening_direction = appearance.direction_mode();
+    if let Err(problem) =
+        locale::switch_language(&mut appearance, opening_direction, &stored_language)
+    {
+        eprintln!("the stored interface language could not be applied: {problem}");
+    }
     // Detection is a pair of subprocess calls, so it is done once here rather
     // than on every read of the hardware tab.
     preferences.observe_hardware(&vise_core::HardwareCapabilities::detect());
@@ -4015,6 +4106,7 @@ fn main() {
             appearance_view,
             set_theme_mode,
             set_direction_mode,
+            language_view,
             report_system_theme,
             report_locale,
             preferences_view,
@@ -4718,6 +4810,8 @@ mod tests {
             "followsLocale":true,
             "systemTheme":"dark",
             "locale":"ar-EG",
+            "language":"ar",
+            "directionLanguage":"من اليمين إلى اليسار",
             "themeOptions":[
                 {"id":"system","label":"Match the system","facts":"","available":true,"reason":"","selected":true},
                 {"id":"light","label":"Light","facts":"","available":true,"reason":"","selected":false},
@@ -4728,7 +4822,7 @@ mod tests {
                 {"id":"ltr","label":"Left to right","facts":"","available":true,"reason":"","selected":false},
                 {"id":"rtl","label":"Right to left","facts":"","available":true,"reason":"","selected":false}
             ],
-            "summary":"Showing the dark theme, laid out right to left because ar-EG reads right to left.",
+            "summary":"The system asks for Dark, so the window will be Dark. / ar-EG reads right to left, so the window is laid out right to left.",
             "flowGlyph":"\u2192",
             "observationNote":"Your system is in its dark theme, reported by this window; your locale is ar-EG, reported by this window."
         }"#;
@@ -4737,6 +4831,7 @@ mod tests {
         assert_eq!(view.direction, "rtl");
         assert_eq!(view.system_theme, "dark");
         assert_eq!(view.locale, "ar-EG");
+        assert_eq!(view.language, "ar");
         assert_eq!(view.theme_options.len(), 3);
         assert_eq!(view.direction_options.len(), 3);
         assert_eq!(view.flow_glyph, "\u{2192}");
@@ -4750,6 +4845,163 @@ mod tests {
         // values, so neither may be spelled any other way.
         assert!(["light", "dark"].contains(&view.theme.as_str()));
         assert!(["ltr", "rtl"].contains(&view.direction.as_str()));
+    }
+
+    /// A window whose preferences and appearance can actually be written.
+    ///
+    /// `DesktopState::default()` leaves both with nowhere to save to, which is right
+    /// for a state that only answers questions and wrong for one that keeps a
+    /// preference: a change that cannot be stored is refused rather than made, so
+    /// these tests load both the way the window does at start-up.
+    fn ready_state(name: &str) -> SharedState {
+        let state = scratch_state(name);
+        let mut guard = state.lock().expect("lock");
+        let path = guard.settings_path.clone();
+        guard.appearance = AppearanceState::load(&path, SystemTheme::Light, None);
+        guard.preferences = PreferencesState::load(&path, &PortableSettings::default());
+        drop(guard);
+        state
+    }
+
+    #[test]
+    fn every_name_the_page_asks_for_is_a_key_this_build_has() {
+        // The page holds no text: an element names the message it wants and the
+        // window's language answers. That only works while both sides agree on the
+        // names, so the markup is checked against the catalog here rather than
+        // leaving a rename on one side to be found on screen.
+        let page = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/index.html");
+        let markup = std::fs::read_to_string(&page).expect("the page");
+        let names: Vec<&str> = markup
+            .match_indices("data-i18n=\"")
+            .map(|(at, found)| {
+                let rest = &markup[at + found.len()..];
+                let end = rest.find('"').expect("a closed attribute");
+                &rest[..end]
+            })
+            .collect();
+        assert!(!names.is_empty(), "the page marks nothing at all");
+        for name in &names {
+            assert!(
+                vise_core::MessageKey::of_name(name).is_some(),
+                "the page asks for '{name}', which is not a key this build has"
+            );
+            assert!(!vise_core::Catalog::base()
+                .text(vise_core::MessageKey::of_name(name).expect(name))
+                .is_empty());
+        }
+        // And every shipped language answers every one of them.
+        for table in vise_core::message_tables() {
+            let resolved = vise_core::resolve_catalog(table.tag);
+            for name in &names {
+                let key = vise_core::MessageKey::of_name(name).expect(name);
+                assert!(
+                    resolved.catalog.message(key).source.is_translated(),
+                    "{}: '{name}' falls back in a shipped locale",
+                    table.tag
+                );
+            }
+        }
+    }
+
+    /// A window whose configuration tabs hold work in progress.
+    fn window_with_typed_input() -> SharedState {
+        let state = ready_state("vise-desktop-language-switch");
+        let mut guard = state.lock().expect("lock");
+        guard.tabs.active = "dimensions".to_string();
+        guard.tabs.dimensions.scale_width = tabs::common::NumField::of("1280");
+        guard.tabs.dimensions.scale_height = tabs::common::NumField::of("720");
+        guard.tabs.dimensions.aspect_ratio = "16:9".to_string();
+        guard.tabs.video.encoder = "libx265".to_string();
+        guard.tabs.subtitles.behaviour = "burn".to_string();
+        guard.tabs.metadata.mode = "edit".to_string();
+        drop(guard);
+        state
+    }
+
+    #[test]
+    fn a_language_switch_re_emits_the_view_models_and_keeps_what_was_typed() {
+        let state = window_with_typed_input();
+        let before = {
+            let guard = state.lock().expect("lock");
+            guard.tabs.clone()
+        };
+        let change = apply_language(&state, "ar").expect("arabic is a language");
+        assert_eq!(change.language.locale, "ar");
+        assert_eq!(change.language.language, "العربية");
+        assert_eq!(change.appearance.direction, "rtl");
+        assert_eq!(change.appearance.language, "ar");
+        // The configuration tabs are not in the payload at all: they are what the
+        // user has half filled in, and a payload that could redraw them is a
+        // payload that loses the work.
+        let payload = serde_json::to_value(&change).expect("payload");
+        assert!(payload.get("tabs").is_none(), "{}", payload);
+        assert!(payload.get("language").is_some());
+        assert!(payload.get("appearance").is_some());
+        assert!(payload.get("preferences").is_some());
+        let after = {
+            let guard = state.lock().expect("lock");
+            guard.tabs.clone()
+        };
+        assert_eq!(after, before, "nothing about the tabs moved");
+        assert_eq!(after.dimensions.scale_width.text, "1280");
+        assert_eq!(after.video.encoder, "libx265");
+        assert_eq!(after.metadata.mode, "edit");
+    }
+
+    #[test]
+    fn a_pinned_direction_is_not_moved_by_a_language_change() {
+        let state = ready_state("vise-desktop-language-pinned");
+        {
+            let mut guard = state.lock().expect("lock");
+            guard
+                .appearance
+                .set_direction_mode("ltr")
+                .expect("the direction is kept");
+        }
+        let change = apply_language(&state, "ar").expect("arabic is a language");
+        assert_eq!(
+            change.language.direction, "rtl",
+            "the language reads this way"
+        );
+        assert!(!change.language.follows_language);
+        assert_eq!(
+            change.appearance.direction, "ltr",
+            "and the layout still does not, because the user pinned it"
+        );
+    }
+
+    #[test]
+    fn a_language_the_build_does_not_ship_still_opens_a_window() {
+        let state = ready_state("vise-desktop-language-unshipped");
+        let change = apply_language(&state, "kl").expect("an unshipped language resolves");
+        assert_eq!(change.language.locale, "en");
+        assert!(
+            change.language.summary.contains("kl"),
+            "{}",
+            change.language.summary
+        );
+        assert_eq!(change.appearance.language, "en");
+    }
+
+    #[test]
+    fn the_language_the_record_holds_is_the_one_the_picker_shows() {
+        let state = ready_state("vise-desktop-language-record");
+        {
+            let mut guard = state.lock().expect("lock");
+            guard
+                .preferences
+                .set(preferences::general::LANGUAGE, &serde_json::json!("ja"))
+                .expect("the preference is accepted");
+        }
+        let applied = apply_language(&state, "ja").expect("japanese");
+        assert_eq!(applied.language.locale, "ja");
+        let guard = state.lock().expect("lock");
+        assert_eq!(
+            guard.preferences.settings().general.language.tag(),
+            "ja",
+            "and the record still holds it"
+        );
+        assert_eq!(guard.appearance.language(), "ja");
     }
     /// A preset built for a machine this one does not resemble still has to reach
     /// the output settings rather than being half-applied, because a preset that
