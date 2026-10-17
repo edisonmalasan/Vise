@@ -440,8 +440,48 @@ pub fn export_user_preset(path: &Path, preset: &UserPreset) -> Result<(), CoreEr
 }
 
 // Settings persistence
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+
+/// Version stamped into every settings file this build writes.
+///
+/// The number is the whole point of the member: a settings file that does not
+/// say which build wrote it can only be read by guessing, and a guess is either
+/// too careful to ever change anything or too eager to drop something a user
+/// set. With the number in the file, a build can say which of the two it is
+/// doing before it reads anything else.
+pub const SETTINGS_VERSION: u32 = 2;
+
+/// Version a settings file is read as when it declares none.
+///
+/// Files written before the version existed are read as this version and are
+/// migrated forward on the next save, which is why no data is moved here: the
+/// members themselves are unchanged, and only the declaration is added.
+pub const SETTINGS_UNVERSIONED: u32 = 1;
+
+/// Members of a settings document that are named rather than bagged.
+///
+/// Everything else a file carries lands in [`AppSettings::extra`] untouched,
+/// which is what lets a file written by a newer build be read without losing
+/// the members this build has never heard of.
+pub const NAMED_SETTINGS: [&str; 5] = [
+    "version",
+    "default_preset",
+    "output_directory",
+    "recent_input",
+    "user_presets_path",
+];
+
+/// Application settings as they are stored.
+///
+/// `version` is written by [`save_settings`] and read back by
+/// [`load_settings`]. It is the number the file declared before this build
+/// touched it, which is how the migration questions below are answered. It is
+/// never written back smaller than the number that was found, so a file a newer
+/// build wrote stays readable by that build after this one saves it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
+    /// Version this build writes, and the version it found in the file.
+    #[serde(default = "current_settings_version")]
+    pub version: u32,
     #[serde(default)]
     pub default_preset: Option<String>,
     #[serde(default)]
@@ -452,6 +492,73 @@ pub struct AppSettings {
     pub user_presets_path: Option<String>,
     #[serde(default, flatten)]
     pub extra: std::collections::BTreeMap<String, serde_json::Value>,
+    /// Version the file on disk declared, or zero when it declared none.
+    ///
+    /// Bookkeeping rather than content: it is never written back, and it is not
+    /// part of equality, so a settings document read from a file still equals
+    /// the document that was saved to it.
+    #[serde(skip)]
+    pub written_version: u32,
+}
+
+/// The version a settings file this build writes carries.
+fn current_settings_version() -> u32 {
+    SETTINGS_VERSION
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            version: SETTINGS_VERSION,
+            default_preset: None,
+            output_directory: None,
+            recent_input: None,
+            user_presets_path: None,
+            extra: std::collections::BTreeMap::new(),
+            written_version: 0,
+        }
+    }
+}
+
+impl AppSettings {
+    /// Whether the file this was read from predates this build.
+    ///
+    /// An unversioned file counts: it is read as [`SETTINGS_UNVERSIONED`] and
+    /// brought forward on the next save.
+    pub fn needs_migration(&self) -> bool {
+        self.written_version > 0 && self.written_version < SETTINGS_VERSION
+    }
+
+    /// Whether the file this was read from was written by a newer build.
+    ///
+    /// True means this build cannot be sure what the file means, so anything it
+    /// does not recognise has to be left exactly where it found it.
+    pub fn from_the_future(&self) -> bool {
+        self.written_version > SETTINGS_VERSION
+    }
+
+    /// The version the file on disk declared, in words, for a status line.
+    pub fn written_version_label(&self) -> String {
+        if self.written_version == 0 {
+            "no version".to_string()
+        } else {
+            format!("version {}", self.written_version)
+        }
+    }
+}
+
+// Equality is about the document, not about how it was read: the two
+// bookkeeping members are skipped so that a settings document read back from
+// disk equals the one that was written to it.
+impl PartialEq for AppSettings {
+    fn eq(&self, other: &Self) -> bool {
+        self.version == other.version
+            && self.default_preset == other.default_preset
+            && self.output_directory == other.output_directory
+            && self.recent_input == other.recent_input
+            && self.user_presets_path == other.user_presets_path
+            && self.extra == other.extra
+    }
 }
 
 pub type Settings = AppSettings;
@@ -459,6 +566,61 @@ pub type AppConfig = AppSettings;
 pub type Config = AppSettings;
 pub type ViseSettings = AppSettings;
 
+/// Read one settings document, whatever version wrote it.
+///
+/// The document is read member by member rather than decoded in one go, and
+/// that is the difference between losing one wrong value and losing the file.
+/// A `default_preset` that is not a string costs that one member; every other
+/// member, and every member of the bag, survives. Anything this build does not
+/// recognise is kept verbatim, so a file a newer build wrote is read as far as
+/// it can be and written back without being flattened by an older reader.
+///
+/// A document that is not an object at all is refused: there is nothing in it
+/// to read, and guessing would mean writing a file over somebody else's.
+pub fn read_settings(document: &serde_json::Value) -> Result<AppSettings, CoreError> {
+    let Some(members) = document.as_object() else {
+        return Err(CoreError::Parse(
+            "a settings file has to be a JSON object".to_string(),
+        ));
+    };
+    let mut settings = AppSettings::default();
+    // A version that is not a whole number cannot be read as one, so the file is
+    // treated as unversioned rather than refused: it is migrated forward and
+    // the wrong member is dropped, which loses nothing that could be recovered.
+    settings.written_version = members
+        .get("version")
+        .and_then(serde_json::Value::as_u64)
+        .map(|version| version.min(u64::from(u32::MAX)) as u32)
+        .unwrap_or(SETTINGS_UNVERSIONED);
+    settings.default_preset = named_string(members, "default_preset");
+    settings.output_directory = named_string(members, "output_directory");
+    settings.recent_input = named_string(members, "recent_input");
+    settings.user_presets_path = named_string(members, "user_presets_path");
+    for (name, member) in members {
+        if NAMED_SETTINGS.contains(&name.as_str()) {
+            continue;
+        }
+        settings.extra.insert(name.clone(), member.clone());
+    }
+    // Never write a version below the one that was found. A file a newer build
+    // wrote keeps its number, so that build can still read what this one saved.
+    settings.version = settings.written_version.max(SETTINGS_VERSION);
+    Ok(settings)
+}
+
+/// A named string member, or nothing when it is absent or the wrong shape.
+fn named_string(
+    members: &serde_json::Map<String, serde_json::Value>,
+    name: &str,
+) -> Option<String> {
+    members.get(name).and_then(serde_json::Value::as_str).map(str::to_string)
+}
+
+/// Read the settings file at `path`.
+///
+/// A file that is missing, empty, or not valid JSON is an error rather than an
+/// empty document: callers decide what an unreadable settings file means for
+/// them, and a window that has been told a file is broken can say so.
 pub fn load_settings(path: &Path) -> Result<AppSettings, CoreError> {
     if !path.exists() {
         return Ok(AppSettings::default());
@@ -467,8 +629,11 @@ pub fn load_settings(path: &Path) -> Result<AppSettings, CoreError> {
     if raw.trim().is_empty() {
         return Ok(AppSettings::default());
     }
-    serde_json::from_str(&raw).map_err(|e| CoreError::Parse(e.to_string()))
+    let document: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|e| CoreError::Parse(format!("the settings file is not valid JSON: {e}")))?;
+    read_settings(&document)
 }
+
 pub fn save_settings(path: &Path, settings: &AppSettings) -> Result<(), CoreError> {
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
