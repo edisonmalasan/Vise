@@ -3489,6 +3489,10 @@ fn apply_language(state: &SharedState, requested: &str) -> Result<LanguageChange
     let direction_mode = guard.appearance.direction_mode();
     let switched: LanguageSwitch =
         locale::switch_language(&mut guard.appearance, direction_mode, requested)?;
+    // The catalog's descriptions are in the same language as everything else, so
+    // one switch moves them: a browser showing English descriptions under a
+    // German interface would be two answers to one question.
+    guard.presets.use_language(requested);
     Ok(LanguageChange {
         language: switched.view,
         appearance: switched.appearance,
