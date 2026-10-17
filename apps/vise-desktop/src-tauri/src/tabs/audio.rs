@@ -55,7 +55,15 @@ impl Default for AudioRules {
             // starting point, so a job is queueable before the user touches
             // anything.
             bitrate: NumField::of("192"),
-            quality: NumField::blank(),
+            // Opus, Vorbis, and FLAC take a quality value instead of a rate,
+            // and they get one for the same reason the bit rate has one: a job
+            // is queueable before the user touches anything. Without it a
+            // catalog preset that names one of these codecs could not be
+            // applied at all, because the tab would refuse a job it cannot
+            // describe rather than carry a number it would have had to invent.
+            // The two fields are not both sent — the tab sends whichever the
+            // chosen encoder takes and blocks the other.
+            quality: NumField::of("5"),
             mixdown: "auto".to_string(),
             sample_rate: "keep".to_string(),
             passthrough: false,
@@ -1096,6 +1104,10 @@ mod tests {
         let mut settings = AudioSettings {
             defaults: AudioRules {
                 encoder: "vorbis".into(),
+                // The rules start with a quality value so a job is queueable
+                // before anything is touched, so this asks about the case that
+                // default does not cover: the user clearing the field.
+                quality: NumField::blank(),
                 ..Default::default()
             },
             ..Default::default()
