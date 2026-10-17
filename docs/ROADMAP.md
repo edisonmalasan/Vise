@@ -318,16 +318,30 @@ Verified by unit tests and by running the application against a generated clip: 
 
 *Outcome: Users can configure the application through the full preferences surface.*
 
-- [ ] General preferences tab
-- [ ] Output preferences tab (folders, overwrite, autonaming collision)
-- [ ] Advanced preferences tab (process isolation, log level, priority)
-- [ ] Hardware preferences tab (encoder availability, decode device)
-- [ ] Updates preferences tab (check frequency, channel)
-- [ ] When-done preferences tab
-- [ ] Reset-to-defaults flow
-- [ ] Settings persistence and migration
+- [x] General preferences tab
+- [x] Output preferences tab (folders, overwrite, autonaming collision)
+- [x] Advanced preferences tab (process isolation, log level, priority)
+- [x] Hardware preferences tab (encoder availability, decode device)
+- [x] Updates preferences tab (check frequency, channel)
+- [x] When-done preferences tab
+- [x] Reset-to-defaults flow
+- [x] Settings persistence and migration
 
-**Status:** Not started (0/8 verified)
+**Status:** Complete (8/8 verified; the six tabs are one record in the settings file, under a version of its own so a record written by a newer build is read, shown as that build left it, and never written over. An older document's own output folder is adopted into the Output tab rather than lost, and a corrupt record falls back to the defaults while the bytes on disk are left exactly as they were found)
+
+A preference is only worth having if something reads it, so each tab names the path that consumes it and a control with no such path is shown closed with the reason rather than stored and ignored. That rule is what decided the three answers the when-done tab cannot give — suspending, hibernating and signing out are listed with what they would have meant and closed, because this build has no session control — and what closed the button that would fetch a release, because this build contacts no release server. The same rule applies to the one that *is* on offer: the advanced tab's switch is closed when a portable settings file has taken isolation away, while the preference itself is kept and shown, so removing the file brings the user's choice back rather than replacing it with a default.
+
+The record's version is separate from the document's on purpose. The document gains members for reasons that have nothing to do with what a control means, while the record's number only moves when a preference changes shape. So a document from an older build is migrated forward by the one migration that has anything to carry — the output folder it kept at the top level becomes the folder the Output tab edits — and a record from a newer build is read as far as it can be, shown as that build left it, and refused rather than written over, because a downgrade and an upgrade round trip would otherwise throw it away. A record this build cannot read is not deleted or half-applied: every preference falls back to its default, the stored bytes are left exactly as they were found, and the first change is what rewrites the file.
+
+The two answers about replacing a file are settled into one before anything is written, rather than left as a rule the user has to learn: turning the switch on settles the collision choice to replace, and choosing any other collision turns the switch off, so the record cannot hold two answers to one question. The queue reads that one settled value as a single policy and resolves the whole batch before any of it is queued, through the same call the selection sheet is built from — so the names on the sheet are the names the queue writes, including the ones a renumbering policy changed, and two titles that would resolve to one file are numbered, refused or left out together rather than the second quietly overwriting the first.
+
+Hardware detection reports what the machine has rather than offering a switch beside each encoder, because a list of encoders is information and offering a choice for each one would be offering a choice nothing reads. A named decode device is a choice, because the pipeline reads it, so it goes into the decoder the media tools are given — as an accelerator name and as the API it corresponds to, not as the `-hwaccel_device` argument, which takes a device path. A device detection did not find is refused at the point of setting rather than saved and quietly ignored, and the two answers that are not a device are always on offer.
+
+The page holds nothing but the surface. A value derived from a preference — the verbosity rank a log level works out to, the days between checks, the date the next check falls — is shown as a description list and not as an editable field, because a field that can be typed into and then ignored is a control that lies about what it is; the only controls that take input are the ones the window will read. Every closed control carries its reason in the same place and announces it through `aria-describedby`, so the explanation exists for people who cannot see it. The strip walks with the platform's own arrows, which swap with the layout rather than becoming unreachable with one of them, and Home and End go to the ends either way.
+
+Restoring the defaults is the one control on the surface that throws away work, so it asks through the countdown every other destructive action uses, and the previous record is kept for exactly one reset so the answer can be taken back. The queue finishing can ask the same question with nobody pressing anything, so that question is pushed to the page as an event and confirmed through a command that closes the window only when a confirmation is behind it; a wait is honoured rather than recorded, and the window remembers it has already asked for this drain so two jobs finishing together ask once.
+
+Verified by unit tests across the record's lifecycle: a round trip through the settings file, an older document whose output folder is adopted, an older record brought forward without losing what it held, a record from a newer build read and never written, three kinds of corrupt record left alone on disk, a settings file that is not JSON at all, a partially missing record, and a reset that is on disk and can be taken back once. Each preference is checked against the code path that consumes it, and the collision rules, the hardware options, the schedule, and the when-done decision are pinned as plain functions. The page was verified by driving the shipped page with the bridge stubbed to the answers the window sends: the six tabs and their panels carry the right semantics, one tab stop with arrows that wrap and swap with the layout, closed controls keeping their reasons and their stored values, the invalid folder marked and explained inline, a change sending the field the window named rather than the element it came from, the reset asking through the countdown, and a question the window asked for itself confirming through its own command. The application itself was not launched for this slice, so the preferences surface was confirmed through the shipped page rather than through the running window.
 
 ## Group 16 — Preset catalog and versioning
 
@@ -458,7 +472,7 @@ Required groups: 19
 | 12 | Platform packaging and release | In progress (3/8) |
 | 13 | Worker process and JSON IPC | Complete (9/9) |
 | 14 | Desktop parity with reference product | Complete (18/18) |
-| 15 | Preferences surface | Not started (0/8) |
+| 15 | Preferences surface | Complete (8/8) |
 | 16 | Preset catalog and versioning | Not started (0/13) |
 | 17 | System integration | Not started (0/9) |
 | 18 | Localization | Not started (0/6) |
