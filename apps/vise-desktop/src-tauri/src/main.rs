@@ -58,6 +58,12 @@ const MAIN_WINDOW: &str = "main";
 
 /// Event the page listens to for a theme the operating system changed.
 const APPEARANCE_EVENT: &str = "appearance-changed";
+/// Event carrying a question the window asked for itself.
+///
+/// The countdown alert is normally opened by the page pressing a control; the
+/// when-done preferences open it without one, because the queue finishing is not
+/// something the user does. The answer still travels the same way round.
+const ALERT_EVENT: &str = "alert-asked";
 
 /// How the shell reaches the transcode pipeline.
 enum Backend {
@@ -1420,7 +1426,7 @@ fn set_job_state(
 }
 
 #[tauri::command]
-fn run_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
+fn run_job(app: AppHandle, state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
     let spec = claim_job(&state, id)?;
     let shared: SharedState = state.inner().clone();
     let worker = worker_client(&state)?;
@@ -1432,7 +1438,7 @@ fn run_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
         // The queue may have drained with this job, and the When-done preference
         // is acted on the moment the last one finishes rather than the next time
         // something is queued.
-        apply_when_done(&shared);
+        apply_when_done(&app, &shared);
     });
     Ok(())
 }
@@ -1448,7 +1454,7 @@ fn run_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
 /// recoverable. The window remembers what it has already decided for this drain,
 /// so two jobs finishing together produce one wait and one question rather than
 /// two.
-fn apply_when_done(state: &SharedState) {
+fn apply_when_done(app: &AppHandle, state: &SharedState) {
     let plan = {
         let Ok(guard) = state.lock() else {
             return;
@@ -1484,7 +1490,7 @@ fn apply_when_done(state: &SharedState) {
         return;
     }
     if plan.delay_seconds == 0 {
-        carry_out_when_done(state, plan);
+        carry_out_when_done(app, state, plan);
         return;
     }
     push_log(
@@ -1494,10 +1500,11 @@ fn apply_when_done(state: &SharedState) {
             plan.delay_seconds
         ),
     );
+    let app = app.clone();
     let shared = state.clone();
     thread::spawn(move || {
         thread::sleep(Duration::from_secs(u64::from(plan.delay_seconds)));
-        carry_out_when_done(&shared, plan);
+        carry_out_when_done(&app, &shared, plan);
     });
 }
 
@@ -1507,9 +1514,14 @@ fn apply_when_done(state: &SharedState) {
 /// before it closes, through the same countdown every other destructive action
 /// uses — so there is one question rather than two that mean the same thing.
 ///
+/// The question is announced as an event rather than waited to be asked for,
+/// because the window asked it itself: the page has no control to press and
+/// would otherwise sit there looking at a queue that has finished with nothing
+/// happening.
+///
 /// A line is written to the activity log because a window that acts on its own
 /// should say so somewhere the user can read it afterwards.
-fn carry_out_when_done(state: &SharedState, plan: WhenDonePlan) {
+fn carry_out_when_done(app: &AppHandle, state: &SharedState, plan: WhenDonePlan) {
     match plan.action {
         preferences::whendone::WhenDoneAction::CloseWindow
         | preferences::whendone::WhenDoneAction::Ask => {
@@ -1526,6 +1538,11 @@ fn carry_out_when_done(state: &SharedState, plan: WhenDonePlan) {
                 None,
                 None,
             );
+            let view = guard.alerts.view();
+            drop(guard);
+            if let Err(e) = app.emit(ALERT_EVENT, &view) {
+                eprintln!("the question could not be shown: {e}");
+            }
         }
         // The three actions this build cannot do are refused before they are
         // stored, so reaching here with one means a record from a newer build
@@ -1584,7 +1601,10 @@ fn claim_job(state: &SharedState, id: JobId) -> Result<JobSpec, String> {
 /// another rather than starting a thread per job; a job that fails does not
 /// stop the ones behind it.
 #[tauri::command]
-fn start_queue(state: State<'_, SharedState>) -> Result<windows::queue::QueueViewModel, String> {
+fn start_queue(
+    app: AppHandle,
+    state: State<'_, SharedState>,
+) -> Result<windows::queue::QueueViewModel, String> {
     require_confirmation(&state, AlertAction::StartQueue)?;
     let waiting = {
         let mut guard = state.lock().map_err(|e| e.to_string())?;
@@ -1625,7 +1645,7 @@ fn start_queue(state: State<'_, SharedState>) -> Result<windows::queue::QueueVie
         }
         // The whole queue has run, so the When-done preference applies here as
         // well as after a single job.
-        apply_when_done(&shared);
+        apply_when_done(&app, &shared);
     });
     queue_window(state)
 }
