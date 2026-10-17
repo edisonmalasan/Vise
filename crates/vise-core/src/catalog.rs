@@ -89,8 +89,11 @@ pub enum EncoderId {
 ///
 /// A list rather than a match because the point of parsing is to be
 /// exhaustive: an identifier that is not in here is not an encoder this build
-/// knows how to check for.
-const EVERY_ENCODER: [EncoderId; 18] = [
+/// knows how to check for. It is public so a caller that has to know what a
+/// machine *could* offer — a test building a machine that has everything, or a
+/// report listing the encoders this build knows — reads one list rather than
+/// keeping its own.
+pub const EVERY_ENCODER: [EncoderId; 18] = [
     EncoderId::X264,
     EncoderId::X265,
     EncoderId::Av1,
@@ -865,7 +868,7 @@ pub fn resolve_availability(
 ) -> PresetResolution {
     let wanted = entry
         .encoder
-        .or_else(|| entry.spec.encoder)
+        .or(entry.spec.encoder)
         .unwrap_or(EncoderId::X264);
     let switched_off = !hw.is_enabled()
         || hw.mode == crate::HardwareMode::Software

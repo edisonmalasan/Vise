@@ -2236,7 +2236,8 @@ fn preset_window(
     state: State<'_, SharedState>,
     change: Option<PresetInput>,
 ) -> Result<windows::presets::PresetView, String> {
-    let guard = state.lock().map_err(|e| e.to_string())?;
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    check_presets_against_this_machine(&mut guard);
     let stored = stored_presets(&guard.presets.path);
     let built_in = vise_core::builtin_presets();
     let input = change.unwrap_or_default();
@@ -2247,6 +2248,48 @@ fn preset_window(
         &built_in,
         windows::presets::form_view(&input, &names, found),
     ))
+}
+
+/// Move the browser to a category, or to one entry inside it.
+///
+/// The page sends what the user pressed and the window decides what that means:
+/// which entries the category holds, which one is open, and what each one will do
+/// on this machine. A name the catalog does not file is refused here rather than
+/// leaving the strip on a tab with nothing in it.
+#[tauri::command]
+fn browse_catalog(
+    state: State<'_, SharedState>,
+    change: windows::presets::CatalogInput,
+) -> Result<windows::presets::PresetView, String> {
+    {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        if !change.category.trim().is_empty() {
+            guard.presets.set_catalog_category(&change.category)?;
+        }
+        if !change.entry.trim().is_empty() {
+            guard.presets.set_catalog_entry(&change.entry)?;
+        }
+    }
+    preset_window(state, None)
+}
+
+/// Resolve every preset against what this machine actually has.
+///
+/// The media tools are asked once, the first time the preset window is opened,
+/// and the answer is kept: probing shells out to the encoder, so doing it on
+/// every repaint would make the window slow for no new information. The user's
+/// own hardware preference is re-read each time, because it can change without
+/// the machine changing.
+fn check_presets_against_this_machine(guard: &mut DesktopState) {
+    let acceleration =
+        preferences::hardware::to_hardware_options(&guard.preferences.settings().hardware);
+    if guard.presets.is_checked() {
+        let known = guard.presets.capabilities.clone();
+        guard.presets.observe_hardware(&known, &acceleration);
+        return;
+    }
+    let capabilities = vise_core::HardwareCapabilities::detect();
+    guard.presets.observe_hardware(&capabilities, &acceleration);
 }
 
 /// Act on a preset: create, edit, copy, delete, or apply.
@@ -2454,7 +2497,7 @@ fn preset_from_tabs(
         // because that is where the window read it from.
         // The encoder and the rate control are what a preset is for, so they
         // travel with it rather than being retyped on the video tab.
-        encoder: tabs::compatibility::encoder_of(&guard.tabs.video.encoder),
+        encoder: tabs::compatibility::encoder_of(&guard.tabs.summary.video_codec),
         video_encoding: {
             let options = tabs::video_encoding_options(&guard.tabs.video);
             (!options.is_empty()).then_some(options)
@@ -2527,34 +2570,67 @@ fn apply_preset_to_tabs(state: &SharedState, preset: &vise_core::PresetSpec) -> 
     if let Some(codec) = preset.audio_codec_of() {
         guard.tabs.summary.audio_codec = format!("{codec:?}").to_ascii_lowercase();
     }
+    // The encoder the preset was written for decides which profiles, levels,
+    // tunes, and speed presets the video tab offers, so the tab is moved to it
+    // before any of those are set: a ProRes profile read against an H.264
+    // picker would be refused as a value H.264 does not offer. A hardware
+    // encoder lands on its own codec, because that is what the tab names — which
+    // chip runs it is the hardware settings' answer, not the tab's.
+    if let Some(codec) = preset
+        .encoder
+        .map(|encoder| encoder.codec())
+        .or_else(|| preset.video_codec_of())
+    {
+        guard.tabs.video.encoder = tabs::compatibility::video_codec_id(codec).to_string();
+    }
     if let Some(quality) = preset.quality {
         guard.tabs.video.quality = tabs::common::NumField::of(quality);
-        guard.tabs.video.rate_control = "quality".to_string();
-    } else if let Some(mode) = preset.encoding_mode {
+    }
+    // The front-loaded index is an MP4 feature. A preset that names another
+    // container decides what the output is, so a switch that describes an MP4
+    // index is turned off with it rather than left on to be refused at the end of
+    // the form; an MP4 preset leaves the user's own answer alone.
+    if preset
+        .container_of()
+        .map(|container| container != vise_core::ContainerFormat::Mp4)
+        .unwrap_or(false)
+    {
+        guard.tabs.summary.web_optimized = false;
+        guard.tabs.summary.ipod_compatible = false;
+    }
+    // The rate control the preset names wins over the quality it carries: a
+    // size-targeted preset also carries a quality value, and showing the tab as
+    // a quality encode would be applying something other than what was asked for.
+    if let Some(mode) = preset.encoding_mode {
         guard.tabs.video.rate_control = rate_control_name(mode).to_string();
+    } else if preset.quality.is_some() {
+        guard.tabs.video.rate_control = "quality".to_string();
     }
     // A size-targeted preset carries the size it was designed around, in bytes;
     // the tab asks in megabytes, so it is converted rather than shown raw.
     if let Some(bytes) = preset.target_size {
         guard.tabs.video.target_size = tabs::common::NumField::of((bytes / 1_000_000) as u32);
     }
-    if let Some(encoding) = &preset.video_encoding {
-        if let Some(name) = &encoding.preset {
-            guard.tabs.video.preset = name.clone();
-        }
-        if let Some(name) = &encoding.profile {
-            guard.tabs.video.profile = name.clone();
-        }
-        if let Some(name) = &encoding.tune {
-            guard.tabs.video.tune = name.clone();
-        }
-        if let Some(name) = &encoding.level {
-            guard.tabs.video.level = name.clone();
-        }
-        if let Some(range) = encoding.colour_range {
-            guard.tabs.video.colour_range = format!("{range:?}").to_ascii_lowercase();
-        }
-    }
+    // Anything the preset says nothing about goes back to the encoder default
+    // rather than keeping whatever the last preset set. A preset is the whole
+    // instruction for the encode, so applying it twice is applying the same
+    // thing: a ProRes profile left on the tab would otherwise be read by the
+    // next preset and refused as a value FFV1 does not offer, or worse, carried
+    // into an encode the user never asked for.
+    //
+    // `default` is what every picker on the video tab carries for "leave it to
+    // the encoder", so it is what a field the instruction is silent about has
+    // to go back to.
+    let encoding = preset.video_encoding.clone().unwrap_or_default();
+    let or_default = |value: Option<String>| value.unwrap_or_else(|| "default".to_string());
+    guard.tabs.video.preset = or_default(encoding.preset.clone());
+    guard.tabs.video.profile = or_default(encoding.profile.clone());
+    guard.tabs.video.tune = or_default(encoding.tune.clone());
+    guard.tabs.video.level = or_default(encoding.level.clone());
+    guard.tabs.video.colour_range = encoding
+        .colour_range
+        .map(|range| format!("{range:?}").to_ascii_lowercase())
+        .unwrap_or_else(|| "default".to_string());
     if let Some((_, _, width, height)) = preset.crop {
         guard.tabs.dimensions.crop_mode = "manual".to_string();
         guard.tabs.dimensions.crop_width = tabs::common::NumField::of(width);
@@ -3080,6 +3156,7 @@ fn main() {
             dismiss_alert,
             about_view,
             preset_window,
+            browse_catalog,
             apply_preset_action,
             window_catalog,
             open_window,
@@ -3742,5 +3819,122 @@ mod tests {
             assert_eq!(view.theme, "light", "the user asked for light");
         }
         assert_eq!(state.lock().expect("state").activity.view().lines.len(), 0);
+    }
+
+    /// A preset built for a machine this one does not resemble still has to reach
+    /// the output settings rather than being half-applied, because a preset that
+    /// silently sets nothing is a control that lies about what it did.
+    fn scratch_state(name: &str) -> SharedState {
+        let dir = std::env::temp_dir().join(name);
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let settings_path = dir.join("settings.json");
+        Arc::new(Mutex::new(DesktopState {
+            settings_path,
+            ..DesktopState::default()
+        }))
+    }
+
+    #[test]
+    fn applying_a_catalog_preset_puts_what_it_sets_onto_the_tabs() {
+        let state = scratch_state("vise-desktop-apply-catalog-preset");
+        for (id, container, video, audio, rate) in [
+            (
+                "general-super-hq-720-30-h264",
+                "mp4",
+                "h264",
+                "aac",
+                "quality",
+            ),
+            // The professional codecs and uncompressed audio are what the tab
+            // pickers were extended for: a preset that asks for them has to be
+            // able to say so on the tabs rather than quietly changing nothing.
+            (
+                "professional-prores-422-hq",
+                "mkv",
+                "prores",
+                "pcm",
+                "quality",
+            ),
+            ("professional-ffv1-flac", "mkv", "ffv1", "flac", "lossless"),
+            ("matroska-vp9-1080-30", "mkv", "vp9", "opus", "quality"),
+            ("hardware-qsv-hevc-1080-30", "mp4", "h265", "aac", "quality"),
+        ] {
+            let preset = vise_core::builtin_preset(id)
+                .unwrap_or_else(|| panic!("'{id}' is not a preset this build carries"));
+            apply_preset_to_tabs(&state, &preset.preset)
+                .unwrap_or_else(|error| panic!("'{id}' could not be applied: {error}"));
+            let guard = state.lock().expect("state");
+            assert_eq!(guard.tabs.summary.container, container, "{id}");
+            assert_eq!(guard.tabs.summary.video_codec, video, "{id}");
+            assert_eq!(guard.tabs.summary.audio_codec, audio, "{id}");
+            assert_eq!(guard.tabs.video.rate_control, rate, "{id}");
+        }
+
+        // A size-targeted preset is refused on a title whose duration nothing
+        // reports, and says why: a file size cannot be aimed at without knowing
+        // how long the title is, and pretending otherwise would produce a file of
+        // the wrong length rather than a wrong number on the tab.
+        let social = vise_core::builtin_preset("web-social-10mb-60s").expect("a social preset");
+        let refused = apply_preset_to_tabs(&state, &social.preset).expect_err("no duration");
+        assert!(
+            refused.contains("source duration"),
+            "'{refused}' does not say what is missing"
+        );
+        // What a preset sets that is not a container or a codec reaches the tabs
+        // as well, so applying it twice is applying the same thing.
+        {
+            let mut guard = state.lock().expect("state");
+            guard.tabs.video.preset = String::new();
+        }
+        let preset = vise_core::builtin_preset("general-super-hq-720-30-h264").expect("a preset");
+        apply_preset_to_tabs(&state, &preset.preset).expect("apply");
+        assert_eq!(
+            state.lock().expect("state").tabs.video.preset,
+            "slow",
+            "the encoder speed the family is named for reaches the tab"
+        );
+        let _ =
+            std::fs::remove_dir_all(std::env::temp_dir().join("vise-desktop-apply-catalog-preset"));
+    }
+
+    #[test]
+    fn a_preset_saved_from_the_tabs_carries_what_the_tabs_hold() {
+        let state = scratch_state("vise-desktop-preset-from-tabs");
+        {
+            let mut guard = state.lock().expect("state");
+            guard.tabs.summary.container = "mkv".to_string();
+            guard.tabs.summary.video_codec = "h265".to_string();
+            guard.tabs.summary.audio_codec = "flac".to_string();
+            guard.tabs.video.rate_control = "target_size".to_string();
+            guard.tabs.video.target_size = tabs::common::NumField::of(25);
+            guard.tabs.video.preset = "slow".to_string();
+            guard.tabs.video.tune = "film".to_string();
+        }
+        let input = windows::presets::PresetInput {
+            name: "Mine".to_string(),
+            ..Default::default()
+        };
+        let spec = preset_from_tabs(&state, &input).expect("a preset from the tabs");
+        assert_eq!(
+            spec.encoder,
+            Some(vise_core::EncoderId::X265),
+            "the codec the tabs hold names the encoder that writes it"
+        );
+        assert_eq!(
+            spec.encoding_mode.map(|mode| mode.is_target_size()),
+            Some(true)
+        );
+        assert_eq!(
+            spec.target_size,
+            Some(25_000_000),
+            "the size is in bytes, in the megabytes the queue already uses"
+        );
+        assert_eq!(
+            spec.video_encoding.as_ref().and_then(|e| e.preset.clone()),
+            Some("slow".to_string())
+        );
+        assert_eq!(spec.name.as_deref(), Some("Mine"));
+        let _ = std::fs::remove_dir_all(std::env::temp_dir().join("vise-desktop-preset-from-tabs"));
     }
 }

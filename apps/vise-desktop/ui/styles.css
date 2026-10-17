@@ -1366,6 +1366,152 @@ button.warn:hover:not(:disabled) {
   color: var(--accent);
 }
 
+/* Catalog browser ------------------------------------------------------------ */
+
+/* The strip is the same strip the output tabs and the preferences use, so the
+   arrow keys, the one tab stop, and the wrapping all behave identically. Only
+   the panels are different: a category holds a list and a reading of whichever
+   entry is open, side by side once there is room and stacked when there is not.
+   Every measurement below is logical, so a right-to-left window lays the list
+   out on the other side without a second rule. */
+.preset-catalog {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 8px 12px 12px;
+}
+
+.catalog {
+  display: grid;
+  gap: 12px;
+}
+
+.catalog-panels {
+  display: grid;
+  min-height: 0;
+}
+
+.catalog-panel {
+  gap: 10px;
+}
+
+.catalog-category-note {
+  margin: 0;
+}
+
+/* The list is a listbox, so the whole list is one tab stop and the arrows walk
+   it. The open entry is marked with a background and an inset edge rather than
+   with colour alone, which keeps it visible in either theme. */
+.catalog-list {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.catalog-option {
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+}
+
+.catalog-option:last-child {
+  border-bottom: none;
+}
+
+.catalog-option:hover {
+  background: var(--surface-sunken);
+}
+
+.catalog-option[aria-selected="true"] {
+  background: var(--accent-wash);
+  /* The edge is drawn on the inline-start side rather than as an inset shadow
+     so it follows the reading direction instead of always sitting on the left. */
+  border-inline-start: 3px solid var(--accent);
+  padding-inline-start: 7px;
+}
+
+/* A preset this machine cannot run stays in the list, read-only, with the
+   reason beside it rather than removed: somebody may be asking what a preset on
+   another machine would do. */
+.catalog-option[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.catalog-option[aria-disabled="true"] .title {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.chip.fallback {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.chip.closed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.catalog-closed {
+  color: var(--danger);
+  margin: 0;
+}
+
+.catalog-detail {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.catalog-detail .facts-list {
+  margin: 0;
+}
+
+.catalog-detail .controls {
+  margin: 0;
+}
+
+.catalog-note {
+  margin: 0;
+}
+
+.catalog-closed-note {
+  margin: 0;
+}
+
+@media (min-width: 900px) {
+  .catalog-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "note    note"
+      "list    detail";
+  }
+
+  .catalog-category-note {
+    grid-area: note;
+  }
+
+  .catalog-list {
+    grid-area: list;
+    max-height: 420px;
+  }
+
+  .catalog-detail {
+    align-content: start;
+    grid-area: detail;
+  }
+}
+
 .preset-form {
   border: 1px solid var(--border);
   border-radius: 8px;
