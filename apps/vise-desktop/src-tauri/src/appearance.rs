@@ -21,7 +21,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use vise_core::{load_settings, save_settings};
+use vise_core::{load_settings, resolve_catalog, save_settings, Catalog, MessageKey};
 
 /// Settings member that holds the appearance preferences.
 pub const APPEARANCE_KEY: &str = "appearance";
@@ -35,50 +35,14 @@ pub const DEFAULT_THEME_MODE: ThemeMode = ThemeMode::System;
 /// Default direction when nothing has been chosen.
 pub const DEFAULT_DIRECTION_MODE: DirectionMode = DirectionMode::Auto;
 
-/// Environment variables that name the user's locale, most specific first.
+/// The locale used when nothing names one.
 ///
-/// `LC_ALL` and `LC_MESSAGES` override `LANG` in the POSIX order. The first
-/// variable is ours and exists so the layout can be exercised on a machine
-/// whose locale is not the one under test; the rest are what the platforms
-/// already publish.
-const LOCALE_VARIABLES: &[&str] = &["VISE_UI_LOCALE", "LC_ALL", "LC_MESSAGES", "LANG"];
-
-/// Locale used when nothing names one.
-pub const FALLBACK_LOCALE: &str = "en";
-
-/// Primary language subtags written right to left.
-const RTL_LANGUAGES: &[&str] = &[
-    "ar",  // Arabic
-    "arc", // Aramaic
-    "ckb", // Central Kurdish
-    "dv",  // Divehi
-    "fa",  // Persian
-    "he",  // Hebrew
-    "khw", // Khowar
-    "ks",  // Kashmiri
-    "ku",  // Kurdish
-    "ps",  // Pashto
-    "sd",  // Sindhi
-    "ug",  // Uyghur
-    "ur",  // Urdu
-    "yi",  // Yiddish
-];
-
-/// Script subtags that read right to left whatever language they are paired
-/// with, so a language written in more than one script resolves by its script
-/// rather than by the language alone.
-const RTL_SCRIPTS: &[&str] = &[
-    "adlm", // Adlam
-    "arab", // Arabic
-    "hebr", // Hebrew
-    "mand", // Mandaic
-    "mend", // Mende Kikakui
-    "nkoo", // N'Ko
-    "rohg", // Hanifi Rohingya
-    "samr", // Samaritan
-    "syrc", // Syriac
-    "thaa", // Thaana
-];
+/// The tag itself, the languages that read right to left, and the environment
+/// variables a machine publishes its locale in all live in `vise_core::i18n`,
+/// because the language the window is written in and the language the layout is
+/// mirrored in are the same question. Answering it in two places is how a
+/// window ends up showing Arabic text laid out left to right.
+pub use vise_core::i18n::BASE_LOCALE as FALLBACK_LOCALE;
 
 /// What the user asked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -106,13 +70,15 @@ impl ThemeMode {
         }
     }
 
-    /// Human-readable label.
-    pub fn label(self) -> &'static str {
-        match self {
-            ThemeMode::System => "Match the system",
-            ThemeMode::Light => "Light",
-            ThemeMode::Dark => "Dark",
-        }
+    /// Human-readable label, in the language in force.
+    pub fn label(self, catalog: &Catalog) -> String {
+        catalog
+            .text(match self {
+                ThemeMode::System => MessageKey::AppearanceThemeSystem,
+                ThemeMode::Light => MessageKey::AppearanceThemeLight,
+                ThemeMode::Dark => MessageKey::AppearanceThemeDark,
+            })
+            .to_string()
     }
 
     /// What choosing this means, in the words of the current observation.
@@ -120,15 +86,27 @@ impl ThemeMode {
     /// The line says which of the two themes it will actually produce, because
     /// "match the system" on a machine that is in dark mode is a dark window and
     /// a reader deciding what to pick needs to know that.
-    pub fn hint(self, system: SystemTheme) -> String {
+    pub fn hint(self, system: SystemTheme, catalog: &Catalog) -> String {
+        let word = |theme: ResolvedTheme| {
+            catalog.text(match theme {
+                ResolvedTheme::Light => MessageKey::AppearanceThemeLight,
+                ResolvedTheme::Dark => MessageKey::AppearanceThemeDark,
+            })
+        };
         match self {
-            ThemeMode::System => format!(
-                "The system asks for {}, so the window is {}.",
-                system.word(),
-                system.word()
-            ),
-            ThemeMode::Light => "Always light, whatever the system asks for.".to_string(),
-            ThemeMode::Dark => "Always dark, whatever the system asks for.".to_string(),
+            ThemeMode::System => {
+                let resolved = self.resolve(system);
+                catalog.format(
+                    MessageKey::AppearanceThemeSystemHint,
+                    &[("asked", word(resolved)), ("shown", word(resolved))],
+                )
+            }
+            ThemeMode::Light => catalog
+                .text(MessageKey::AppearanceThemeLightHint)
+                .to_string(),
+            ThemeMode::Dark => catalog
+                .text(MessageKey::AppearanceThemeDarkHint)
+                .to_string(),
         }
     }
 
@@ -269,25 +247,41 @@ impl DirectionMode {
         }
     }
 
-    /// Human-readable label.
-    pub fn label(self) -> &'static str {
-        match self {
-            DirectionMode::Auto => "Match my language",
-            DirectionMode::Ltr => "Left to right",
-            DirectionMode::Rtl => "Right to left",
-        }
+    /// Human-readable label, in the language in force.
+    pub fn label(self, catalog: &Catalog) -> String {
+        catalog
+            .text(match self {
+                DirectionMode::Auto => MessageKey::AppearanceDirectionAuto,
+                DirectionMode::Ltr => MessageKey::AppearanceDirectionLtr,
+                DirectionMode::Rtl => MessageKey::AppearanceDirectionRtl,
+            })
+            .to_string()
     }
 
     /// What choosing this means, in the words of the current observation.
-    pub fn hint(self, locale: &str, system: SystemDirection) -> String {
+    ///
+    /// The words inside the sentence are translated too, because a sentence with
+    /// an English phrase in the middle of an Arabic one is not a translation of
+    /// anything.
+    pub fn hint(self, locale: &str, system: SystemDirection, catalog: &Catalog) -> String {
+        let word = system.word(catalog);
         match self {
-            DirectionMode::Auto => format!(
-                "{locale} reads {}, so the window is laid out {}.",
-                system.reads(),
-                system.flows()
+            DirectionMode::Auto => catalog.format(
+                MessageKey::AppearanceDirectionAutoHint,
+                &[
+                    ("locale", locale),
+                    ("reads", word),
+                    // The layout follows the reading direction in every language
+                    // this build ships, so the same word fills both slots.
+                    ("flows", word),
+                ],
             ),
-            DirectionMode::Ltr => "Always left to right, whatever your language reads.".to_string(),
-            DirectionMode::Rtl => "Always right to left, whatever your language reads.".to_string(),
+            DirectionMode::Ltr => catalog
+                .text(MessageKey::AppearanceDirectionFixedLtr)
+                .to_string(),
+            DirectionMode::Rtl => catalog
+                .text(MessageKey::AppearanceDirectionFixedRtl)
+                .to_string(),
         }
     }
 
@@ -356,82 +350,55 @@ pub enum SystemDirection {
 }
 
 impl SystemDirection {
-    /// How the locale reads, in words.
-    pub fn reads(self) -> &'static str {
-        match self {
-            SystemDirection::Ltr => "left to right",
-            SystemDirection::Rtl => "right to left",
-        }
-    }
-
-    /// How the window is laid out when it follows this locale.
-    pub fn flows(self) -> &'static str {
-        match self {
-            SystemDirection::Ltr => "left to right",
-            SystemDirection::Rtl => "right to left",
-        }
+    /// The message that names this direction in the language in force.
+    ///
+    /// A word is a message like any other: a sentence in Arabic with an English
+    /// phrase inside it is not a translation, and the direction is the one thing
+    /// in this window a user cannot guess the meaning of.
+    pub fn word(self, catalog: &Catalog) -> &str {
+        catalog.text(match self {
+            SystemDirection::Ltr => MessageKey::AppearanceReadsLtr,
+            SystemDirection::Rtl => MessageKey::AppearanceReadsRtl,
+        })
     }
 
     /// The direction a language tag resolves to.
     ///
-    /// A named right-to-left script is consulted before the language, so a
-    /// Kurdish or Punjabi locale written in the Arabic script is mirrored even
-    /// though the language alone would not be. A script that is not one of the
-    /// right-to-left ones does not override the language, so a tag this build
-    /// does not recognise still resolves to the way its language reads rather
-    /// than being split down the middle by an unrecognised script. An empty tag,
-    /// a wildcard, or a tag with no recognisable language reads left to right,
-    /// which keeps a window usable when the locale is unknown rather than
-    /// mirroring it at random.
+    /// The rules are the ones the translation resources use, in the one place
+    /// that decides them: a named right-to-left script is consulted before the
+    /// language, so a Kurdish or Punjabi locale written in the Arabic script is
+    /// mirrored even though the language alone would not be. A script that is
+    /// not one of the right-to-left ones does not override the language, so a
+    /// tag this build does not recognise still resolves to the way its language
+    /// reads rather than being split down the middle by an unrecognised script.
     pub fn of_locale(tag: &str) -> Self {
-        let mut subtags = tag.split(['-', '_']).map(|part| part.trim());
-        let language = subtags.next().unwrap_or_default().to_ascii_lowercase();
-        if language.is_empty() || language == "*" {
-            return SystemDirection::Ltr;
+        match vise_core::i18n::reading_direction(tag) {
+            vise_core::i18n::ReadingDirection::Ltr => SystemDirection::Ltr,
+            vise_core::i18n::ReadingDirection::Rtl => SystemDirection::Rtl,
         }
-        for subtag in subtags {
-            let lowered = subtag.to_ascii_lowercase();
-            if lowered.len() == 4 && RTL_SCRIPTS.contains(&lowered.as_str()) {
-                return SystemDirection::Rtl;
-            }
-        }
-        if RTL_LANGUAGES.contains(&language.as_str()) {
-            return SystemDirection::Rtl;
-        }
-        SystemDirection::Ltr
     }
 }
 
 /// The locale tag reduced to what decides a direction.
 ///
 /// A POSIX locale carries an encoding and a modifier that have nothing to do
-/// with reading order, so `ar_EG.UTF-8` is read as `ar-EG`.
+/// with reading order, so `ar_EG.UTF-8` is read as `ar-EG`. This is the same
+/// reduction the translation resources use, so the tag the window stores, the tag
+/// the messages are looked up under, and the tag the direction is decided from
+/// are one tag.
 pub fn locale_tag(raw: &str) -> String {
-    let trimmed = raw.trim();
-    let base = trimmed.split(['.', '@', ':']).next().unwrap_or_default();
-    let base = base.replace('_', "-");
-    if base.is_empty() {
-        FALLBACK_LOCALE.to_string()
-    } else {
-        base
-    }
+    vise_core::i18n::normalize_locale_tag(raw)
 }
 
-/// The locale the environment names, or the fallback.
+/// The locale the environment names, as a tag.
 ///
 /// Reading this at start-up gives the window an answer before the page has said
 /// anything, which is what keeps a mirrored window from opening left to right
-/// for as long as it takes the first round trip.
+/// for as long as it takes the first round trip. A locale that names a language
+/// this build does not ship is reduced to the one it does ship, which is the
+/// same fallback chain the messages go through.
 pub fn locale_from_environment() -> String {
-    for name in LOCALE_VARIABLES {
-        if let Some(value) = std::env::var_os(name) {
-            let value = value.to_string_lossy().to_string();
-            if !value.trim().is_empty() && value.trim() != "C" && value.trim() != "POSIX" {
-                return locale_tag(&value);
-            }
-        }
-    }
-    FALLBACK_LOCALE.to_string()
+    vise_core::i18n::locale_from_environment().tag().to_string()
 }
 
 /// The two preferences, as they are stored.
@@ -497,8 +464,14 @@ pub struct Observation {
     /// authority before the page has run. Both write the same observation, so
     /// the two answers cannot produce two themes.
     pub theme_from_page: bool,
-    /// Whether the locale came from the page rather than from the environment.
-    pub locale_from_page: bool,
+    /// Whether the locale was chosen rather than read from the environment.
+    ///
+    /// Both answers are deliberate: the page reporting `navigator.language` and the
+    /// user picking a language from the preferences are the same kind of evidence,
+    /// and the note says "by this window" for either of them. What it is
+    /// distinguishing is a deliberate answer from whatever the machine happened to
+    /// be set to when the window opened.
+    pub locale_chosen: bool,
 }
 
 impl Default for Observation {
@@ -507,7 +480,7 @@ impl Default for Observation {
             theme: SystemTheme::Light,
             locale: FALLBACK_LOCALE.to_string(),
             theme_from_page: false,
-            locale_from_page: false,
+            locale_chosen: false,
         }
     }
 }
@@ -557,6 +530,18 @@ pub struct AppearanceViewModel {
     pub system_theme: String,
     /// The locale tag the direction is decided from.
     pub locale: String,
+    /// The language the window is written in.
+    ///
+    /// Sent rather than looked up by the page, because the tag on the document is
+    /// this value and the page has no way to know it: a locale that is not in the
+    /// shipped set has to reach the browser as the language it was resolved to,
+    /// or the browser picks a font for a language nobody is writing in.
+    pub language: String,
+    /// How the language reads, in that language.
+    ///
+    /// Its own message rather than a word from the layout code, so a sentence
+    /// about direction is not half in one language.
+    pub direction_language: String,
     /// The theme preference as a list of options.
     pub theme_options: Vec<AppearanceOptionViewModel>,
     /// The direction preference as a list of options.
@@ -575,7 +560,7 @@ pub struct AppearanceViewModel {
 
 impl AppearanceViewModel {
     /// The answer, resolved and explained.
-    fn build(settings: &AppearanceSettings, observed: &Observation) -> Self {
+    fn build(settings: &AppearanceSettings, observed: &Observation, catalog: &Catalog) -> Self {
         let theme_mode = settings.theme;
         let direction_mode = settings.direction;
         let theme = theme_mode.resolve(observed.theme);
@@ -590,12 +575,19 @@ impl AppearanceViewModel {
             follows_locale: matches!(direction_mode, DirectionMode::Auto),
             system_theme: observed.theme.id().to_string(),
             locale: observed.locale.clone(),
+            language: catalog.locale_tag().to_string(),
+            direction_language: catalog
+                .text(match system_direction {
+                    SystemDirection::Ltr => MessageKey::AppearanceReadsLtr,
+                    SystemDirection::Rtl => MessageKey::AppearanceReadsRtl,
+                })
+                .to_string(),
             theme_options: ThemeMode::ALL
                 .into_iter()
                 .map(|mode| AppearanceOptionViewModel {
                     id: mode.id().to_string(),
-                    label: mode.label().to_string(),
-                    facts: mode.hint(observed.theme),
+                    label: mode.label(catalog),
+                    facts: mode.hint(observed.theme, catalog),
                     available: true,
                     reason: String::new(),
                     selected: mode == theme_mode,
@@ -605,8 +597,8 @@ impl AppearanceViewModel {
                 .into_iter()
                 .map(|mode| AppearanceOptionViewModel {
                     id: mode.id().to_string(),
-                    label: mode.label().to_string(),
-                    facts: mode.hint(&observed.locale, system_direction),
+                    label: mode.label(catalog),
+                    facts: mode.hint(&observed.locale, system_direction, catalog),
                     available: true,
                     reason: String::new(),
                     selected: mode == direction_mode,
@@ -618,6 +610,7 @@ impl AppearanceViewModel {
                 direction_mode,
                 &observed.locale,
                 system_direction,
+                catalog,
             ),
             flow_glyph: FLOW_GLYPH.to_string(),
             observation_note: observation_note(observed),
@@ -636,7 +629,7 @@ fn observation_note(observed: &Observation) -> String {
     } else {
         "read from the operating system"
     };
-    let locale_source = if observed.locale_from_page {
+    let locale_source = if observed.locale_chosen {
         "reported by this window"
     } else {
         "read from the environment"
@@ -664,22 +657,51 @@ fn summary(
     direction_mode: DirectionMode,
     locale: &str,
     system_direction: SystemDirection,
+    catalog: &Catalog,
 ) -> String {
     let theme_answer = match theme_mode {
-        ThemeMode::System => format!("the {} theme, because the system asks for it", theme.word()),
-        ThemeMode::Light => "the light theme, whatever the system asks for".to_string(),
-        ThemeMode::Dark => "the dark theme, whatever the system asks for".to_string(),
+        ThemeMode::System => catalog
+            .format(
+                MessageKey::AppearanceThemeSystemHint,
+                &[
+                    ("asked", catalog.text(theme_word(theme))),
+                    ("shown", catalog.text(theme_word(theme))),
+                ],
+            )
+            .to_string(),
+        ThemeMode::Light => catalog
+            .text(MessageKey::AppearanceThemeLightHint)
+            .to_string(),
+        ThemeMode::Dark => catalog
+            .text(MessageKey::AppearanceThemeDarkHint)
+            .to_string(),
     };
+    let reads = system_direction.word(catalog);
     let direction_answer = match direction_mode {
-        DirectionMode::Auto => format!(
-            "laid out {} because {locale} reads {}",
-            system_direction.flows(),
-            system_direction.reads()
+        DirectionMode::Auto => catalog.format(
+            MessageKey::AppearanceDirectionAutoHint,
+            &[("locale", locale), ("reads", reads), ("flows", reads)],
         ),
-        DirectionMode::Ltr => "laid out left to right, whatever your language reads".to_string(),
-        DirectionMode::Rtl => "laid out right to left, whatever your language reads".to_string(),
+        DirectionMode::Ltr => catalog
+            .text(MessageKey::AppearanceDirectionFixedLtr)
+            .to_string(),
+        DirectionMode::Rtl => catalog
+            .text(MessageKey::AppearanceDirectionFixedRtl)
+            .to_string(),
     };
-    format!("Showing {theme_answer}, {direction_answer}.")
+    format!(
+        "{} / {}",
+        theme_answer.trim_end_matches('.'),
+        direction_answer.trim_end_matches('.')
+    )
+}
+
+/// Which message names a theme.
+fn theme_word(theme: SystemTheme) -> MessageKey {
+    match theme {
+        SystemTheme::Light => MessageKey::AppearanceThemeLight,
+        SystemTheme::Dark => MessageKey::AppearanceThemeDark,
+    }
 }
 
 /// The appearance state the window keeps.
@@ -691,6 +713,15 @@ pub struct AppearanceState {
     observed: Observation,
     /// Where the settings live.
     settings_path: PathBuf,
+    /// The language the window is written in.
+    ///
+    /// Held rather than derived from the observed locale because the two are
+    /// different questions and can legitimately have different answers: a user can
+    /// read Arabic and still want the window laid out left to right, and a user
+    /// whose machine is in Japanese can choose English for the words. Which
+    /// catalog is in force is the language module's decision; this state only
+    /// draws its labels from it.
+    catalog: &'static Catalog,
 }
 
 impl Default for AppearanceState {
@@ -705,6 +736,7 @@ impl Default for AppearanceState {
             settings: AppearanceSettings::new(),
             observed: Observation::default(),
             settings_path: PathBuf::new(),
+            catalog: Catalog::base(),
         }
     }
 }
@@ -716,7 +748,7 @@ impl AppearanceState {
     /// an unknown one: a window that opens light and then corrects itself is
     /// readable, and a window that opens dark on a light machine is not.
     pub fn load(settings_path: &Path, theme: SystemTheme, locale: Option<String>) -> Self {
-        let (locale, locale_from_page) = match locale {
+        let (locale, locale_chosen) = match locale {
             Some(reported) => (locale_tag(&reported), true),
             None => (locale_from_environment(), false),
         };
@@ -724,11 +756,12 @@ impl AppearanceState {
             settings: AppearanceSettings::load(settings_path),
             observed: Observation {
                 theme,
-                locale,
+                locale: locale.clone(),
                 theme_from_page: false,
-                locale_from_page,
+                locale_chosen,
             },
             settings_path: settings_path.to_path_buf(),
+            catalog: resolve_catalog(&locale).catalog,
         }
     }
 
@@ -742,9 +775,35 @@ impl AppearanceState {
     ) -> Self {
         Self {
             settings,
+            catalog: resolve_catalog(&observed.locale).catalog,
             observed,
             settings_path: settings_path.to_path_buf(),
         }
+    }
+
+    /// Draw the labels from another language's messages.
+    ///
+    /// Reports whether the language moved, so a caller that repaints on every
+    /// change is not repainting a window that did not. This is the only thing a
+    /// language switch does to this state: the layout is decided by
+    /// [`AppearanceState::observe_locale`], and which direction that produces is
+    /// decided by the preference, so choosing a language cannot override a user
+    /// who pinned the direction the other way.
+    pub fn use_language(&mut self, catalog: &'static Catalog) -> bool {
+        if self.catalog.locale_tag() == catalog.locale_tag() {
+            return false;
+        }
+        self.catalog = catalog;
+        true
+    }
+
+    /// The language the labels are drawn from.
+    ///
+    /// Read-only and answered by the view model, because the page asks for the
+    /// language through [`AppearanceViewModel::language`] and a second accessor on
+    /// the state would be a second answer to the same question.
+    pub fn language(&self) -> &'static str {
+        self.catalog.locale_tag()
     }
 
     /// Record what the operating system is doing.
@@ -767,22 +826,36 @@ impl AppearanceState {
         true
     }
 
-    /// Record the locale the page is showing in.
+    /// Record a deliberate answer about the locale.
     ///
-    /// An empty tag is ignored rather than stored: it would resolve to left to
-    /// right for no reason, and the page asking again on its next start would
-    /// not fix it.
+    /// Both callers are the same kind of witness: the page reporting what it is
+    /// showing, and the user choosing a language from the preferences. An empty tag
+    /// is ignored rather than stored: it would resolve to left to right for no
+    /// reason, and the page asking again on its next start would not fix it.
+    ///
+    /// This is an observation rather than a preference, which is the whole reason a
+    /// right-to-left language does not force a right-to-left window: the direction
+    /// preference is what decides, and it is resolved against this.
     pub fn observe_locale(&mut self, locale: &str) -> bool {
         if locale.trim().is_empty() {
             return false;
         }
         let tag = locale_tag(locale);
-        if self.observed.locale_from_page && self.observed.locale == tag {
+        if self.observed.locale_chosen && self.observed.locale == tag {
             return false;
         }
         self.observed.locale = tag;
-        self.observed.locale_from_page = true;
+        self.observed.locale_chosen = true;
         true
+    }
+
+    /// The direction preference the user is holding.
+    ///
+    /// Read rather than written so a language switch can be resolved against what
+    /// the user chose about the layout without this module having to know that
+    /// there are two preferences rather than one.
+    pub fn direction_mode(&self) -> DirectionMode {
+        self.settings.direction
     }
 
     /// What the window has observed.
@@ -793,7 +866,7 @@ impl AppearanceState {
 
     /// The answer, resolved and explained.
     pub fn view(&self) -> AppearanceViewModel {
-        AppearanceViewModel::build(&self.settings, &self.observed)
+        AppearanceViewModel::build(&self.settings, &self.observed, self.catalog)
     }
 
     /// Choose a theme and keep it.
@@ -836,7 +909,7 @@ mod tests {
             theme: SystemTheme::Dark,
             locale: "ar-EG".to_string(),
             theme_from_page: true,
-            locale_from_page: true,
+            locale_chosen: true,
         }
     }
 
@@ -846,12 +919,21 @@ mod tests {
         AppearanceState::with_observation(&temp_dir("observe"), settings, seen)
     }
 
+    /// The view as the base language builds it.
+    ///
+    /// The language in force is a separate question with its own tests in
+    /// `locale.rs`; what matters here is the resolution, so every one of these
+    /// tests draws its labels from the same catalog.
+    fn build(settings: &AppearanceSettings, seen: &Observation) -> AppearanceViewModel {
+        AppearanceViewModel::build(settings, seen, Catalog::base())
+    }
+
     #[test]
     fn the_default_preferences_follow_the_machine() {
         let settings = AppearanceSettings::new();
         assert_eq!(settings.theme, DEFAULT_THEME_MODE);
         assert_eq!(settings.direction, DEFAULT_DIRECTION_MODE);
-        let view = AppearanceViewModel::build(&settings, &dark_rtl());
+        let view = build(&settings, &dark_rtl());
         assert_eq!(view.theme, "dark");
         assert_eq!(view.direction, "rtl");
         assert!(view.follows_system_theme);
@@ -1104,7 +1186,7 @@ mod tests {
                 theme: SystemTheme::Light,
                 locale: "en-GB".to_string(),
                 theme_from_page: false,
-                locale_from_page: false,
+                locale_chosen: false,
             },
         );
         assert!(state.observe_theme(SystemTheme::Dark, true));
@@ -1130,7 +1212,7 @@ mod tests {
             theme: ThemeMode::Light,
             direction: DirectionMode::Rtl,
         };
-        let view = AppearanceViewModel::build(&settings, &dark_rtl());
+        let view = build(&settings, &dark_rtl());
         assert_eq!(view.theme_options.len(), ThemeMode::ALL.len());
         assert_eq!(view.direction_options.len(), DirectionMode::ALL.len());
         let chosen: Vec<&str> = view
@@ -1153,9 +1235,9 @@ mod tests {
 
     #[test]
     fn the_summary_says_which_theme_and_which_direction_are_on_screen() {
-        let following = AppearanceViewModel::build(&AppearanceSettings::new(), &dark_rtl());
+        let following = build(&AppearanceSettings::new(), &dark_rtl());
         assert!(
-            following.summary.contains("dark theme"),
+            following.summary.contains("will be Dark"),
             "{}",
             following.summary
         );
@@ -1171,21 +1253,25 @@ mod tests {
             following.summary
         );
 
-        let forced = AppearanceViewModel::build(
+        let forced = build(
             &AppearanceSettings {
                 theme: ThemeMode::Light,
                 direction: DirectionMode::Ltr,
             },
             &dark_rtl(),
         );
-        assert!(forced.summary.contains("light theme"), "{}", forced.summary);
+        assert!(
+            forced.summary.contains("Always light"),
+            "{}",
+            forced.summary
+        );
         assert!(
             forced.summary.contains("whatever the system asks for"),
             "{}",
             forced.summary
         );
         assert!(
-            forced.summary.contains("whatever your language reads"),
+            forced.summary.contains("whatever the language reads"),
             "{}",
             forced.summary
         );
@@ -1197,7 +1283,7 @@ mod tests {
     fn the_page_receives_the_answer_it_paints_from() {
         // The page is handed the resolved pair, never a preference, so every
         // surface reads the same two values.
-        let payload = serde_json::to_value(AppearanceViewModel::build(
+        let payload = serde_json::to_value(build(
             &AppearanceSettings {
                 theme: ThemeMode::Dark,
                 direction: DirectionMode::Auto,
@@ -1212,5 +1298,46 @@ mod tests {
         assert!(payload["followsSystemTheme"].as_bool().is_some());
         assert!(payload["flowGlyph"].as_str().is_some());
         assert!(payload["summary"].as_str().is_some());
+        // The page puts this on the document, so it has to be there: the language
+        // the messages were resolved from, not the tag the layout was decided
+        // from.
+        assert_eq!(payload["language"], "en");
+        assert_eq!(payload["locale"], "ar-EG");
+        assert_eq!(payload["directionLanguage"], "right to left");
+    }
+
+    #[test]
+    fn the_labels_are_drawn_from_the_language_in_force() {
+        let settings = AppearanceSettings::new();
+        let english = build(&settings, &dark_rtl());
+        assert_eq!(english.direction_options[0].label, "Match my language");
+        let arabic = AppearanceViewModel::build(
+            &settings,
+            &dark_rtl(),
+            vise_core::resolve_catalog("ar").catalog,
+        );
+        assert_eq!(arabic.language, "ar");
+        assert_eq!(arabic.direction_options[0].label, "حسب لغتي");
+        // The hint sentence is in that language too, including the words inside
+        // it: an English phrase in the middle of an Arabic sentence is not a
+        // translation.
+        assert!(
+            arabic.direction_options[0]
+                .facts
+                .contains("من اليمين إلى اليسار"),
+            "{}",
+            arabic.direction_options[0].facts
+        );
+        assert!(!arabic.direction_options[0].facts.contains("reads"));
+        assert_eq!(arabic.theme_options[0].label, "حسب النظام");
+    }
+
+    #[test]
+    fn choosing_the_same_language_twice_is_not_a_change() {
+        let mut state = observed(AppearanceSettings::new(), dark_rtl());
+        let catalog = vise_core::resolve_catalog("de").catalog;
+        assert!(state.use_language(catalog), "the first choice moves");
+        assert!(!state.use_language(catalog), "the second one does not");
+        assert_eq!(state.view().language, "de");
     }
 }

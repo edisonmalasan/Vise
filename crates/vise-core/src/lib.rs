@@ -10,7 +10,7 @@ mod chapter;
 mod error;
 mod geometry;
 mod hardware;
-mod i18n;
+pub mod i18n;
 mod job;
 mod media;
 mod metadata;

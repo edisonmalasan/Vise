@@ -526,6 +526,19 @@ pub enum MessageKey {
     AppearanceThemeLight,
     /// The dark theme.
     AppearanceThemeDark,
+    /// What following the system resolves to. Takes `{asked}` and `{shown}`.
+    AppearanceThemeSystemHint,
+    /// What overriding to light means.
+    AppearanceThemeLightHint,
+    /// What overriding to dark means.
+    AppearanceThemeDarkHint,
+    /// How a language that reads left to right reads. Fills both `{reads}` and
+    /// `{flows}`: the two are the same in every language this build ships, and
+    /// inventing a key pair for one phrase in two slots would only make a
+    /// translator invent a difference that is not there.
+    AppearanceReadsLtr,
+    /// How a language that reads right to left reads.
+    AppearanceReadsRtl,
     /// Follow the language.
     AppearanceDirectionAuto,
     /// Always left to right.
@@ -568,7 +581,7 @@ pub enum MessageKey {
 
 impl MessageKey {
     /// Every key, in the order the files are written in.
-    pub const ALL: [MessageKey; 70] = [
+    pub const ALL: [MessageKey; 75] = [
         MessageKey::AppTitle,
         MessageKey::AppTagline,
         MessageKey::CommonOk,
@@ -621,6 +634,11 @@ impl MessageKey {
         MessageKey::AppearanceThemeSystem,
         MessageKey::AppearanceThemeLight,
         MessageKey::AppearanceThemeDark,
+        MessageKey::AppearanceThemeSystemHint,
+        MessageKey::AppearanceThemeLightHint,
+        MessageKey::AppearanceThemeDarkHint,
+        MessageKey::AppearanceReadsLtr,
+        MessageKey::AppearanceReadsRtl,
         MessageKey::AppearanceDirectionAuto,
         MessageKey::AppearanceDirectionLtr,
         MessageKey::AppearanceDirectionRtl,
@@ -681,6 +699,7 @@ impl MessageKey {
             MessageKey::SourceScanning => &["name"],
             MessageKey::SourceScanned | MessageKey::QueueWaiting => &["count"],
             MessageKey::AppearanceDirectionAutoHint => &["locale", "reads", "flows"],
+            MessageKey::AppearanceThemeSystemHint => &["asked", "shown"],
             MessageKey::LanguageCoverage => &["translated", "total", "base"],
             MessageKey::LanguageSwitched => &["locale"],
             MessageKey::CliUnknownFormat
@@ -700,7 +719,7 @@ impl MessageKey {
 ///
 /// The length is checked against [`MessageKey::ALL`] by a test rather than by
 /// the type system, because an array length is not part of an enum's identity.
-const NAMES: [&str; 70] = [
+const NAMES: [&str; 75] = [
     "app.title",
     "app.tagline",
     "common.ok",
@@ -753,6 +772,11 @@ const NAMES: [&str; 70] = [
     "appearance.themeSystem",
     "appearance.themeLight",
     "appearance.themeDark",
+    "appearance.themeSystemHint",
+    "appearance.themeLightHint",
+    "appearance.themeDarkHint",
+    "appearance.readsLtr",
+    "appearance.readsRtl",
     "appearance.directionAuto",
     "appearance.directionLtr",
     "appearance.directionRtl",
@@ -975,6 +999,16 @@ impl Catalog {
     /// The base locale's catalog, with nothing resolved through a fallback.
     pub fn base() -> &'static Catalog {
         base_catalog()
+    }
+
+    /// The locale these messages are in.
+    pub fn locale(&self) -> Locale {
+        self.locale
+    }
+
+    /// The locale's tag.
+    pub fn locale_tag(&self) -> &'static str {
+        self.locale.tag()
     }
 
     /// One message, from the locale or from whichever rung answered.

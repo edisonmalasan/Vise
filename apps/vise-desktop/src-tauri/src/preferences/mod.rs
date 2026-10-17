@@ -49,7 +49,14 @@ pub const PREFERENCES_KEY: &str = "preferences";
 /// for reasons that have nothing to do with what a control means, while this
 /// number only moves when a preference changes shape. A record stamped with a
 /// higher number than this build understands is left untouched.
-pub const PREFERENCES_VERSION: u32 = 2;
+///
+/// Version three added the interface language. It arrives with its default rather
+/// than with anything being chosen: a record from version two was written by a
+/// build whose only language was English, so the honest reading of it is that the
+/// user has not chosen one and the window follows this machine. Nothing the
+/// record already held is lost by that, which is why it is a migration and not a
+/// second store.
+pub const PREFERENCES_VERSION: u32 = 3;
 
 /// Identifier of the preferences surface.
 pub const SURFACE: &str = "preferences";
@@ -165,6 +172,7 @@ impl PreferencesSettings {
             (general::KEEP_DUPLICATE_TITLES, "general"),
             (general::DEFAULT_RANGE_MODE, "general"),
             (general::SCAN_ON_OPEN, "general"),
+            (general::LANGUAGE, "general"),
             (output::FOLDER, "output"),
             (output::NAME_PATTERN, "output"),
             (output::OVERWRITE, "output"),
@@ -875,6 +883,7 @@ impl PreferencesState {
                 next.general.default_range_mode = general::RangePreference::read(value)?
             }
             general::SCAN_ON_OPEN => next.general.scan_on_open = want_switch(field, value)?,
+            general::LANGUAGE => next.general.language = general::LanguagePreference::read(value)?,
             output::FOLDER => next.output.folder = output::read_folder(value)?,
             output::NAME_PATTERN => next.output.name_pattern = output::read_pattern(value)?,
             output::OVERWRITE => next.output.overwrite = want_switch(field, value)?,
@@ -1312,6 +1321,11 @@ fn read_record(settings: &AppSettings, location: &str) -> (PreferencesSettings, 
     if declared.is_none() || declared != Some(PREFERENCES_VERSION) {
         // An older record is brought forward. Its members keep their defaults
         // where they are missing, so migrating costs nothing that was there.
+        //
+        // The language is the one member whose default is a decision rather than a
+        // number: a record written before this build could speak more than one
+        // language, so it says the user chose nothing, and the window follows this
+        // machine.
         note.state = RecordState::Migrated;
         note.written_version = declared.unwrap_or(0);
         note.note = RecordState::Migrated.note(PREFERENCES_VERSION);
@@ -1434,6 +1448,7 @@ fn field_label(field: &str) -> &'static str {
         general::KEEP_DUPLICATE_TITLES => "Keep duplicate titles",
         general::DEFAULT_RANGE_MODE => "Default range",
         general::SCAN_ON_OPEN => "Scan when a source is opened",
+        general::LANGUAGE => "Language",
         output::FOLDER => "Output folder",
         output::NAME_PATTERN => "File name pattern",
         output::OVERWRITE => "Replace files that already exist",
@@ -2074,6 +2089,75 @@ mod tests {
             Some("info".to_string())
         );
         assert!(view.ready, "{:?}", view.problems);
+    }
+
+    #[test]
+    fn a_version_two_record_gains_a_language_that_follows_the_machine() {
+        // The migration Group 18 needed: a record written before this build could
+        // speak more than one language has nothing to say about which one, so the
+        // honest reading is that nothing was chosen and the window follows the
+        // machine. Nothing it did hold is lost on the way.
+        let path = temp_settings("language-migration");
+        let folder = path.parent().unwrap().join("out");
+        fs::create_dir_all(&folder).expect("folder");
+        write_raw(
+            &path,
+            &serde_json::json!({
+                "version": vise_core::SETTINGS_VERSION,
+                "preferences": {
+                    "version": PREFERENCES_VERSION - 1,
+                    "general": {"preview_count": 3, "scan_on_open": true},
+                    "output": {"folder": folder.display().to_string()}
+                }
+            })
+            .to_string(),
+        );
+        let state = PreferencesState::load(&path, &vise_ipc::portable::default_settings());
+        let view = state.view();
+        assert_eq!(view.storage.state, RecordState::Migrated);
+        assert_eq!(view.storage.written_version, PREFERENCES_VERSION - 1);
+        assert_eq!(
+            view.storage.note,
+            RecordState::Migrated.note(PREFERENCES_VERSION)
+        );
+        assert_eq!(view.general.numbers[0].value, Some(3.0), "kept");
+        assert!(
+            view.general.toggles.iter().any(|toggle| toggle.checked),
+            "kept"
+        );
+        assert_eq!(
+            state.settings().general.language,
+            general::LanguagePreference::FollowSystem,
+            "and the language arrives at its default rather than as a choice"
+        );
+        let picker = view
+            .general
+            .choices
+            .iter()
+            .find(|choice| choice.id == general::LANGUAGE)
+            .expect("the language picker is there after the migration");
+        assert_eq!(picker.selected, general::FOLLOW_SYSTEM);
+        assert_eq!(picker.options.len(), vise_core::SUPPORTED.len() + 1);
+        assert!(view.ready, "{:?}", view.problems);
+
+        // Writing it forward stamps the new version and keeps the choice.
+        let mut state = state;
+        state
+            .set(general::LANGUAGE, &value("\"de\""))
+            .expect("the language is accepted");
+        let document: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).expect("read")).expect("json");
+        assert_eq!(document["preferences"]["version"], PREFERENCES_VERSION);
+        assert_eq!(
+            document["preferences"]["general"]["language"],
+            serde_json::json!({"locale": "de"}),
+            "stored as the two answers it has, not as one string"
+        );
+        assert_eq!(document["preferences"]["general"]["preview_count"], 3);
+        assert_eq!(
+            document["preferences"]["output"]["folder"],
+            folder.display().to_string()
+        );
     }
 
     #[test]
