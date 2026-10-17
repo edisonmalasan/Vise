@@ -1,0 +1,14 @@
+{
+  "general-very-fast-480-30-h264": "La codificación más rápida de la escalera: archivo más pequeño y menos trabajo, a cambio de la pérdida más visible. H.264 se reproduce en todas partes. Escalado a 854 por 480.",
+  "general-very-fast-1080-30-hevc": "La codificación más rápida de la escalera: archivo más pequeño y menos trabajo, a cambio de la pérdida más visible. H.265 ocupa más o menos la mitad que H.264 con la misma calidad. Escalado a 1920 por 1080.",
+  "general-fast-720-30-h264": "Un preajuste rápido que aun así codifica con sentido; la opción habitual para una primera pasada sobre un título largo. H.264 se reproduce en todas partes. Escalado a 1280 por 720.",
+  "general-hq-1080-30-h264": "Más lento y más grande que Fast, a cambio de un detalle que aguanta una mirada de cerca, y todavía rápido de codificar. H.264 se reproduce en todas partes. Escalado a 1920 por 1080.",
+  "web-creator-1080-60": "Un archivo H.264 de fotogramas por segundo altos para una plataforma que vuelve a codificar lo que recibe: los fotogramas por segundo y el tamaño son lo importante, así que la calidad se ajusta para que el movimiento fluya y no para el detalle.",
+  "web-social-10mb-60s": "Codificado para caber en 10 MB. El tamaño es el objetivo y no la calidad, así que solo es honesto para un título de unos 60 segundos: uno más largo se comprime más para caber y uno más corto no gastará todo el margen.",
+  "device-fire-720-30-h264": "Elegido para que Fire TV reproduzca el archivo sin convertirlo: H.264 en MP4, con el tamaño de esa pantalla y de ninguna mayor.",
+  "device-apple-2160-60-hevc": "Elegido para que los dispositivos de Apple reproduzcan el archivo sin convertirlo: H.264 en MP4, con el tamaño de esa pantalla y de ninguna mayor.",
+  "matroska-hevc-1080-30": "Matroska con vídeo H.265 y audio FLAC. El contenedor admite todos los códecs de esta página, así que el archivo se podrá leer sea cual sea lo que descodifique una máquina posterior.",
+  "hardware-nvenc-hevc-1080-30": "Codifica la parte NVIDIA NVENC de la tarjeta de gráficos en lugar del procesador, que es varias veces más rápida con el mismo tamaño. Merece la pena cuando la tarjeta está ahí; cuando no lo está, este preajuste recurre al codificador por software y lo dice.",
+  "professional-prores-422-hq": "Resolución completa, 10 bits, 4:2:2: el intercambio habitual en la edición diaria. El audio es PCM sin comprimir, de modo que una edición nunca deshace primero un paso con pérdida.",
+  "professional-ffv1-pcm": "FFV1 es sin pérdida y solo con cuadros propios, así que cada cuadro se sostiene por sí mismo y un archivo de conservación se puede cortar en cualquier punto sin generar otro archivo. PCM conserva el audio bit a bit, que es justamente lo que se busca en una copia de conservación."
+}

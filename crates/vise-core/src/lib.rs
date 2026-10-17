@@ -10,6 +10,7 @@ mod chapter;
 mod error;
 mod geometry;
 mod hardware;
+mod i18n;
 mod job;
 mod media;
 mod metadata;
@@ -26,6 +27,7 @@ pub use chapter::*;
 pub use error::CoreError;
 pub use geometry::*;
 pub use hardware::*;
+pub use i18n::*;
 pub use job::{
     AudioCodec, ContainerFormat, EncodingMode, JobSpec, OutputOptions, SubtitleMode, VideoCodec,
 };
