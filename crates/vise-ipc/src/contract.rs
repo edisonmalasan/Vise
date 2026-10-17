@@ -278,6 +278,20 @@ pub struct InitCommand {
     /// that needs the priority: it is the one competing with the machine for
     /// the encoder, and a parent cannot raise a priority it does not hold.
     pub process_priority: i32,
+    /// Keep the machine awake for as long as an encode is running.
+    ///
+    /// Sent rather than decided by the window because the worker is the process
+    /// that outlives the encode thread: a hold requested by the window would be
+    /// released by whichever thread finished last, and a hold that outlived its
+    /// encode is a machine that will not sleep tonight.
+    pub prevent_sleep: bool,
+    /// What the machine should keep doing while it is held awake: zero keeps the
+    /// machine running and lets the screen go dark, one keeps both.
+    pub power_scope: i32,
+    /// Where the worker should run on a machine with several processor groups:
+    /// negative leaves the placement to the operating system, zero lets the
+    /// worker decide from the layout, and a positive number names a group.
+    pub numa_mode: i32,
     /// Keep duplicate title entries instead of collapsing them.
     pub keep_duplicate_titles: bool,
 }
@@ -297,6 +311,9 @@ impl Default for InitCommand {
             hw_decode: 0,
             hw_decode_device: String::new(),
             process_priority: 0,
+            prevent_sleep: true,
+            power_scope: 0,
+            numa_mode: 0,
             keep_duplicate_titles: false,
         }
     }
@@ -354,6 +371,24 @@ impl InitCommand {
     /// The scheduling priority to ask for, clamped to what the worker applies.
     pub fn priority(&self) -> i32 {
         self.process_priority.clamp(-2, 2)
+    }
+
+    /// What the machine should keep doing while it is held awake.
+    ///
+    /// Read through [`crate::power::PowerScope`] rather than from a second table,
+    /// so the scope the preferences stored and the scope the worker holds are one
+    /// value with one set of names.
+    pub fn power(&self) -> crate::power::PowerScope {
+        if self.power_scope <= 0 {
+            crate::power::PowerScope::System
+        } else {
+            crate::power::PowerScope::SystemAndDisplay
+        }
+    }
+
+    /// Where the worker should run, as the preferences asked.
+    pub fn numa(&self) -> crate::numa::NumaMode {
+        crate::numa::NumaMode::read(self.numa_mode)
     }
 
     /// Resolve the log file path when disk logging is enabled.

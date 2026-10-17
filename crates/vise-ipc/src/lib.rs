@@ -13,14 +13,19 @@
 //! - [`validation`] — pre-flight job validation.
 //! - [`client`] — loopback HTTP client with typed command wrappers.
 //! - [`supervisor`] — worker process lifecycle, handshake, and restart.
-//! - [`portable`] — portable-mode switch that can disable process isolation.
+//! - [`portable`] — portable-mode file: the process-isolation switch and where
+//!   the settings, the queue, and the presets are written.
+//! - [`power`] — holding the machine awake while an encode runs.
+//! - [`numa`] — what the processor layout is, and where the worker is put.
 
 pub mod api;
 pub mod base64;
 pub mod client;
 pub mod contract;
 pub mod http;
+pub mod numa;
 pub mod portable;
+pub mod power;
 pub mod route;
 pub mod supervisor;
 pub mod timespan;
@@ -29,7 +34,8 @@ pub mod validation;
 
 pub use client::{ClientError, WorkerClient};
 pub use contract::*;
-pub use portable::{PortableError, PortableSettings};
+pub use portable::{PortableError, PortableSettings, StorageKind, StorageRoots};
+pub use power::{PowerError, PowerRequest, PowerScope};
 pub use route::{Route, TOKEN_HEADER};
 pub use supervisor::{SupervisorError, WorkerConfig, WorkerConnection, WorkerSupervisor};
 pub use timespan::{TimeSpan, TimeSpanError};
