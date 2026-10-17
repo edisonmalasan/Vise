@@ -806,6 +806,467 @@ td.controls {
   word-break: break-word;
 }
 
+/* Secondary windows -------------------------------------------------------- */
+
+/* The toolbar is built from the window catalog, so its buttons come and go with
+   the surfaces the build offers. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--gap);
+}
+
+.toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge {
+  background: var(--danger);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  min-width: 18px;
+  padding: 3px 6px;
+  text-align: center;
+}
+
+/* Every secondary surface is an overlay inside the application window, so the
+   window behind it is dimmed and cannot be reached by tabbing or by clicking
+   through it. The backdrop is only in the layout while a surface is up: a
+   full-viewport box that is always there would swallow every click. */
+.backdrop {
+  background: rgb(0 0 0 / 45%);
+  inset: 0;
+  position: fixed;
+  z-index: 10;
+}
+
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 28%);
+  left: 50%;
+  max-height: min(84vh, 900px);
+  overflow: auto;
+  padding: 16px;
+  position: fixed;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(680px, 92vw);
+  z-index: 20;
+}
+
+.surface-wide {
+  width: min(1080px, 94vw);
+}
+
+.surface + .surface {
+  margin-top: 0;
+}
+
+.surface-head {
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 4px 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+}
+
+.surface-head h2 {
+  grid-column: 1;
+}
+
+.surface-head .hint {
+  grid-column: 1;
+  margin: 0;
+}
+
+.surface-head button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+}
+
+.surface-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 10px;
+}
+
+.surface-summary .title {
+  font-weight: 600;
+}
+
+.surface-body > .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+
+.surface-body .controls .field {
+  margin: 0;
+  min-width: 160px;
+}
+
+/* Queue -------------------------------------------------------------------- */
+
+.queue-table td.order {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  width: 48px;
+}
+
+.queue-table td.state {
+  white-space: nowrap;
+}
+
+.queue-table td.progress-cell {
+  min-width: 120px;
+}
+
+.queue-table tr[data-tone="ok"] td.state span:first-child {
+  color: var(--success);
+}
+
+.queue-table tr[data-tone="error"] td.state span:first-child {
+  color: var(--danger);
+}
+
+.queue-table tr[data-tone="warn"] td.state span:first-child {
+  color: var(--warning);
+}
+
+.queue-table .chip {
+  margin-left: 6px;
+}
+
+button.warn {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+button.warn:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
+/* Queue selection ---------------------------------------------------------- */
+
+.selection-list {
+  list-style: none;
+  margin: 0 0 10px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 0;
+}
+
+.selection-item {
+  align-items: start;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.selection-item[data-collides="true"] {
+  background: var(--danger-soft);
+}
+
+.selection-body {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+
+.selection-head {
+  display: flex;
+  gap: 8px;
+}
+
+.selection-head .title {
+  font-weight: 600;
+}
+
+.selection-head .facts {
+  color: var(--muted);
+}
+
+.planned .path {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* Activity ----------------------------------------------------------------- */
+
+.logs {
+  max-height: 46vh;
+}
+
+.log-line {
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 64px 56px minmax(0, 1fr);
+  padding: 2px 0;
+}
+
+.log-line .log-level {
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.log-line .log-source {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.log-line[data-tone="error"] .log-level {
+  color: var(--danger);
+}
+
+.log-line[data-tone="warn"] .log-level {
+  color: var(--warning);
+}
+
+/* Preview ------------------------------------------------------------------ */
+
+.scrub {
+  width: 100%;
+}
+
+.stops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  list-style: none;
+  margin: 0 0 10px;
+  max-height: 84px;
+  overflow: auto;
+  padding: 0;
+}
+
+.stops .stop button {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+}
+
+.stops .stop button.current {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.preview-stage {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 180px;
+  overflow: hidden;
+  position: relative;
+}
+
+.preview-stage img.still {
+  display: block;
+  max-height: 46vh;
+  width: 100%;
+}
+
+/* The rectangle the crop is taken from. It is drawn from the fractions the
+   window reports, so the rectangle on screen is the one that was checked. */
+.crop-overlay {
+  border: 2px solid var(--accent);
+  background: rgb(31 95 208 / 12%);
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 28%);
+  cursor: crosshair;
+  pointer-events: none;
+  position: absolute;
+}
+
+.crop-overlay[data-valid="false"] {
+  border-color: var(--danger);
+}
+
+/* Problems ----------------------------------------------------------------- */
+
+.error-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.error-item {
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 2px 10px;
+  grid-template-columns: 72px minmax(0, 1fr);
+  padding: 8px 0;
+}
+
+.error-item .severity {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.error-item[data-tone="error"] .severity {
+  color: var(--danger);
+}
+
+.error-item .context {
+  font-weight: 600;
+}
+
+.error-item .detail,
+.error-item .hint {
+  grid-column: 2;
+  margin: 0;
+}
+
+/* About -------------------------------------------------------------------- */
+
+.facts-list {
+  display: grid;
+  gap: 4px 12px;
+  grid-template-columns: 120px minmax(0, 1fr);
+  margin: 0 0 10px;
+}
+
+.facts-list dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.facts-list dd {
+  margin: 0;
+}
+
+.link-row {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 2px 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 6px 0;
+}
+
+.link-row .hint {
+  grid-column: 1;
+  margin: 0;
+  word-break: break-all;
+}
+
+.link-row button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+/* Presets ------------------------------------------------------------------ */
+
+.presets {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 0 0 10px;
+  padding: 8px 12px 12px;
+}
+
+.preset-row {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 0;
+}
+
+.preset-row[data-built-in="true"] {
+  opacity: 0.92;
+}
+
+.preset-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-head .title {
+  font-weight: 600;
+}
+
+.chip.default {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.preset-form {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 0 12px;
+  padding: 8px 12px 12px;
+}
+
+.preset-form > * {
+  grid-column: 1 / -1;
+}
+
+.preset-form .field {
+  grid-column: span 1;
+  margin: 0;
+}
+
+.preset-form .notice,
+.preset-form > button {
+  grid-column: 1 / -1;
+}
+
+/* Metadata tags ------------------------------------------------------------ */
+
+.tags {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.tag {
+  align-items: center;
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(0, 2fr) auto auto;
+}
+
+.tag .tag-key {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-weight: 600;
+}
+
+.tag .hint {
+  margin: 0;
+}
+
+.tag[data-tone="error"] .tag-key {
+  color: var(--danger);
+}
+
+.tag[data-tone="info"] .tag-key {
+  color: var(--accent);
+}
+
+.chip.written {
+  border-color: var(--success);
+  color: var(--success);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition-duration: 0.01ms !important;

@@ -570,19 +570,30 @@ pub fn queue_view(state: &QueueState, jobs: &[Job]) -> QueueViewModel {
     let bulk = vec![
         QueueActionViewModel::open("start_queue", "Start queue", true)
             .blocked_or(!pending.is_empty(), || start_reason.clone()),
-        QueueActionViewModel::open("cancel_all", "Cancel everything", true)
-            .blocked_or(total > 0, || "The queue is empty.".to_string()),
+        QueueActionViewModel::open("cancel_all", "Cancel everything", true).blocked_or(
+            running > 0,
+            || {
+                if total == 0 {
+                    "The queue is empty.".to_string()
+                } else {
+                    "Nothing is being encoded right now.".to_string()
+                }
+            },
+        ),
         QueueActionViewModel::open("clear_finished", "Clear finished", true)
             .blocked_or(finished > 0, || "No job has finished yet.".to_string()),
+        // Emptying the queue throws away every job that is not being encoded, so
+        // it is on offer only when there is something to throw away and nothing
+        // in flight that would be lost part-way through an encode.
         QueueActionViewModel::open("empty_queue", "Empty queue", true).blocked_or(
-            total > 0 && running == total,
+            total > 0 && total > running,
             || {
                 if total == 0 {
                     "The queue is empty.".to_string()
                 } else {
                     format!(
                         "{} job(s) are still in the queue; cancel them before emptying it.",
-                        total - running
+                        running
                     )
                 }
             },
@@ -1275,10 +1286,8 @@ mod tests {
         assert!(bulk("cancel_all").available);
         assert!(bulk("clear_finished").available);
         assert!(
-            bulk("empty_queue")
-                .reason
-                .contains("cancel them before emptying"),
-            "{}",
+            bulk("empty_queue").available,
+            "there is a finished job to throw away: {}",
             bulk("empty_queue").reason
         );
 
@@ -1289,6 +1298,53 @@ mod tests {
         let view = queue_view(&state, &all_running);
         assert!(!view.can_start);
         assert!(view.start_reason.contains("already with the encoder"));
+        let bulk = |id: &str| {
+            view.bulk
+                .iter()
+                .find(|action| action.id == id)
+                .cloned()
+                .expect("bulk action")
+        };
+        assert!(
+            bulk("cancel_all").available,
+            "every job is being encoded, so there is something to cancel"
+        );
+        assert!(!bulk("clear_finished").available, "nothing has finished yet");
+        assert!(bulk("clear_finished").reason.contains("No job has finished"));
+        assert!(
+            !bulk("empty_queue").available,
+            "emptying the queue would lose an encode in flight"
+        );
+        assert!(bulk("empty_queue").reason.contains("cancel them before emptying"));
+    }
+
+    #[test]
+    fn nothing_is_offered_to_cancel_when_the_encoder_is_idle() {
+        let (state, mut jobs) = synced();
+        for job in &mut jobs {
+            job.status.state = JobState::Queued;
+        }
+        let view = queue_view(&state, &jobs);
+        let cancel = view
+            .bulk
+            .iter()
+            .find(|action| action.id == "cancel_all")
+            .expect("bulk action");
+        assert!(!cancel.available, "there is nothing running to cancel");
+        assert!(cancel.reason.contains("Nothing is being encoded"));
+    }
+
+    #[test]
+    fn an_empty_queue_offers_nothing_to_clear_empty_or_cancel() {
+        let state = QueueState::default();
+        let view = queue_view(&state, &[]);
+        assert!(view.empty);
+        assert_eq!(view.total, 0);
+        assert_eq!(view.summary, "The queue is empty.");
+        for action in &view.bulk {
+            assert!(!action.available, "{} is on offer", action.id);
+            assert!(!action.reason.is_empty(), "{} has no reason", action.id);
+        }
     }
 
     #[test]

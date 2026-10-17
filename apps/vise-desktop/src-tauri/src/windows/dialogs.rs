@@ -252,8 +252,13 @@ pub fn report_text(entries: &[ErrorEntry]) -> String {
 // ---------------------------------------------------------------------------
 
 /// An action that cannot be undone.
+///
+/// The names are what the page sends back, so they are spelled in full rather
+/// than squeezed together: `start_queue` and not `startqueue`. A confirmation
+/// is the one place a mistyped name would quietly do nothing, so the spelling
+/// is pinned by a test.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum AlertAction {
     /// Cancel a running or queued encode.
     CancelJob,
@@ -731,5 +736,27 @@ mod tests {
             "{}",
             view.copy_text
         );
+    }
+
+    #[test]
+    fn every_action_name_is_spelled_the_way_the_page_sends_it() {
+        // A confirmation is the one place where a name that does not round-trip
+        // does nothing at all rather than failing loudly, so each one is pinned.
+        for (action, name) in [
+            (AlertAction::CancelJob, "cancel_job"),
+            (AlertAction::RemoveJob, "remove_job"),
+            (AlertAction::CancelQueue, "cancel_queue"),
+            (AlertAction::ClearFinished, "clear_finished"),
+            (AlertAction::ClearQueue, "clear_queue"),
+            (AlertAction::StartQueue, "start_queue"),
+            (AlertAction::DeletePreset, "delete_preset"),
+        ] {
+            let json = serde_json::to_string(&action).expect("serialise");
+            assert_eq!(json, format!("\"{name}\""));
+            assert_eq!(
+                serde_json::from_str::<AlertAction>(&json).expect("parse"),
+                action
+            );
+        }
     }
 }

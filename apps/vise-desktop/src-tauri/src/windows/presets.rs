@@ -249,6 +249,8 @@ pub struct PresetFormViewModel {
     pub path_reason: String,
     /// Whether the form may be submitted.
     pub can_submit: bool,
+    /// Label on the control that submits the form.
+    pub submit_label: String,
     /// Everything that has to be fixed first.
     pub problems: Vec<String>,
 }
@@ -697,7 +699,26 @@ pub fn form_view(
             )
         },
         can_submit,
+        submit_label: submit_label(action).to_string(),
         problems: all,
+    }
+}
+
+/// The label on the control that submits the form for `action`.
+///
+/// The page does not choose it: one window has one set of words for what it can
+/// do with a preset, so the same action is never named two ways.
+pub fn submit_label(action: PresetAction) -> &'static str {
+    match action {
+        PresetAction::Create => "Store the current settings",
+        PresetAction::Edit => "Save the changes",
+        PresetAction::Clone => "Store the copy",
+        PresetAction::Delete => "Delete this preset",
+        PresetAction::Apply => "Apply this preset",
+        PresetAction::Import => "Import this file",
+        PresetAction::Export => "Export this preset",
+        PresetAction::SetDefault => "Use for every new job",
+        PresetAction::ClearDefault => "Stop using this preset",
     }
 }
 
@@ -905,6 +926,22 @@ mod tests {
         let create = form_view(&input("create"), &[], None);
         assert!(!create.path_available);
         assert!(create.path_reason.contains("does not read or write a file"));
+    }
+
+    #[test]
+    fn the_submit_control_is_named_by_the_window_not_the_page() {
+        assert_eq!(
+            submit_label(PresetAction::Create),
+            "Store the current settings"
+        );
+        assert_eq!(submit_label(PresetAction::Delete), "Delete this preset");
+        assert_eq!(submit_label(PresetAction::Import), "Import this file");
+        assert_eq!(submit_label(PresetAction::Export), "Export this preset");
+        let form = form_view(&input("clone"), &[], None);
+        assert_eq!(form.submit_label, "Store the copy");
+        assert!(form
+            .problems
+            .contains(&"Give the preset a name.".to_string()));
     }
 
     #[test]

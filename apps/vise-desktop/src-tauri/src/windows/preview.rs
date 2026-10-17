@@ -183,9 +183,17 @@ pub struct StillImageViewModel {
     pub label: String,
     /// Size of the encoded image, for the caption.
     pub byte_length: u64,
+    /// The media type of the image bytes.
+    ///
+    /// The worker writes its stills as JPEG files, and the page cannot tell
+    /// that from the bytes, so the type travels with the frame.
+    pub media_type: String,
     /// The image itself, base64, ready for an `img` element.
     pub data_base64: String,
 }
+
+/// The media type of a still the worker produced.
+pub const STILL_MEDIA_TYPE: &str = "image/jpeg";
 
 /// One control in the preview window, with its availability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -538,6 +546,7 @@ impl PreviewState {
                 .map(|still| still.label.clone())
                 .unwrap_or_else(|| format!("Still {}", image.number + 1)),
             byte_length: image.byte_length,
+            media_type: STILL_MEDIA_TYPE.to_string(),
             data_base64: image.data_base64.clone(),
         });
         let back_reason = stop_reason(&stills, -1);

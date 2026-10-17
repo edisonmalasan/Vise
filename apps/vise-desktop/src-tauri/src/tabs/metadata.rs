@@ -601,7 +601,12 @@ pub fn tab_view(settings: &MetadataSettings, facts: &TitleFacts) -> MetadataTabV
         },
         new_key: closed_text(
             invalid_text(
-                TextViewModel::new("metadataNewKey", "New tag name", "", "title"),
+                TextViewModel::new(
+                    "metadataNewKey",
+                    "New tag name",
+                    "",
+                    "what the tag is called",
+                ),
                 problems.iter().any(|problem| problem == "A tag has no name."),
                 "A tag has no name; fix it or remove it.",
             ),
