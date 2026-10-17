@@ -5,13 +5,16 @@
 //! frontends. It has no UI dependency.
 
 mod audio;
+pub mod attachments;
 mod catalog;
 mod chapter;
 mod error;
 mod geometry;
 mod hardware;
+pub mod hdr;
 pub mod i18n;
 mod job;
+mod lossless;
 mod media;
 mod metadata;
 mod pipeline;
@@ -22,12 +25,15 @@ mod session;
 mod subtitle;
 mod video;
 pub use audio::*;
+pub use attachments::*;
 pub use catalog::*;
 pub use chapter::*;
 pub use error::CoreError;
 pub use geometry::*;
 pub use hardware::*;
+pub use hdr::*;
 pub use i18n::*;
+pub use lossless::*;
 pub use job::{
     AudioCodec, ContainerFormat, EncodingMode, JobSpec, OutputOptions, SubtitleMode, VideoCodec,
 };

@@ -147,6 +147,8 @@ impl Transcoder {
             duration_seconds,
             video_codec_name,
             audio_codec_name,
+            lossless_claim: plan.lossless_claim.clone(),
+            hdr_claims: plan.hdr_claims.clone(),
         })
     }
 
@@ -236,6 +238,12 @@ impl Transcoder {
         let resolved_encoder = caps.preferred_encoder(video_codec, &hw_opts);
         let hw_decode = caps.preferred_decoder_arg(&hw_opts);
 
+        // Lossless is a property of the whole job rather than of the video
+        // encoder alone, so it is resolved once here and read by both the
+        // encoder arguments and the finished result.
+        let lossless_plan = crate::LosslessPlan::resolve(spec);
+        let hdr_caps = crate::HdrCapabilities::detect(self.ffmpeg.as_deref());
+
         let chapter_opts = spec.chapter_processing_options();
         // An edited or replaced marker list becomes a metadata sidecar that
         // ffmpeg reads as a second input, so the markers the window shows are
@@ -278,6 +286,27 @@ impl Transcoder {
         // Preset, profile, tune, level, and colour range shape how frames are
         // coded, so they follow the encoder name.
         args.extend(spec.video_encoding_options().encoder_args());
+        // Dolby Vision RPU coding and HDR10+ SEI forwarding are private
+        // options of the software HEVC encoder, so they are only added when
+        // that encoder is the one that will run. The decision itself is still
+        // reported to the caller even when this build cannot honour it.
+        let hdr_claims: Vec<String> = if resolved_encoder == "libx265" {
+            let vision = spec.dolby_vision_outcome(&hdr_caps);
+            let plus = spec.hdr10_plus_outcome(&hdr_caps);
+            args.extend(vision.args.clone());
+            args.extend(plus.args.clone());
+            [vision, plus]
+                .iter()
+                .filter(|outcome| !outcome.supported)
+                .map(|outcome| outcome.claim.clone())
+                .collect()
+        } else {
+            [spec.dolby_vision_outcome(&hdr_caps), spec.hdr10_plus_outcome(&hdr_caps)]
+                .iter()
+                .filter(|outcome| !outcome.supported)
+                .map(|outcome| outcome.claim.clone())
+                .collect()
+        };
         if audio_opts.passthrough || audio_opts.copy {
             args.push("-c:a".into());
             args.push("copy".into());
@@ -305,14 +334,21 @@ impl Transcoder {
             args.push("-ac".into());
             args.push(ch.to_string());
         }
-        // Keep broad compatibility for software baseline encoding.
-        let pix_fmt = if video_opts.ten_bit {
-            "yuv420p10le"
-        } else {
-            "yuv420p"
-        };
+        // Keep broad compatibility for software baseline encoding, and pin the
+        // lossless plan's pixel format when the job is a lossless write so the
+        // encoder is not handed a format the plan did not choose.
+        let pix_fmt = lossless_plan
+            .pix_fmt
+            .clone()
+            .unwrap_or_else(|| {
+                if video_opts.ten_bit {
+                    "yuv420p10le".to_string()
+                } else {
+                    "yuv420p".to_string()
+                }
+            });
         args.push("-pix_fmt".into());
-        args.push(pix_fmt.into());
+        args.push(pix_fmt);
         // constant frame rate handling
         let cfr_fps = match &video_opts.frame_rate {
             Some(crate::FrameRateMode::Constant(fps)) => Some(*fps),
@@ -387,8 +423,12 @@ impl Transcoder {
 
         let input_duration = self.probe_duration(&input);
         if resolved_mode.is_lossless() {
-            args.push("-crf".into());
-            args.push("0".into());
+            // An intra lossless encoder takes no rate-control value at all;
+            // handing it `-crf 0` would make the encoder refuse the job.
+            if lossless_plan.video_encoder.is_none() {
+                args.push("-crf".into());
+                args.push("0".into());
+            }
         } else if resolved_mode.is_constant_quality() {
             if let Some(q) = quality {
                 args.push("-crf".into());
@@ -449,6 +489,12 @@ impl Transcoder {
             audio_filter_chain,
             duration_seconds: input_duration,
             chapter_metadata_path,
+            lossless_claim: if crate::is_lossless_request(spec) {
+                Some(lossless_plan.claim.clone())
+            } else {
+                None
+            },
+            hdr_claims: hdr_claims.clone(),
         })
     }
 
@@ -540,6 +586,11 @@ pub struct TranscodeResult {
     pub duration_seconds: Option<f64>,
     pub video_codec_name: Option<String>,
     pub audio_codec_name: Option<String>,
+    /// What the finished file can honestly be called, when the job is a
+    /// lossless write; `None` when it is not.
+    pub lossless_claim: Option<String>,
+    /// Dolby Vision and HDR10+ requests this build could not honour, if any.
+    pub hdr_claims: Vec<String>,
 }
 
 /// A fully resolved encoder invocation.
@@ -574,6 +625,11 @@ pub struct TranscodePlan {
     /// Chapter metadata sidecar written while planning, if the job carried an
     /// edited marker list. [`Transcoder::execute`] removes it afterwards.
     pub chapter_metadata_path: Option<PathBuf>,
+    /// What the finished file can honestly be called, when the job is a
+    /// lossless write; `None` when it is not.
+    pub lossless_claim: Option<String>,
+    /// Dolby Vision and HDR10+ requests this build could not honour, if any.
+    pub hdr_claims: Vec<String>,
 }
 
 impl TranscodePlan {
@@ -691,6 +747,12 @@ fn merge_video_options(target: &mut VideoProcessingOptions, src: &VideoProcessin
     }
     if src.sharpen_amount.is_some() {
         target.sharpen_amount = src.sharpen_amount;
+    }
+    if src.deblock {
+        target.deblock = true;
+    }
+    if src.deblock_strength.is_some() {
+        target.deblock_strength = src.deblock_strength;
     }
     if src.rotate.is_some() {
         target.rotate = src.rotate;

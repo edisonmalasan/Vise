@@ -99,6 +99,12 @@ pub struct StreamInfo {
     pub channel_layout: Option<String>,
     pub bit_rate: Option<u64>,
     pub duration_seconds: Option<f64>,
+    /// Dolby Vision profile reported in the stream's side data, when present.
+    pub dolby_vision_profile: Option<u8>,
+    /// Whether the stream carries a Dolby Vision RPU.
+    pub dolby_vision_rpu: bool,
+    /// Whether the stream carries HDR10+ dynamic metadata.
+    pub hdr10_plus: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -419,6 +425,19 @@ struct FfprobeStream {
     duration: Option<String>,
     #[serde(default)]
     tags: Option<BTreeMap<String, String>>,
+    /// Per-frame side data, which is where Dolby Vision and HDR10+ travel.
+    #[serde(default)]
+    side_data_list: Option<Vec<FfprobeSideData>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct FfprobeSideData {
+    #[serde(default)]
+    side_data_type: Option<String>,
+    #[serde(default)]
+    dv_profile: Option<u8>,
+    #[serde(default)]
+    rpu_present_flag: Option<u8>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -454,6 +473,8 @@ fn convert_stream(s: FfprobeStream) -> StreamInfo {
     } else {
         (None, None)
     };
+    let (dolby_vision_profile, dolby_vision_rpu, hdr10_plus) =
+        read_hdr_side_data(s.side_data_list.as_deref());
     StreamInfo {
         index: s.index,
         kind,
@@ -469,7 +490,34 @@ fn convert_stream(s: FfprobeStream) -> StreamInfo {
         channel_layout: s.channel_layout,
         bit_rate: s.bit_rate.as_deref().and_then(parse_u64),
         duration_seconds: s.duration.as_deref().and_then(parse_f64),
+        dolby_vision_profile,
+        dolby_vision_rpu,
+        hdr10_plus,
     }
+}
+
+/// Read the HDR side data ffprobe reports for a stream.
+///
+/// Dolby Vision announces itself as a `DOVI configuration record` with a
+/// profile and an RPU-present flag; HDR10+ announces itself as SMPTE 2094-40
+/// dynamic metadata. Both are side data rather than codec properties, which
+/// is why a stream can be plain HEVC and still carry a Dolby Vision RPU.
+fn read_hdr_side_data(
+    side_data: Option<&[FfprobeSideData]>,
+) -> (Option<u8>, bool, bool) {
+    let mut profile = None;
+    let mut rpu = false;
+    let mut hdr10_plus = false;
+    for entry in side_data.unwrap_or(&[]) {
+        let kind = entry.side_data_type.as_deref().unwrap_or("");
+        if kind.contains("DOVI") || kind.contains("Dolby Vision") {
+            profile = entry.dv_profile.or(profile);
+            rpu |= entry.rpu_present_flag.unwrap_or(0) != 0;
+        } else if kind.contains("2094-40") || kind.contains("HDR10+") {
+            hdr10_plus = true;
+        }
+    }
+    (profile, rpu, hdr10_plus)
 }
 
 fn convert_chapter(idx: usize, c: FfprobeChapter) -> ChapterInfo {
@@ -539,6 +587,22 @@ pub fn parse_ffprobe_output(bytes: &[u8], path: &Path) -> Result<ScanResult, cra
         chapters,
         titles: vec![title],
     })
+}
+
+impl ScanResult {
+    /// The first video stream's Dolby Vision profile and RPU presence, when
+    /// the source carries them.
+    pub fn dolby_vision(&self) -> Option<(u8, bool)> {
+        self.streams
+            .iter()
+            .filter(|stream| stream.kind == TrackKind::Video)
+            .find_map(|stream| stream.dolby_vision_profile.map(|profile| (profile, stream.dolby_vision_rpu)))
+    }
+
+    /// Whether any stream carries HDR10+ dynamic metadata.
+    pub fn has_hdr10_plus(&self) -> bool {
+        self.streams.iter().any(|stream| stream.hdr10_plus)
+    }
 }
 
 // ---------------------------------------------------------------------------

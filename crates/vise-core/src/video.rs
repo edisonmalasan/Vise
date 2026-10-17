@@ -165,6 +165,18 @@ pub struct VideoProcessingOptions {
     pub sharpen: bool,
     #[serde(default, alias = "sharpen_amount")]
     pub sharpen_amount: Option<f32>,
+    /// Smooth the block edges a compressed picture leaves behind.
+    ///
+    /// Off by default: deblocking is a judgement about how much of a source's
+    /// compression to remove, and applying it unasked for changes every encode.
+    #[serde(default)]
+    pub deblock: bool,
+    /// Block size for [`Self::deblock`], 4 to 31.
+    ///
+    /// `None` lets the filter pick its default, which is the right answer for a
+    /// user who only asked for the edges to be smoothed.
+    #[serde(default, alias = "deblock_block", alias = "deblock_block_size")]
+    pub deblock_strength: Option<u8>,
     #[serde(default)]
     pub rotate: Option<i32>,
     #[serde(default, alias = "rotate_degrees")]
@@ -230,6 +242,20 @@ impl VideoProcessingOptions {
             .or_else(|| self.color_conversion.clone())
     }
 
+    /// The deblock filter for the chosen strength.
+    ///
+    /// The filter's own `block` option is the block size it works on, and a
+    /// value outside its 4-to-31 range would make ffmpeg refuse the job. A value
+    /// that is present but out of range is left to the filter rather than
+    /// clamping it into the middle of the range, which would silently change
+    /// what the user asked for.
+    fn deblock_filter(&self) -> String {
+        match self.deblock_strength {
+            Some(strength) => format!("deblock=filter=strong:block={strength}"),
+            None => "deblock".to_string(),
+        }
+    }
+
     /// Build the ffmpeg `-vf` filter chain string for these options.
     pub fn build_filter_chain(&self) -> String {
         self.build()
@@ -270,6 +296,10 @@ impl VideoProcessingOptions {
             filters.push(format!("unsharp=5:5:{amount}:5:5:0"));
         } else if self.sharpen {
             filters.push("unsharp".to_string());
+        }
+
+        if self.deblock {
+            filters.push(self.deblock_filter());
         }
 
         if let Some(deg) = self.effective_rotate() {

@@ -426,6 +426,14 @@ pub struct JobSpec {
     #[serde(default)]
     pub audio_track_config: Option<crate::AudioTrackConfig>,
 
+    /// Dolby Vision metadata handling, when the job asks for it.
+    #[serde(default, alias = "dolby_vision_options")]
+    pub dolby_vision: crate::DolbyVisionOptions,
+
+    /// HDR10+ dynamic metadata handling, when the job asks for it.
+    #[serde(default, alias = "hdr10plus_options", alias = "hdr10_plus_options")]
+    pub hdr10_plus: crate::Hdr10PlusOptions,
+
     /// Hardware acceleration options.
     #[serde(default, alias = "hardware_options", alias = "hw_acceleration")]
     pub hardware_acceleration: crate::HardwareAcceleration,
@@ -467,6 +475,10 @@ impl JobSpec {
             opts.detelecine |= x.detelecine;
             opts.denoise |= x.denoise;
             opts.sharpen |= x.sharpen;
+            opts.deblock |= x.deblock;
+            if x.deblock_strength.is_some() {
+                opts.deblock_strength = x.deblock_strength;
+            }
             opts.grayscale |= x.grayscale;
             opts.chroma_smooth |= x.chroma_smooth || x.chroma_smoothing;
             opts.ten_bit |= x.ten_bit;
@@ -526,6 +538,27 @@ impl JobSpec {
     ///
     /// The compatibility profile is a hard requirement of the output flags, so
     /// it wins over a profile the user picked while the flag is on.
+    /// The resolved Dolby Vision decision for this job, against the machine.
+    pub fn dolby_vision_outcome(
+        &self,
+        caps: &crate::HdrCapabilities,
+    ) -> crate::HdrOutcome {
+        self.dolby_vision.resolve(caps, self.video_codec)
+    }
+
+    /// The resolved HDR10+ decision for this job, against the machine.
+    pub fn hdr10_plus_outcome(
+        &self,
+        caps: &crate::HdrCapabilities,
+    ) -> crate::HdrOutcome {
+        self.hdr10_plus.resolve(caps, self.video_codec)
+    }
+
+    /// The lossless plan this job describes.
+    pub fn lossless_plan(&self) -> crate::LosslessPlan {
+        crate::LosslessPlan::resolve(self)
+    }
+
     pub fn video_encoding_options(&self) -> crate::VideoEncodingOptions {
         let mut opts = self.video_encoding.clone();
         if let Some((profile, level)) = self.output_options.mp4_compatibility() {
