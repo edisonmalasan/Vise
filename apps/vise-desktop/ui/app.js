@@ -3540,6 +3540,15 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       bridge.event.listen("alert-asked", function (event) {
         showAskedAlert(event && event.payload);
       });
+      /* The notification-area icon was pressed by somebody who cannot see this
+         page, so the window decided what should open and said so. The page only
+         routes: it does not decide whether a surface may be opened. */
+      bridge.event.listen("tray-action", function (event) {
+        var payload = event && event.payload;
+        if (payload && payload.surface) {
+          openSurface(payload.surface);
+        }
+      });
     }
     return first;
   }

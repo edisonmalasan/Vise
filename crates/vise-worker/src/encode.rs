@@ -16,9 +16,49 @@ use std::time::Instant;
 use vise_core::{JobSpec, TranscodePlan, Transcoder};
 use vise_ipc::contract::error_codes;
 use vise_ipc::contract::{EncodeProgress, WorkDone, WorkState};
+use vise_ipc::power::{self, PowerRequest, PowerScope};
 
 use crate::log::LogService;
 use crate::platform;
+
+/// Whether this process is currently holding the machine awake.
+///
+/// Held in one place rather than in the encode state, because the hold outlives
+/// any single encode thread: the flag is what makes the release idempotent, so a
+/// failed encode, a cancelled one, and a worker shutting down can all let go
+/// without one of them releasing somebody else's hold.
+static POWER_HELD: AtomicBool = AtomicBool::new(false);
+
+/// Hold the machine awake for the duration of an encode.
+///
+/// The scope comes from the preferences rather than being fixed here, and a
+/// platform that cannot do it says so in the log once rather than on every
+/// encode: a warning nobody can act on is how a log stops being read.
+fn hold_power(scope: Option<PowerScope>, logs: &LogService) {
+    let Some(scope) = scope else {
+        return;
+    };
+    match power::request(PowerRequest::Hold(scope)) {
+        Ok(()) => {
+            POWER_HELD.store(true, Ordering::SeqCst);
+            logs.info(format!(
+                "the machine is being held awake: {}",
+                scope.effect()
+            ));
+        }
+        Err(e) => logs.warn(format!("power management: {e}")),
+    }
+}
+
+/// Let the machine sleep again, if this process is the one holding it.
+fn release_power(logs: &LogService) {
+    if !POWER_HELD.swap(false, Ordering::SeqCst) {
+        return;
+    }
+    if let Err(e) = power::request(PowerRequest::Release) {
+        logs.warn(format!("power management: {e}"));
+    }
+}
 
 /// Lock a mutex, recovering from poisoning.
 ///
@@ -89,6 +129,9 @@ pub struct EncodeService {
     logs: Arc<LogService>,
     /// Source facts cached by the scan service, used for validation.
     scanner: Arc<Mutex<Option<vise_core::ScanResult>>>,
+    /// What the machine should keep doing while an encode runs, when it should
+    /// keep doing anything at all.
+    power: Arc<Mutex<Option<PowerScope>>>,
 }
 
 impl EncodeService {
@@ -99,7 +142,22 @@ impl EncodeService {
             control: Arc::new(Mutex::new(None)),
             logs,
             scanner: Arc::new(Mutex::new(None)),
+            power: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Record what the preferences asked for while an encode runs.
+    ///
+    /// `None` means the machine may sleep, which is not the same as not knowing:
+    /// the preference is stored either way, so turning it back on takes effect on
+    /// the next encode rather than needing a restart.
+    pub fn set_power(&self, scope: Option<PowerScope>) {
+        *lock(&self.power) = scope;
+    }
+
+    /// The scope the preferences asked for.
+    pub fn power_scope(&self) -> Option<PowerScope> {
+        *lock(&self.power)
     }
 
     /// Record the scan result most recently produced by the scan service.
@@ -220,6 +278,10 @@ impl EncodeService {
 
         self.logs
             .info(format!("encode started for {}", job.input_path));
+        // The hold is taken here, after the job has been accepted and before any
+        // work happens, and released on every path out of the encode thread. An
+        // encode that never started cannot need a machine held awake for it.
+        hold_power(self.power_scope(), &self.logs);
 
         let inner = self.inner.clone();
         let control_slot = self.control.clone();
@@ -257,6 +319,9 @@ impl EncodeService {
         if let Some(control) = lock(&self.control).clone() {
             control.kill();
         }
+        // A worker that exits while holding the machine awake would leave it
+        // awake for whoever is using it, so the hold goes with the process.
+        release_power(&self.logs);
     }
 }
 
@@ -542,6 +607,10 @@ fn set_stage(inner: &Arc<Mutex<EncodeSlot>>, stage: &str) {
 }
 
 fn finish(inner: &Arc<Mutex<EncodeSlot>>, done: WorkDone, logs: &LogService, message: &str) {
+    // Every way out of an encode goes through here — finished, failed, cancelled,
+    // rejected, or never startable — so this is the one place the machine is let
+    // go of, and the flag makes a second call harmless.
+    release_power(logs);
     let level = if done.was_successful {
         vise_ipc::contract::LogLevel::Info
     } else {

@@ -247,6 +247,27 @@ impl WorkerRuntime {
                 )),
             }
         }
+        // Where the worker runs is decided here, for the same reason the priority
+        // is: the worker is the process that has to be placed, and a process can
+        // restrict itself where nothing else can restrict it reliably. The
+        // decision is logged as a sentence rather than as a number, because "it is
+        // pinned" and "it was left alone" are the two things that can happen and
+        // both of them are correct answers.
+        let topology = vise_ipc::numa::topology();
+        let placement = vise_ipc::numa::placement_for(
+            &topology,
+            init.numa(),
+            vise_ipc::numa::WorkerPriority::of(init.priority()),
+        );
+        match vise_ipc::numa::apply(&placement.placement) {
+            Ok(()) => self.logs.info(placement.reason.clone()),
+            Err(e) => self.logs.warn(format!("{}: {e}", placement.reason)),
+        }
+        // The power scope is remembered rather than acted on: the hold belongs to
+        // an encode, and the encode service is what knows when one starts and
+        // stops.
+        self.encode
+            .set_power(init.prevent_sleep.then(|| init.power()));
         self.logs.info(format!(
             "initialised (log verbosity {}, hardware acceleration {}, parent monitoring {})",
             init.log_verbosity, init.enable_hardware_acceleration, self.settings.monitor_parent
