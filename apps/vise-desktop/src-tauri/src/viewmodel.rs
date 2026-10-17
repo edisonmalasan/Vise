@@ -944,6 +944,7 @@ mod tests {
             language: language.into(),
             language_code: code.into(),
             description: String::new(),
+            foreign_language: false,
         }
     }
 
@@ -1109,6 +1110,7 @@ mod tests {
             language: "jpn".into(),
             language_code: "jpn".into(),
             description: String::new(),
+            foreign_language: false,
         };
         let view = audio_track_view(&bare, &[]);
         assert_eq!(view.summary, "Audio 4 · jpn");

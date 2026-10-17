@@ -291,24 +291,34 @@ pub fn titles_from_core_scan(result: &vise_core::ScanResult) -> TitlesResult {
                 .copied()
                 .find(|stream| stream.kind == TrackKind::Video)
                 .or_else(|| result.streams.iter().find(|s| s.kind == TrackKind::Video));
+            let audio_codes: Vec<&str> = streams
+                .iter()
+                .filter(|stream| stream.kind == TrackKind::Audio)
+                .filter_map(|stream| stream.language.as_deref())
+                .collect();
+            let foreign_audio = vise_core::foreign_audio_indices(&audio_codes);
             let audio: Vec<vise_ipc::contract::ScanAudioTrack> = streams
                 .iter()
                 .copied()
                 .filter(|stream| stream.kind == TrackKind::Audio)
                 .enumerate()
-                .map(|(number, stream)| vise_ipc::contract::ScanAudioTrack {
-                    track_number: number as u32 + 1,
-                    codec_name: stream.codec.clone().unwrap_or_else(|| "unknown".into()),
-                    channel_count: stream.channels.unwrap_or(0),
-                    channel_layout: stream
-                        .channel_layout
-                        .clone()
-                        .unwrap_or_else(|| "unknown".into()),
-                    sample_rate: stream.sample_rate.unwrap_or(0),
-                    bit_rate: stream.bit_rate.unwrap_or(0),
-                    language: stream.language.clone().unwrap_or_else(|| "und".into()),
-                    language_code: stream.language.clone().unwrap_or_else(|| "und".into()),
-                    description: stream.title.clone().unwrap_or_default(),
+                .map(|(number, stream)| {
+                    let foreign = foreign_audio.contains(&(number + 1));
+                    vise_ipc::contract::ScanAudioTrack {
+                        track_number: number as u32 + 1,
+                        codec_name: stream.codec.clone().unwrap_or_else(|| "unknown".into()),
+                        channel_count: stream.channels.unwrap_or(0),
+                        channel_layout: stream
+                            .channel_layout
+                            .clone()
+                            .unwrap_or_else(|| "unknown".into()),
+                        sample_rate: stream.sample_rate.unwrap_or(0),
+                        bit_rate: stream.bit_rate.unwrap_or(0),
+                        language: stream.language.clone().unwrap_or_else(|| "und".into()),
+                        language_code: stream.language.clone().unwrap_or_else(|| "und".into()),
+                        description: stream.title.clone().unwrap_or_default(),
+                        foreign_language: foreign,
+                    }
                 })
                 .collect();
             let subtitles: Vec<vise_ipc::contract::ScanSubtitleTrack> = streams
@@ -324,6 +334,19 @@ pub fn titles_from_core_scan(result: &vise_core::ScanResult) -> TitlesResult {
                     description: stream.title.clone().unwrap_or_default(),
                 })
                 .collect();
+            let title_video = streams
+                .iter()
+                .copied()
+                .find(|stream| stream.kind == TrackKind::Video)
+                .or_else(|| result.streams.iter().find(|s| s.kind == TrackKind::Video));
+            let dv_profile = title_video
+                .and_then(|stream| stream.dolby_vision_profile)
+                .unwrap_or(0) as u32;
+            let dv_rpu = title_video.is_some_and(|stream| stream.dolby_vision_rpu);
+            let hdr10_plus = streams.iter().any(|stream| stream.hdr10_plus);
+            let source_kind = vise_core::optical_source_kind(&result.path)
+                .map(|kind| kind.as_str().to_string())
+                .unwrap_or_default();
             ScanTitle {
                 index: title.index.max(position + 1) as u32,
                 name: name.clone(),
@@ -349,6 +372,10 @@ pub fn titles_from_core_scan(result: &vise_core::ScanResult) -> TitlesResult {
                     .unwrap_or(0.0),
                 angle_count: 1,
                 crop: [0, 0, 0, 0],
+                source_kind,
+                dolby_vision_profile: dv_profile,
+                dolby_vision_rpu: dv_rpu,
+                hdr10_plus,
                 audio_list: audio,
                 subtitle_list: subtitles,
                 chapter_list: title
@@ -474,6 +501,7 @@ mod tests {
             language: language.into(),
             language_code: code.into(),
             description: String::new(),
+            foreign_language: false,
         }
     }
 

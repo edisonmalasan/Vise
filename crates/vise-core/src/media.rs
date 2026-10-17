@@ -589,6 +589,89 @@ pub fn parse_ffprobe_output(bytes: &[u8], path: &Path) -> Result<ScanResult, cra
     })
 }
 
+/// An optical-disc source this build can recognise.
+///
+/// Optical media is not a file: a DVD is a `VIDEO_TS` folder or an ISO image,
+/// and a Blu-ray is a `BDMV` folder. Recognising which one a path names is the
+/// first half of supporting them; the encoder arguments the recognition
+/// produces are the second.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OpticalSourceKind {
+    /// A DVD-Video folder or ISO image.
+    Dvd,
+    /// A Blu-ray folder or ISO image.
+    BluRay,
+    /// An optical image whose format could not be told apart.
+    Iso,
+}
+
+impl OpticalSourceKind {
+    /// Stable identifier the interface layer sends back.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Dvd => "dvd",
+            Self::BluRay => "bluray",
+            Self::Iso => "iso",
+        }
+    }
+
+    /// Human-readable label.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Dvd => "DVD",
+            Self::BluRay => "Blu-ray",
+            Self::Iso => "Optical image",
+        }
+    }
+
+    /// The demuxer/protocol arguments this source needs.
+    ///
+    /// A DVD is read through the `dvdvideo` demuxer, whether the path is a
+    /// `VIDEO_TS` folder or an ISO image. A Blu-ray is read through ffmpeg's
+    /// `bluray` protocol, which takes the path as `bluray:<path>` rather than
+    /// as a demuxer name.
+    pub fn input_args(self, path: &Path) -> Vec<String> {
+        match self {
+            Self::Dvd | Self::Iso => vec!["-f".into(), "dvdvideo".into(), path_str(path)],
+            Self::BluRay => vec![format!("bluray:{}", path_str(path))],
+        }
+    }
+}
+
+fn path_str(path: &Path) -> String {
+    path.to_string_lossy().to_string()
+}
+
+/// Recognise an optical-disc source from its path.
+///
+/// A directory is named by the folder it holds (`VIDEO_TS` for DVD, `BDMV` for
+/// Blu-ray); an `.iso` file is reported as an optical image without guessing
+/// which of the two formats it holds, because that would need the disc's own
+/// table of contents. A plain file is not optical at all.
+pub fn optical_source_kind(path: &Path) -> Option<OpticalSourceKind> {
+    if path.is_dir() {
+        let dvd = path.join("VIDEO_TS").is_dir();
+        let bluray = path.join("BDMV").is_dir();
+        return match (dvd, bluray) {
+            (true, _) => Some(OpticalSourceKind::Dvd),
+            (_, true) => Some(OpticalSourceKind::BluRay),
+            _ => None,
+        };
+    }
+    if path.is_file() {
+        let is_iso = path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.eq_ignore_ascii_case("iso"))
+            .unwrap_or(false);
+        if is_iso {
+            return Some(OpticalSourceKind::Iso);
+        }
+    }
+    None
+}
+
 impl ScanResult {
     /// The first video stream's Dolby Vision profile and RPU presence, when
     /// the source carries them.

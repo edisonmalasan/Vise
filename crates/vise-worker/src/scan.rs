@@ -452,6 +452,24 @@ pub fn build_titles(
             .collect();
         let chapters: Vec<ScanChapter> = title.chapters.iter().map(chapter_to_scan).collect();
 
+        // Foreign-audio detection compares every track's language with the
+        // source's primary one, so the answer is the same whichever track is
+        // asked about.
+        let audio_codes: Vec<&str> = audio
+            .iter()
+            .filter_map(|track| track.language.as_deref())
+            .collect();
+        let foreign = vise_core::foreign_audio_indices(&audio_codes);
+        let source_kind = vise_core::optical_source_kind(&result.path)
+            .map(|kind| kind.as_str().to_string())
+            .unwrap_or_default();
+        // The HDR facts travel with the title's own video stream, so a title
+        // whose picture carries a Dolby Vision RPU or HDR10+ metadata says so.
+        let title_video = streams.iter().find(|s| s.kind == TrackKind::Video);
+        let dv_profile = title_video.and_then(|s| s.dolby_vision_profile).unwrap_or(0) as u32;
+        let dv_rpu = title_video.is_some_and(|s| s.dolby_vision_rpu);
+        let hdr10_plus = streams.iter().any(|s| s.hdr10_plus);
+
         titles.push(ScanTitle {
             index: reported_index,
             name: default_title(&result.path),
@@ -472,10 +490,14 @@ pub fn build_titles(
                 .unwrap_or(0.0),
             angle_count: 1,
             crop: [0, 0, 0, 0],
+            source_kind,
+            dolby_vision_profile: dv_profile,
+            dolby_vision_rpu: dv_rpu,
+            hdr10_plus,
             audio_list: audio
                 .iter()
                 .enumerate()
-                .map(|(n, track)| track_to_audio(track, n))
+                .map(|(n, track)| track_to_audio(track, n, &foreign))
                 .collect(),
             subtitle_list: subtitles
                 .iter()
@@ -546,7 +568,7 @@ fn chapter_to_scan(chapter: &ChapterInfo) -> ScanChapter {
     }
 }
 
-fn track_to_audio(track: &StreamInfo, position: usize) -> ScanAudioTrack {
+fn track_to_audio(track: &StreamInfo, position: usize, foreign: &[usize]) -> ScanAudioTrack {
     let language = track.language.clone().unwrap_or_else(|| "und".to_string());
     ScanAudioTrack {
         track_number: position as u32 + 1,
@@ -561,6 +583,7 @@ fn track_to_audio(track: &StreamInfo, position: usize) -> ScanAudioTrack {
         language: language_description(&language),
         language_code: language,
         description: String::new(),
+        foreign_language: foreign.contains(&(position + 1)),
     }
 }
 

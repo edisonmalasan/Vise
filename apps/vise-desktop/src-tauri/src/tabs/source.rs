@@ -344,6 +344,7 @@ mod tests {
             language: "English".into(),
             language_code: "eng".into(),
             description: String::new(),
+            foreign_language: false,
         }
     }
 

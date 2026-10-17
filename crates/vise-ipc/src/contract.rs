@@ -465,6 +465,15 @@ pub struct ScanTitle {
     pub subtitle_list: Vec<ScanSubtitleTrack>,
     pub chapter_list: Vec<ScanChapter>,
     pub meta_data: std::collections::BTreeMap<String, String>,
+    /// What kind of source this title came from: `file`, `folder`, `dvd`,
+    /// `bluray`, or `iso`. Empty means a plain file.
+    pub source_kind: String,
+    /// Dolby Vision profile reported in the stream side data; zero when none.
+    pub dolby_vision_profile: u32,
+    /// Whether the stream carries a Dolby Vision RPU.
+    pub dolby_vision_rpu: bool,
+    /// Whether the stream carries HDR10+ dynamic metadata.
+    pub hdr10_plus: bool,
 }
 
 /// One audio track inside a [`ScanTitle`].
@@ -480,6 +489,9 @@ pub struct ScanAudioTrack {
     pub language: String,
     pub language_code: String,
     pub description: String,
+    /// Whether this track's language differs from the source's primary one,
+    /// which is what a foreign-audio scan looks for.
+    pub foreign_language: bool,
 }
 
 /// One subtitle track inside a [`ScanTitle`].

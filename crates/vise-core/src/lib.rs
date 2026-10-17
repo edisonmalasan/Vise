@@ -38,8 +38,9 @@ pub use job::{
     AudioCodec, ContainerFormat, EncodingMode, JobSpec, OutputOptions, SubtitleMode, VideoCodec,
 };
 pub use media::{
-    parse_ffprobe_output, ChapterInfo, CropDetection, FfprobeScanner, FormatInfo, MediaBuffer,
-    MediaScanner, Packet, ScanResult, StreamInfo, TitleInfo, TrackKind,
+    optical_source_kind, parse_ffprobe_output, ChapterInfo, CropDetection, FfprobeScanner,
+    FormatInfo, MediaBuffer, MediaScanner, OpticalSourceKind, Packet, ScanResult, StreamInfo,
+    TitleInfo, TrackKind,
 };
 pub use metadata::*;
 pub use pipeline::{transcode, transcode_file, TranscodePlan, TranscodeResult, Transcoder};
