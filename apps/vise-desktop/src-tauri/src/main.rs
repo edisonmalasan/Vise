@@ -727,7 +727,17 @@ fn resume_queue(state: &SharedState) {
     if let Ok(mut guard) = state.lock() {
         sync_queue(&mut guard);
         let jobs = guard.session.jobs().to_vec();
-        let waiting = guard.queue.pending(&jobs);
+        // Everything that is waiting *or* paused, in the queue's own order: a job
+        // the pause put to sleep is not in the pending list, and a resume that only
+        // looked at the pending list would leave exactly those jobs behind.
+        let waiting: Vec<JobId> = guard
+            .queue
+            .run_order(&jobs)
+            .into_iter()
+            .filter(|job| matches!(job.status.state, JobState::Queued | JobState::Paused))
+            .filter(|job| job.status.state != JobState::Running)
+            .map(|job| job.id)
+            .collect();
         for id in &waiting {
             let _ = guard.session.update_status(
                 *id,
@@ -1725,10 +1735,18 @@ fn subtitle_extension(name: &str) -> bool {
 
 #[tauri::command]
 fn add_job(state: State<'_, SharedState>, spec: JobSpec) -> Result<JobId, String> {
-    let mut guard = state.lock().map_err(|e| e.to_string())?;
-    let id = guard.session.add_job(spec);
-    guard.queue.push(id);
-    guard.activity.record(format!("queued job {id}"));
+    let id = {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        let id = guard.session.add_job(spec);
+        guard.queue.push(id);
+        guard.activity.record(format!("queued job {id}"));
+        id
+    };
+    // Written and republished here rather than at each command that queues: a queue
+    // file that is a moment behind the queue is a queue that comes back without a
+    // job the user just added.
+    persist_queue(&state);
+    refresh_system(&state);
     Ok(id)
 }
 
@@ -2007,14 +2025,18 @@ fn move_job(
     id: JobId,
     delta: i32,
 ) -> Result<windows::queue::QueueViewModel, String> {
-    let mut guard = state.lock().map_err(|e| e.to_string())?;
-    sync_queue(&mut guard);
-    guard.queue.move_by(id, delta)?;
-    guard.activity.record(format!("moved job {id}"));
-    Ok(windows::queue::queue_view(
-        &guard.queue,
-        guard.session.jobs(),
-    ))
+    let view = {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        sync_queue(&mut guard);
+        guard.queue.move_by(id, delta)?;
+        guard.activity.record(format!("moved job {id}"));
+        windows::queue::queue_view(&guard.queue, guard.session.jobs())
+    };
+    // The run order is part of what is written down, so a move is a change to the
+    // queue on disk as well as to the queue on screen.
+    persist_queue(&state);
+    refresh_system(&state);
+    Ok(view)
 }
 
 /// Set what a job is worth in the run order.
@@ -2024,17 +2046,19 @@ fn set_job_priority(
     id: JobId,
     priority: String,
 ) -> Result<windows::queue::QueueViewModel, String> {
-    let mut guard = state.lock().map_err(|e| e.to_string())?;
-    sync_queue(&mut guard);
-    let set = guard.queue.set_priority_name(id, &priority)?;
-    guard.activity.record(format!(
-        "job {id} is now {} priority",
-        set.label().to_ascii_lowercase()
-    ));
-    Ok(windows::queue::queue_view(
-        &guard.queue,
-        guard.session.jobs(),
-    ))
+    let view = {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        sync_queue(&mut guard);
+        let set = guard.queue.set_priority_name(id, &priority)?;
+        guard.activity.record(format!(
+            "job {id} is now {} priority",
+            set.label().to_ascii_lowercase()
+        ));
+        windows::queue::queue_view(&guard.queue, guard.session.jobs())
+    };
+    persist_queue(&state);
+    refresh_system(&state);
+    Ok(view)
 }
 
 #[tauri::command]
@@ -2052,6 +2076,10 @@ fn remove_job(state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
     guard.activity.record(format!("removed job {id}"));
     drop(guard);
     take_confirmation(&state, AlertAction::RemoveJob);
+    // The queue on disk is the one thing that has to agree with the queue on
+    // screen, so every command that changes it writes it and republishes the tray.
+    persist_queue(&state);
+    refresh_system(&state);
     Ok(())
 }
 
@@ -2062,7 +2090,15 @@ fn set_job_state(
     progress: Progress,
     message: Option<String>,
 ) {
-    if let Ok(mut guard) = state.lock() {
+    let changed = {
+        let Ok(mut guard) = state.lock() else {
+            return;
+        };
+        let was = guard
+            .session
+            .job(id)
+            .map(|job| job.status.state)
+            .unwrap_or(job_state);
         let _ = guard.session.update_status(
             id,
             vise_core::JobStatus {
@@ -2071,13 +2107,18 @@ fn set_job_state(
                 message,
             },
         );
-    }
+        was != job_state
+    };
     // A job that has finished is the thing the tray, the notifications, and the
     // saved queue all care about, so it is refreshed here rather than at each of
     // the places a job can end — which are several, and one that was forgotten
-    // would be a queue that never says it has finished.
-    persist_queue(state);
-    refresh_system(state);
+    // would be a queue that never says it has finished. Only a change of state is
+    // written down: the progress ticks arrive four times a second, and a queue file
+    // rewritten four times a second is a queue file nobody can inspect.
+    if changed {
+        persist_queue(state);
+        refresh_system(state);
+    }
 }
 
 #[tauri::command]
@@ -2342,6 +2383,8 @@ fn clear_finished_jobs(
     let view = queue_view(&guard);
     drop(guard);
     take_confirmation(&state, AlertAction::ClearFinished);
+    persist_queue(&state);
+    refresh_system(&state);
     Ok(view)
 }
 
@@ -2376,6 +2419,8 @@ fn empty_queue(state: State<'_, SharedState>) -> Result<windows::queue::QueueVie
     let view = queue_view(&guard);
     drop(guard);
     take_confirmation(&state, AlertAction::ClearQueue);
+    persist_queue(&state);
+    refresh_system(&state);
     Ok(view)
 }
 
@@ -3466,6 +3511,14 @@ fn set_preference(
             let _ = guard.preview.set_still_count(stills);
         }
     }
+    if before.advanced != after.advanced || before.updates != after.updates {
+        // These preferences are read by the desktop integration rather than by the
+        // page: the hold on the machine, the sleep scope, the placement of the
+        // worker, the commands around an encode, the notifications, and whether a
+        // release should be looked for. So the tray and the log are brought up to
+        // date here rather than at the next job.
+        refresh_system(&state);
+    }
     Ok(view)
 }
 
@@ -3987,6 +4040,103 @@ mod tests {
 
     use super::*;
     use tabs::{SummarySettings, VideoSettings};
+
+    /// A window whose queue holds `specs`, with nothing running.
+    fn window_with(specs: &[JobSpec]) -> DesktopState {
+        let mut session = vise_core::Session::new();
+        let mut queue = QueueState::default();
+        for spec in specs {
+            let id = session.add_job(spec.clone());
+            queue.push(id);
+        }
+        DesktopState {
+            session,
+            queue,
+            ..DesktopState::default()
+        }
+    }
+
+    fn spec_named(name: &str) -> JobSpec {
+        JobSpec {
+            input_path: format!("C:\\media\\{name}.mkv"),
+            output_path: format!("D:\\out\\{name}.mp4"),
+            ..JobSpec::default()
+        }
+    }
+
+    #[test]
+    fn the_facts_the_tray_is_built_from_are_the_queue_s_own() {
+        // The tray, the notifications, and the saved queue all describe the same
+        // queue, so they read it through the queue's own methods rather than each
+        // keeping a count of its own.
+        let window = window_with(&[spec_named("One"), spec_named("Two")]);
+        let facts = system_facts(&window);
+        assert_eq!(facts.queued, 2);
+        assert_eq!(facts.running, 0);
+        assert_eq!(facts.finished, 0);
+        assert_eq!(facts.last_failure, None);
+        assert!(
+            facts.in_process,
+            "a window with no worker behind it runs the pipeline itself"
+        );
+        assert!(facts.queue_paused.is_none());
+    }
+
+    #[test]
+    fn the_last_failure_is_carried_with_the_file_and_the_reason() {
+        // A notification about a failure names the file, so the facts carry both
+        // rather than leaving the window to go looking for them.
+        let mut window = window_with(&[spec_named("One"), spec_named("Two")]);
+        let ids: Vec<JobId> = window.queue.pending(window.session.jobs());
+        let second = ids[1];
+        set_job_state_holding(&mut window, second, JobState::Failed, "no space left");
+        let facts = system_facts(&window);
+        assert_eq!(facts.failed, 1);
+        assert_eq!(
+            facts.last_failure,
+            Some(("D:\\out\\Two.mp4".to_string(), "no space left".to_string()))
+        );
+    }
+
+    /// Change a job's state in the window directly, so a test can arrange one
+    /// without going through a worker.
+    fn set_job_state_holding(window: &mut DesktopState, id: JobId, to: JobState, why: &str) {
+        let _ = window.session.update_status(
+            id,
+            vise_core::JobStatus {
+                state: to,
+                progress: Progress::new(0.0),
+                message: Some(why.to_string()),
+            },
+        );
+    }
+
+    #[test]
+    fn a_window_without_a_worker_reports_itself_as_running_the_pipeline() {
+        let mut window = window_with(&[]);
+        window.backend = Some(Backend::InProcess);
+        assert!(system_facts(&window).in_process);
+        // A worker behind it means the hold belongs to that worker instead.
+        window.backend = Some(Backend::Worker(Box::new(vise_ipc::WorkerSupervisor::new(
+            vise_ipc::WorkerConfig::new("vise-worker.exe"),
+        ))));
+        assert!(!system_facts(&window).in_process);
+    }
+
+    #[test]
+    fn the_settings_a_job_carries_are_the_ones_the_preferences_hold() {
+        // The three preferences the worker reads are the three the window sends,
+        // read from the one record rather than from a second table in main.rs.
+        let settings = PreferencesSettings::new();
+        let init = settings.to_worker_init();
+        assert!(init.prevent_sleep, "an encode holds the machine awake");
+        assert_eq!(init.power_scope, 0, "the screen is not held by default");
+        assert_eq!(
+            init.numa_mode, 0,
+            "the placement is decided from the machine"
+        );
+        assert_eq!(init.process_priority, 0);
+    }
 
     fn idle_flow() -> ScanFlow {
         ScanFlow::default()
