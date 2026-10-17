@@ -2308,15 +2308,30 @@ fn report_system_theme(
     dark: bool,
     state: State<'_, SharedState>,
 ) -> Result<AppearanceViewModel, String> {
-    let (view, changed) = {
+    record_system_theme(&state, dark)
+}
+
+/// Record what the page read off the media query, and hand back the answer.
+///
+/// Split out from the command so the rule about what is worth a line in the
+/// activity window can be tested without a running application. What is logged is
+/// the theme that was on screen before and after, not whether the record moved:
+/// the page reporting the same theme the platform already reported hands the
+/// window a stronger witness without changing a single pixel, and that handover
+/// is not something to put in the log.
+fn record_system_theme(state: &SharedState, dark: bool) -> Result<AppearanceViewModel, String> {
+    let (view, was, now) = {
         let mut guard = state.lock().map_err(|e| e.to_string())?;
-        let changed = guard
+        let was = guard.appearance.view().theme;
+        guard
             .appearance
             .observe_theme(SystemTheme::of_dark(dark), true);
-        (guard.appearance.view(), changed)
+        let view = guard.appearance.view();
+        let now = view.theme.clone();
+        (view, was, now)
     };
-    if changed {
-        push_log(&state, "the system theme changed; the window follows it");
+    if was != now {
+        push_log(state, "the system theme changed; the window follows it");
     }
     Ok(view)
 }
@@ -2930,8 +2945,7 @@ mod tests {
             ],
             "summary":"Showing the dark theme, laid out right to left because ar-EG reads right to left.",
             "flowGlyph":"\u2192",
-            "themeSource":"reported by this window",
-            "localeSource":"reported by this window"
+            "observationNote":"Your system is in its dark theme, reported by this window; your locale is ar-EG, reported by this window."
         }"#;
         let view: AppearanceViewModel = serde_json::from_str(payload).expect("appearance answer");
         assert_eq!(view.theme, "dark");
@@ -2941,6 +2955,11 @@ mod tests {
         assert_eq!(view.theme_options.len(), 3);
         assert_eq!(view.direction_options.len(), 3);
         assert_eq!(view.flow_glyph, "\u{2192}");
+        assert!(
+            view.observation_note.contains("ar-EG"),
+            "{}",
+            view.observation_note
+        );
 
         // The stylesheet keys its colours and its mirroring off exactly these two
         // values, so neither may be spelled any other way.
@@ -2969,5 +2988,63 @@ mod tests {
     fn the_appearance_event_has_a_name_the_page_can_subscribe_to() {
         assert_eq!(APPEARANCE_EVENT, "appearance-changed");
         assert_eq!(MAIN_WINDOW, "main");
+    }
+
+    /// Only a theme that actually changed is worth a line in the activity window.
+    ///
+    /// The page reports the media query once at start-up and again on every
+    /// change, so the first report routinely repeats what the platform already
+    /// said. Putting that in the log would fill the window with lines describing
+    /// nothing that happened.
+    #[test]
+    fn a_report_that_moves_no_colours_is_not_logged() {
+        let state: SharedState = Arc::new(Mutex::new(DesktopState::default()));
+        let lines = |state: &SharedState| state.lock().expect("state").activity.view().lines.len();
+
+        // The machine is dark and the window is following it. The page reports
+        // the same dark query, which hands the window a stronger witness and
+        // changes nothing on screen.
+        {
+            let mut guard = state.lock().expect("state");
+            guard.appearance.observe_theme(SystemTheme::Dark, false);
+        }
+        let view = record_system_theme(&state, true).expect("report");
+        assert_eq!(view.theme, "dark");
+        assert_eq!(lines(&state), 0, "the colours did not move");
+
+        // The query really does go dark, and this time the window follows it.
+        let view = record_system_theme(&state, false).expect("report");
+        assert_eq!(view.theme, "light");
+        assert_eq!(lines(&state), 1, "the theme on screen changed");
+
+        // And the machine switching back is worth the second line.
+        let view = record_system_theme(&state, true).expect("report");
+        assert_eq!(view.theme, "dark");
+        assert_eq!(lines(&state), 2);
+    }
+
+    /// A forced theme ignores the machine, and so does the log.
+    #[test]
+    fn a_forced_theme_is_never_moved_by_a_report() {
+        // A scratch settings file, because choosing a preference writes one and
+        // a state built the default way has nowhere to put it.
+        let dir = std::env::temp_dir().join("vise-desktop-forced-theme");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let settings_path = dir.join("settings.json");
+        let state: SharedState = Arc::new(Mutex::new(DesktopState {
+            appearance: AppearanceState::load(&settings_path, SystemTheme::Light, None),
+            settings_path,
+            ..DesktopState::default()
+        }));
+        {
+            let mut guard = state.lock().expect("state");
+            guard.appearance.set_theme_mode("light").expect("light");
+        }
+        for dark in [false, true, false, true] {
+            let view = record_system_theme(&state, dark).expect("report");
+            assert_eq!(view.theme, "light", "the user asked for light");
+        }
+        assert_eq!(state.lock().expect("state").activity.view().lines.len(), 0);
     }
 }

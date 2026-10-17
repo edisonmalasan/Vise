@@ -569,10 +569,8 @@ pub struct AppearanceViewModel {
     /// text flows in, and a glyph that implies one direction has to mirror with
     /// the layout rather than be replaced by another one.
     pub flow_glyph: String,
-    /// Where the theme observation came from, for the line under the picker.
-    pub theme_source: String,
-    /// Where the locale came from, for the line under the picker.
-    pub locale_source: String,
+    /// Where the two observations came from, in one line.
+    pub observation_note: String,
 }
 
 impl AppearanceViewModel {
@@ -622,18 +620,34 @@ impl AppearanceViewModel {
                 system_direction,
             ),
             flow_glyph: FLOW_GLYPH.to_string(),
-            theme_source: if observed.theme_from_page {
-                "reported by this window".to_string()
-            } else {
-                "read from the operating system".to_string()
-            },
-            locale_source: if observed.locale_from_page {
-                "reported by this window".to_string()
-            } else {
-                "read from the environment".to_string()
-            },
+            observation_note: observation_note(observed),
         }
     }
+}
+
+/// One line saying where the two observations came from.
+///
+/// Named rather than shown as two bare values because "dark" on its own does not
+/// say whether the window or the machine decided it, and the whole point of the
+/// preference is that the user can.
+fn observation_note(observed: &Observation) -> String {
+    let theme_source = if observed.theme_from_page {
+        "reported by this window"
+    } else {
+        "read from the operating system"
+    };
+    let locale_source = if observed.locale_from_page {
+        "reported by this window"
+    } else {
+        "read from the environment"
+    };
+    format!(
+        "Your system is in its {} theme, {}; your locale is {}, {}.",
+        observed.theme.word(),
+        theme_source,
+        observed.locale,
+        locale_source
+    )
 }
 
 /// The arrow the summary puts beside the layout direction.
@@ -1100,7 +1114,14 @@ mod tests {
         // the same media query the stylesheet is written against.
         assert!(!state.observe_theme(SystemTheme::Light, false));
         assert_eq!(state.view().theme, "dark");
-        assert!(!state.view().theme_source.contains("operating system"));
+        assert!(
+            state
+                .view()
+                .observation_note
+                .contains("reported by this window"),
+            "{}",
+            state.view().observation_note
+        );
     }
 
     #[test]

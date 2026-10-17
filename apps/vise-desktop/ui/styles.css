@@ -3,6 +3,22 @@
  * One stylesheet, no build step. The layout is a single column of cards that
  * becomes two columns on a wide window; every control keeps a visible focus
  * ring, and all motion is switched off when the reader asked for less of it.
+ *
+ * Two things are decided by the window rather than here, and the page puts both
+ * on the document as attributes:
+ *
+ *   `data-theme` is `light` or `dark`. The window resolves the user's preference
+ *   against the operating system and sends the answer, so the colours here are
+ *   one token set per theme and there is no preference logic in this file. The
+ *   media query below is the fallback for the moment before the first answer
+ *   arrives, so a window that has not been told yet still paints the right
+ *   colours rather than the light ones.
+ *
+ *   `dir` is `ltr` or `rtl`, and it is the whole mirroring mechanism. Every
+ *   offset, padding and text alignment below is a logical property, so the one
+ *   attribute moves the toolbar, the tab strip, the form rows and the dialogs
+ *   together instead of each needing its own override. The two places that are
+ *   physical are marked below and are deliberate.
  */
 
 :root {
@@ -10,36 +26,84 @@
 
   --bg: #f4f5f7;
   --surface: #ffffff;
-  --surface-sunken: #f0f1f4;
-  --text: #1b1c21;
-  --muted: #62666f;
-  --accent: #1f5fd0;
-  --accent-soft: #e7effc;
-  --border: #dcdfe6;
-  --border-strong: #c2c7d1;
-  --danger: #b3261e;
-  --danger-soft: #fdeceb;
-  --success: #1c6b3f;
-  --warning: #8a5a00;
+  --surface-sunken: #eceef2;
+  --text: #16181d;
+  --muted: #4d525c;
+  --accent: #1a56c4;
+  --accent-soft: #e6eefb;
+  --accent-wash: rgb(26 86 196 / 12%);
+  --on-accent: #ffffff;
+  --border: #d5d9e1;
+  /* The boundary that has to be visible to tell a control from what is behind
+     it, so it carries a contrast ratio and not only a colour. */
+  --border-strong: #7d8494;
+  --danger: #a8201a;
+  --danger-soft: #fdecea;
+  --on-danger: #ffffff;
+  --success: #14663a;
+  --warning: #7a4f00;
+  /* The focus ring is two colours: a mark against the control, and a halo
+     against whatever is behind it. One colour alone disappears on one of the
+     two themes whichever colour it is. */
+  --focus: #1a56c4;
+  --focus-halo: #ffffff;
   --radius: 10px;
   --gap: 16px;
 }
 
+/* The theme the window asked for. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #14161a;
+  --surface: #1d2026;
+  --surface-sunken: #262a31;
+  --text: #e9ebef;
+  --muted: #a7aeb9;
+  --accent: #8ab4ff;
+  --accent-soft: #1e2b42;
+  --accent-wash: rgb(138 180 255 / 14%);
+  --on-accent: #0d1017;
+  --border: #333844;
+  --border-strong: #707886;
+  --danger: #ff9d95;
+  --danger-soft: #3b211f;
+  --on-danger: #2a0f0d;
+  --success: #86ddaa;
+  --warning: #e8bd63;
+  --focus: #8ab4ff;
+  --focus-halo: #0b0d11;
+}
+
+/* The same dark tokens, for a document that has not been told which theme it
+   wants yet. `:not([data-theme="light"])` keeps a window that was told to stay
+   light out of this even on a machine set to dark. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #16181d;
-    --surface: #1e2127;
-    --surface-sunken: #262a32;
-    --text: #e8eaee;
-    --muted: #a0a6b2;
-    --accent: #7aa8f7;
-    --accent-soft: #22304a;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #14161a;
+    --surface: #1d2026;
+    --surface-sunken: #262a31;
+    --text: #e9ebef;
+    --muted: #a7aeb9;
+    --accent: #8ab4ff;
+    --accent-soft: #1e2b42;
+    --accent-wash: rgb(138 180 255 / 14%);
+    --on-accent: #0d1017;
     --border: #333844;
-    --border-strong: #454b59;
-    --danger: #f2867e;
-    --danger-soft: #3a2321;
-    --success: #7fd3a4;
-    --warning: #e5b95c;
+    --border-strong: #707886;
+    --danger: #ff9d95;
+    --danger-soft: #3b211f;
+    --on-danger: #2a0f0d;
+    --success: #86ddaa;
+    --warning: #e8bd63;
+    --focus: #8ab4ff;
+    --focus-halo: #0b0d11;
   }
 }
 
@@ -185,6 +249,9 @@ select {
   color: var(--text);
   font: inherit;
   padding: 7px 9px;
+  /* `start` rather than `left`, so a field in a mirrored layout is filled from
+     the edge the reading starts at. */
+  text-align: start;
   width: 100%;
 }
 
@@ -211,7 +278,7 @@ button:disabled {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
 }
 
 button.quiet {
@@ -225,9 +292,42 @@ button.quiet:hover:not(:disabled) {
   color: var(--danger);
 }
 
+/* The ring is drawn outside the control in two colours, so it is visible against
+   a light control in a dark window and a dark control in a light one. */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+.field:focus-within,
+.choice:focus-within,
+label.switch:focus-within {
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px var(--focus-halo);
+}
+
+/* A run of text that keeps its own reading order inside a mirrored layout:
+   paths, time codes, and numbers that are separated by neutral characters.
+   `direction` sets the base order for the run and `unicode-bidi: isolate` stops
+   that order from reaching the text around it, so `C:\media\movie.mkv` stays
+   left to right while the sentence holding it flows the other way. No
+   `text-align` appears here on purpose: a run is positioned by the block around
+   it, so it lands at that block's start whichever way that is. */
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* A glyph that names a direction mirrors with the layout rather than being
+   swapped for a different one, so the arrow always points the way the window
+   actually reads. */
+.icon-flow {
+  display: inline-block;
+  margin-inline-end: 6px;
+}
+
+[dir="rtl"] .icon-flow {
+  transform: scaleX(-1);
 }
 
 /* Source picker ---------------------------------------------------------- */
@@ -410,7 +510,7 @@ button.quiet:hover:not(:disabled) {
   content: "";
   display: inline-block;
   height: 6px;
-  margin-left: 6px;
+  margin-inline-start: 6px;
   vertical-align: middle;
   width: 6px;
 }
@@ -466,6 +566,15 @@ button.quiet:hover:not(:disabled) {
 .field .value {
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+/* A read-out holds numbers separated by neutral characters — a resolution, a
+   frame rate, a bit rate — which a mirrored layout would otherwise reorder. */
+.field .value,
+.choice .facts,
+.tag .tag-key {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .field .hint,
@@ -766,7 +875,9 @@ th,
 td {
   border-bottom: 1px solid var(--border);
   padding: 7px 6px;
-  text-align: left;
+  /* `start`, so a column of numbers lines up under its own heading in either
+     direction. */
+  text-align: start;
   vertical-align: middle;
 }
 
@@ -806,6 +917,23 @@ td.controls {
   word-break: break-word;
 }
 
+.log-line {
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 64px 56px minmax(0, 1fr);
+  padding: 2px 0;
+}
+
+/* The activity window is worker output: the columns mirror with the rest of the
+   layout, but a line of it is a transcript of paths and command text and must
+   not be reordered inside itself. */
+.log-line .log-message {
+  direction: ltr;
+  text-align: start;
+  unicode-bidi: isolate;
+}
+
 /* Secondary windows -------------------------------------------------------- */
 
 /* The toolbar is built from the window catalog, so its buttons come and go with
@@ -826,7 +954,7 @@ td.controls {
 .badge {
   background: var(--danger);
   border-radius: 999px;
-  color: #ffffff;
+  color: var(--on-danger);
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
@@ -846,6 +974,9 @@ td.controls {
   z-index: 10;
 }
 
+/* A surface is centred over the window rather than laid out inside it, so its
+   offset from the left edge and its correction are both physical. They cancel
+   out, which is why centring is written this way and not with a logical inset. */
 .surface {
   background: var(--surface);
   border: 1px solid var(--border-strong);
@@ -948,7 +1079,7 @@ td.controls {
 }
 
 .queue-table .chip {
-  margin-left: 6px;
+  margin-inline-start: 6px;
 }
 
 button.warn {
@@ -1003,9 +1134,26 @@ button.warn:hover:not(:disabled) {
 }
 
 .planned .path {
+  direction: ltr;
   font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 12px;
+  unicode-bidi: isolate;
   word-break: break-all;
+}
+
+/* Appearance ---------------------------------------------------------------- */
+
+/* The two pickers sit side by side on a wide window and stack on a narrow one,
+   in whichever direction the window is laid out. */
+.appearance {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.appearance-summary {
+  color: var(--muted);
+  margin: 0;
 }
 
 /* Activity ----------------------------------------------------------------- */
@@ -1059,8 +1207,10 @@ button.warn:hover:not(:disabled) {
 }
 
 .stops .stop button {
+  direction: ltr;
   font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 12px;
+  unicode-bidi: isolate;
 }
 
 .stops .stop button.current {
@@ -1087,7 +1237,9 @@ button.warn:hover:not(:disabled) {
    window reports, so the rectangle on screen is the one that was checked. */
 .crop-overlay {
   border: 2px solid var(--accent);
-  background: rgb(31 95 208 / 12%);
+  /* Over a picture rather than over the page, so the wash is drawn in the theme
+     the window chose and stays legible whichever of them is on screen. */
+  background: var(--accent-wash);
   box-shadow: 0 0 0 9999px rgb(0 0 0 / 28%);
   cursor: crosshair;
   pointer-events: none;
@@ -1165,6 +1317,14 @@ button.warn:hover:not(:disabled) {
   grid-column: 1;
   margin: 0;
   word-break: break-all;
+}
+
+/* A link row holds a web address, which must not be reordered around the
+   punctuation in it. */
+.link-row .hint,
+.selection-head .facts {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .link-row button {
