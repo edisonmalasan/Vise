@@ -12,7 +12,8 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use vise_core::{
-    load_settings, read_settings, save_settings, AppSettings, SETTINGS_UNVERSIONED, SETTINGS_VERSION,
+    load_settings, read_settings, save_settings, AppSettings, SETTINGS_UNVERSIONED,
+    SETTINGS_VERSION,
 };
 
 fn temp_path(name: &str) -> PathBuf {
@@ -36,12 +37,17 @@ fn write_raw(path: &PathBuf, body: &str) {
 #[test]
 fn a_saved_document_says_which_build_wrote_it_and_reads_back_unchanged() {
     let path = temp_path("round-trip");
-    let mut written = AppSettings::default();
-    written.default_preset = Some("high-quality".to_string());
-    written.output_directory = Some("C:\\media\\out".to_string());
-    written
-        .extra
-        .insert("preferences".to_string(), serde_json::json!({"logLevel": "info"}));
+    let mut extra = std::collections::BTreeMap::new();
+    extra.insert(
+        "preferences".to_string(),
+        serde_json::json!({"logLevel": "info"}),
+    );
+    let written = AppSettings {
+        default_preset: Some("high-quality".to_string()),
+        output_directory: Some("C:\\media\\out".to_string()),
+        extra,
+        ..AppSettings::default()
+    };
     save_settings(&path, &written).expect("saved");
 
     let body: serde_json::Value =
@@ -49,7 +55,10 @@ fn a_saved_document_says_which_build_wrote_it_and_reads_back_unchanged() {
     assert_eq!(body["version"], SETTINGS_VERSION);
 
     let loaded = load_settings(&path).expect("loaded");
-    assert_eq!(loaded, written, "a document read back is the document saved");
+    assert_eq!(
+        loaded, written,
+        "a document read back is the document saved"
+    );
     assert_eq!(loaded.written_version, SETTINGS_VERSION);
     assert!(!loaded.needs_migration());
     assert!(!loaded.from_the_future());
@@ -156,13 +165,23 @@ fn a_document_that_is_not_an_object_is_refused_rather_than_overwritten() {
 #[test]
 fn a_missing_empty_or_broken_file_reads_as_the_defaults_or_an_error() {
     let missing = temp_path("missing");
-    assert_eq!(load_settings(&missing).expect("missing"), AppSettings::default());
-    assert_eq!(load_settings(&PathBuf::from("no/such/folder/settings.json")).expect("absent")
-        .written_version, 0);
+    assert_eq!(
+        load_settings(&missing).expect("missing"),
+        AppSettings::default()
+    );
+    assert_eq!(
+        load_settings(&PathBuf::from("no/such/folder/settings.json"))
+            .expect("absent")
+            .written_version,
+        0
+    );
 
     let empty = temp_path("empty");
     write_raw(&empty, "   \n");
-    assert_eq!(load_settings(&empty).expect("empty"), AppSettings::default());
+    assert_eq!(
+        load_settings(&empty).expect("empty"),
+        AppSettings::default()
+    );
 
     let broken = temp_path("broken");
     write_raw(&broken, "{ not json");
@@ -183,7 +202,10 @@ fn a_partly_missing_document_keeps_every_member_it_does_have() {
         "appearance": {"theme": "dark", "direction": "rtl"},
     });
     let loaded = read_settings(&document).expect("read");
-    assert_eq!(loaded.user_presets_path.as_deref(), Some("C:\\presets.json"));
+    assert_eq!(
+        loaded.user_presets_path.as_deref(),
+        Some("C:\\presets.json")
+    );
     assert_eq!(loaded.default_preset, None);
     assert_eq!(loaded.output_directory, None);
     assert_eq!(loaded.recent_input, None);
@@ -202,7 +224,10 @@ fn the_version_questions_are_answered_from_the_file_and_not_from_the_clock() {
     };
     assert!(!current.needs_migration());
     assert!(!current.from_the_future());
-    assert_eq!(current.written_version_label(), format!("version {SETTINGS_VERSION}"));
+    assert_eq!(
+        current.written_version_label(),
+        format!("version {SETTINGS_VERSION}")
+    );
 
     let never_read = AppSettings::default();
     assert!(!never_read.needs_migration());

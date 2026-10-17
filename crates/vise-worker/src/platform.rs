@@ -109,8 +109,12 @@ impl Priority {
             Priority::Low => "The worker steps aside for everything else on the machine.",
             Priority::BelowNormal => "The worker gives way to other programs.",
             Priority::Normal => "The worker takes a share of the machine like any other program.",
-            Priority::AboveNormal => "The worker asks for more of the machine than other programs get.",
-            Priority::High => "The worker asks for nearly all of the machine and can starve other programs.",
+            Priority::AboveNormal => {
+                "The worker asks for more of the machine than other programs get."
+            }
+            Priority::High => {
+                "The worker asks for nearly all of the machine and can starve other programs."
+            }
         }
     }
 
@@ -184,13 +188,14 @@ mod sys {
     }
 
     // Priorities are the same numbers on every Windows version this builds for,
-    // so they are named here once rather than looked up.
-    const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
-    const IDLE_PRIORITY_CLASS: u32 = 0x0000_0040;
-    const NORMAL_PRIORITY_CLASS: u32 = 0x0000_0020;
-    const ABOVE_NORMAL_PRIORITY_CLASS: u32 = 0x0000_8000;
-    const HIGH_PRIORITY_CLASS: u32 = 0x0000_0080;
-    const REALTIME_PRIORITY_CLASS: u32 = 0x0000_0100;
+    // so they are named here once rather than looked up. They are visible
+    // outside this module only so the tests below can pin what each level of the
+    // contract's scale is actually asked for.
+    pub(crate) const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+    pub(crate) const IDLE_PRIORITY_CLASS: u32 = 0x0000_0040;
+    pub(crate) const NORMAL_PRIORITY_CLASS: u32 = 0x0000_0020;
+    pub(crate) const ABOVE_NORMAL_PRIORITY_CLASS: u32 = 0x0000_8000;
+    pub(crate) const REALTIME_PRIORITY_CLASS: u32 = 0x0000_0100;
     const PROCESS_SET_INFORMATION: u32 = 0x0200;
     const PROCESS_QUERY_INFORMATION: u32 = 0x0400;
 
@@ -198,12 +203,16 @@ mod sys {
         fn SetPriorityClass(process: *mut c_void, class: u32) -> i32;
     }
 
-    fn priority_class(priority: super::Priority) -> u32 {
+    /// The Windows priority class that a level of the contract's scale asks for.
+    pub(crate) fn priority_class(priority: super::Priority) -> u32 {
         match priority {
             super::Priority::Low => IDLE_PRIORITY_CLASS,
             super::Priority::BelowNormal => BELOW_NORMAL_PRIORITY_CLASS,
             super::Priority::Normal => NORMAL_PRIORITY_CLASS,
             super::Priority::AboveNormal => ABOVE_NORMAL_PRIORITY_CLASS,
+            // The top of the contract's scale is the realtime class, which is what
+            // the level is labelled; the ordinary high class is not on that scale
+            // and is not asked for.
             super::Priority::High => REALTIME_PRIORITY_CLASS,
         }
     }
@@ -213,13 +222,8 @@ mod sys {
     }
 
     pub fn set_priority(pid: u32, priority: super::Priority) -> Result<(), super::ControlError> {
-        let handle = unsafe {
-            OpenProcess(
-                PROCESS_SET_INFORMATION | PROCESS_QUERY_INFORMATION,
-                0,
-                pid,
-            )
-        };
+        let handle =
+            unsafe { OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_INFORMATION, 0, pid) };
         if handle.is_null() {
             return Err(super::ControlError::NotFound(pid));
         }
@@ -313,10 +317,7 @@ mod sys {
         false
     }
 
-    pub fn set_priority(
-        _pid: u32,
-        _priority: super::Priority,
-    ) -> Result<(), super::ControlError> {
+    pub fn set_priority(_pid: u32, _priority: super::Priority) -> Result<(), super::ControlError> {
         Err(super::ControlError::Unsupported("process priority"))
     }
 
@@ -391,6 +392,27 @@ mod tests {
         // The middle of the scale has to read as the unremarkable answer, or a
         // user cannot tell which one is the one to leave alone.
         assert_eq!(Priority::Normal.level(), 0);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn every_level_of_the_scale_is_given_the_platform_class_it_is_labelled() {
+        // The label on a level is what the activity window records, so the class
+        // behind it has to be the one the label names: a level called "Realtime"
+        // that quietly asked for "above normal" would record a decision the
+        // machine never made.
+        use super::sys::priority_class;
+        assert_eq!(priority_class(Priority::Low), sys::IDLE_PRIORITY_CLASS);
+        assert_eq!(
+            priority_class(Priority::BelowNormal),
+            sys::BELOW_NORMAL_PRIORITY_CLASS
+        );
+        assert_eq!(priority_class(Priority::Normal), sys::NORMAL_PRIORITY_CLASS);
+        assert_eq!(
+            priority_class(Priority::AboveNormal),
+            sys::ABOVE_NORMAL_PRIORITY_CLASS
+        );
+        assert_eq!(priority_class(Priority::High), sys::REALTIME_PRIORITY_CLASS);
     }
 
     #[test]

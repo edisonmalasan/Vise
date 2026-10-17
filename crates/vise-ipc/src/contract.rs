@@ -82,6 +82,48 @@ impl LogLevel {
             LogLevel::Debug => 3,
         }
     }
+
+    /// Every level, least to most verbose.
+    ///
+    /// One list, so the filter control, the row labels, and the preference that
+    /// chooses a level are all built from the same order and cannot disagree
+    /// about which way round it is.
+    pub const ALL: [LogLevel; 4] = [
+        LogLevel::Error,
+        LogLevel::Warning,
+        LogLevel::Info,
+        LogLevel::Debug,
+    ];
+
+    /// Stable identifier the interface layer sends back.
+    pub fn id(self) -> &'static str {
+        match self {
+            LogLevel::Debug => "debug",
+            LogLevel::Info => "info",
+            LogLevel::Warning => "warning",
+            LogLevel::Error => "error",
+        }
+    }
+
+    /// The name shown on a filter option and beside a row.
+    pub fn label(self) -> &'static str {
+        match self {
+            LogLevel::Debug => "Debug",
+            LogLevel::Info => "Info",
+            LogLevel::Warning => "Warning",
+            LogLevel::Error => "Error",
+        }
+    }
+
+    /// Read a level the interface layer sent.
+    ///
+    /// The wire spelling is the one the contract serialises, and the lower-case
+    /// identifier is accepted as well because that is what the preference and the
+    /// page both send.
+    pub fn parse(raw: &str) -> Option<Self> {
+        let wanted = raw.trim().to_ascii_lowercase();
+        LogLevel::ALL.into_iter().find(|level| level.id() == wanted)
+    }
 }
 
 /// One worker log entry.

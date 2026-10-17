@@ -583,19 +583,22 @@ pub fn read_settings(document: &serde_json::Value) -> Result<AppSettings, CoreEr
             "a settings file has to be a JSON object".to_string(),
         ));
     };
-    let mut settings = AppSettings::default();
     // A version that is not a whole number cannot be read as one, so the file is
     // treated as unversioned rather than refused: it is migrated forward and
     // the wrong member is dropped, which loses nothing that could be recovered.
-    settings.written_version = members
+    let written_version = members
         .get("version")
         .and_then(serde_json::Value::as_u64)
         .map(|version| version.min(u64::from(u32::MAX)) as u32)
         .unwrap_or(SETTINGS_UNVERSIONED);
-    settings.default_preset = named_string(members, "default_preset");
-    settings.output_directory = named_string(members, "output_directory");
-    settings.recent_input = named_string(members, "recent_input");
-    settings.user_presets_path = named_string(members, "user_presets_path");
+    let mut settings = AppSettings {
+        written_version,
+        default_preset: named_string(members, "default_preset"),
+        output_directory: named_string(members, "output_directory"),
+        recent_input: named_string(members, "recent_input"),
+        user_presets_path: named_string(members, "user_presets_path"),
+        ..AppSettings::default()
+    };
     for (name, member) in members {
         if NAMED_SETTINGS.contains(&name.as_str()) {
             continue;
@@ -613,7 +616,10 @@ fn named_string(
     members: &serde_json::Map<String, serde_json::Value>,
     name: &str,
 ) -> Option<String> {
-    members.get(name).and_then(serde_json::Value::as_str).map(str::to_string)
+    members
+        .get(name)
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
 }
 
 /// Read the settings file at `path`.

@@ -46,6 +46,29 @@ pub enum HardwareApi {
 }
 
 impl HardwareApi {
+    /// The API a media-tools accelerator name corresponds to, or `Auto` for a
+    /// name this build does not know.
+    ///
+    /// The names the tools publish (`-hwaccels`) and the names of this enum are
+    /// not the same list: `nvenc` and `cuda` are one API under two spellings, and
+    /// some accelerators have no API here at all. A name that resolves is used
+    /// rather than ignored, so a caller that has one does not have to spell it
+    /// twice in two vocabularies.
+    pub fn of_accelerator(name: &str) -> Self {
+        match name.trim().to_ascii_lowercase().as_str() {
+            "cuda" | "cuvid" | "nvenc" | "nvdec" => Self::Cuda,
+            "qsv" => Self::Qsv,
+            "vaapi" | "vdpau" => Self::Vaapi,
+            "amf" => Self::Amf,
+            "videotoolbox" => Self::Videotoolbox,
+            "d3d11va" => Self::D3d11va,
+            "dxva2" | "d3d11va_copy" => Self::Dxva2,
+            "opencl" => Self::Opencl,
+            "vulkan" => Self::Vulkan,
+            _ => Self::Auto,
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Auto => "auto",
