@@ -2448,6 +2448,32 @@ fn preset_from_tabs(
         video: None,
         audio_codec: tabs::compatibility::audio_codec_of(&guard.tabs.summary.audio_codec),
         audio: None,
+        // The encoder, the rate control, and the size it aims at are what a
+        // preset is for, so they travel with it rather than being retyped on the
+        // video tab. The encoder comes from the hardware settings the tabs hold,
+        // because that is where the window read it from.
+        // The encoder and the rate control are what a preset is for, so they
+        // travel with it rather than being retyped on the video tab.
+        encoder: tabs::compatibility::encoder_of(&guard.tabs.video.encoder),
+        video_encoding: {
+            let options = tabs::video_encoding_options(&guard.tabs.video);
+            (!options.is_empty()).then_some(options)
+        },
+        encoding_mode: tabs::compatibility::encoding_mode_of(&guard.tabs.video.rate_control),
+        target_size: tabs::compatibility::target_size_bytes_of(
+            &guard.tabs.video.rate_control,
+            guard
+                .tabs
+                .video
+                .target_size
+                .whole("Target size")
+                .ok()
+                .flatten(),
+        ),
+        // No tab asks how long a title is, so a preset saved from the tabs
+        // carries no cap: the cap belongs to the preset that was designed around
+        // a length, not to every preset.
+        duration_cap_seconds: None,
         subtitle_mode: None,
         subtitles: None,
         title_index: None,
@@ -2458,6 +2484,26 @@ fn preset_from_tabs(
         name: Some(change.name.trim().to_string()),
         description: non_empty(change.description.trim()),
     })
+}
+
+/// The name the video tab knows a rate-control mode by.
+///
+/// The job model carries more modes than the tab offers, so the ones the tab has
+/// no word for are not invented: a preset that asks for something the tab cannot
+/// show keeps the tab's current rate control rather than being shown a mode that
+/// does not exist.
+fn rate_control_name(mode: vise_core::EncodingMode) -> &'static str {
+    if mode.is_constant_quality() {
+        "quality"
+    } else if mode.is_average_bitrate() {
+        "bitrate"
+    } else if mode.is_target_size() {
+        "target_size"
+    } else if mode.is_lossless() {
+        "lossless"
+    } else {
+        "quality"
+    }
 }
 
 /// A description, or nothing rather than an empty string.
@@ -2472,18 +2518,42 @@ fn non_empty(text: &str) -> Option<String> {
 /// Write a preset back into the tab settings.
 fn apply_preset_to_tabs(state: &SharedState, preset: &vise_core::PresetSpec) -> Result<(), String> {
     let mut guard = state.lock().map_err(|e| e.to_string())?;
-    if let Some(container) = preset.container.or(preset.format) {
+    if let Some(container) = preset.container_of() {
         guard.tabs.summary.container = format!("{container:?}").to_ascii_lowercase();
     }
-    if let Some(codec) = preset.video_codec.or(preset.video) {
+    if let Some(codec) = preset.video_codec_of() {
         guard.tabs.summary.video_codec = format!("{codec:?}").to_ascii_lowercase();
     }
-    if let Some(codec) = preset.audio_codec.or(preset.audio) {
+    if let Some(codec) = preset.audio_codec_of() {
         guard.tabs.summary.audio_codec = format!("{codec:?}").to_ascii_lowercase();
     }
     if let Some(quality) = preset.quality {
         guard.tabs.video.quality = tabs::common::NumField::of(quality);
         guard.tabs.video.rate_control = "quality".to_string();
+    } else if let Some(mode) = preset.encoding_mode {
+        guard.tabs.video.rate_control = rate_control_name(mode).to_string();
+    }
+    // A size-targeted preset carries the size it was designed around, in bytes;
+    // the tab asks in megabytes, so it is converted rather than shown raw.
+    if let Some(bytes) = preset.target_size {
+        guard.tabs.video.target_size = tabs::common::NumField::of((bytes / 1_000_000) as u32);
+    }
+    if let Some(encoding) = &preset.video_encoding {
+        if let Some(name) = &encoding.preset {
+            guard.tabs.video.preset = name.clone();
+        }
+        if let Some(name) = &encoding.profile {
+            guard.tabs.video.profile = name.clone();
+        }
+        if let Some(name) = &encoding.tune {
+            guard.tabs.video.tune = name.clone();
+        }
+        if let Some(name) = &encoding.level {
+            guard.tabs.video.level = name.clone();
+        }
+        if let Some(range) = encoding.colour_range {
+            guard.tabs.video.colour_range = format!("{range:?}").to_ascii_lowercase();
+        }
     }
     if let Some((_, _, width, height)) = preset.crop {
         guard.tabs.dimensions.crop_mode = "manual".to_string();

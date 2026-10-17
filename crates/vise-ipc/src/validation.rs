@@ -87,19 +87,34 @@ fn container_audio_support(container: ContainerFormat) -> &'static [AudioCodec] 
             AudioCodec::Mp3,
             AudioCodec::Ac3,
             AudioCodec::Eac3,
+            AudioCodec::Pcm,
         ],
         ContainerFormat::Webm => &[AudioCodec::Opus, AudioCodec::Vorbis],
     }
 }
 
 /// Video codecs each container can carry in this build.
+///
+/// The professional codecs are Matroska-only here: they normally travel in a
+/// quick-time or broadcast wrapper, and this build has no such container, so
+/// they are offered where the muxer takes them rather than in a container that
+/// cannot carry them at all.
 fn container_video_support(container: ContainerFormat) -> &'static [VideoCodec] {
     match container {
-        ContainerFormat::Mp4 | ContainerFormat::Mkv => &[
+        ContainerFormat::Mp4 => &[
             VideoCodec::H264,
             VideoCodec::H265,
             VideoCodec::Av1,
             VideoCodec::Vp9,
+        ],
+        ContainerFormat::Mkv => &[
+            VideoCodec::H264,
+            VideoCodec::H265,
+            VideoCodec::Av1,
+            VideoCodec::Vp9,
+            VideoCodec::ProRes,
+            VideoCodec::Dnxhr,
+            VideoCodec::Ffv1,
         ],
         ContainerFormat::Webm => &[VideoCodec::Vp9],
     }
@@ -575,24 +590,11 @@ fn container_name(container: ContainerFormat) -> &'static str {
 }
 
 fn audio_codec_name(codec: AudioCodec) -> &'static str {
-    match codec {
-        AudioCodec::Aac => "AAC",
-        AudioCodec::Opus => "Opus",
-        AudioCodec::Vorbis => "Vorbis",
-        AudioCodec::Flac => "FLAC",
-        AudioCodec::Mp3 => "MP3",
-        AudioCodec::Ac3 => "AC3",
-        AudioCodec::Eac3 => "E-AC3",
-    }
+    codec.label()
 }
 
 fn video_codec_name(codec: VideoCodec) -> &'static str {
-    match codec {
-        VideoCodec::H264 => "H.264",
-        VideoCodec::H265 => "H.265",
-        VideoCodec::Av1 => "AV1",
-        VideoCodec::Vp9 => "VP9",
-    }
+    codec.label()
 }
 
 /// Build a synthetic scan result, useful for validation tests and for callers

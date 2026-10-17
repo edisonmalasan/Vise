@@ -620,6 +620,7 @@ fn audio_encoder(codec: AudioCodec) -> &'static str {
         AudioCodec::Mp3 => "libmp3lame",
         AudioCodec::Ac3 => "ac3",
         AudioCodec::Eac3 => "eac3",
+        AudioCodec::Pcm => "pcm_s16le",
     }
 }
 

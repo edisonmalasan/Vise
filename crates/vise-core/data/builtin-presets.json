@@ -1,0 +1,2724 @@
+{
+  "version": {
+    "major": 1,
+    "minor": 0,
+    "micro": 0
+  },
+  "template": {
+    "container": "mp4",
+    "video_codec": "h264",
+    "audio_codec": "aac",
+    "subtitle_mode": "passthrough",
+    "quality": 23
+  },
+  "presets": [
+    {
+      "id": "general-very-fast-480-30-h264",
+      "name": "Very Fast 480p30 (H.264)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. H.264 plays everywhere. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 27,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "ultrafast"
+        }
+      }
+    },
+    {
+      "id": "general-very-fast-480-30-hevc",
+      "name": "Very Fast 480p30 (H.265)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. H.265 is roughly half the size of H.264 at the same quality. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 28,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "ultrafast"
+        }
+      }
+    },
+    {
+      "id": "general-very-fast-480-30-av1",
+      "name": "Very Fast 480p30 (AV1)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. AV1 is the smallest of the three, and the slowest to encode. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 40,
+        "scale_to": [
+          854,
+          480
+        ]
+      }
+    },
+    {
+      "id": "general-very-fast-576-25-h264",
+      "name": "Very Fast 576p25 (H.264)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. H.264 plays everywhere. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 27,
+        "scale_to": [
+          1024,
+          576
+        ],
+        "video_encoding": {
+          "preset": "ultrafast"
+        }
+      }
+    },
+    {
+      "id": "general-very-fast-576-25-hevc",
+      "name": "Very Fast 576p25 (H.265)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 28,
+        "scale_to": [
+          1024,
+          576
+        ],
+        "video_encoding": {
+          "preset": "ultrafast"
+        }
+      }
+    },
+    {
+      "id": "general-very-fast-576-25-av1",
+      "name": "Very Fast 576p25 (AV1)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 40,
+        "scale_to": [
+          1024,
+          576
+        ]
+      }
+    },
+    {
+      "id": "general-very-fast-720-30-h264",
+      "name": "Very Fast 720p30 (H.264)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. H.264 plays everywhere. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 27,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "ultrafast"
+        }
+      }
+    },
+    {
+      "id": "general-very-fast-720-30-hevc",
+      "name": "Very Fast 720p30 (H.265)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 28,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "ultrafast"
+        }
+      }
+    },
+    {
+      "id": "general-very-fast-720-30-av1",
+      "name": "Very Fast 720p30 (AV1)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 40,
+        "scale_to": [
+          1280,
+          720
+        ]
+      }
+    },
+    {
+      "id": "general-very-fast-1080-30-h264",
+      "name": "Very Fast 1080p30 (H.264)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. H.264 plays everywhere. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 27,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "ultrafast"
+        }
+      }
+    },
+    {
+      "id": "general-very-fast-1080-30-hevc",
+      "name": "Very Fast 1080p30 (H.265)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 28,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "ultrafast"
+        }
+      }
+    },
+    {
+      "id": "general-very-fast-1080-30-av1",
+      "name": "Very Fast 1080p30 (AV1)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 40,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "general-very-fast-2160-60-h264",
+      "name": "Very Fast 2160p60 (H.264)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. H.264 plays everywhere. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 27,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "ultrafast"
+        }
+      }
+    },
+    {
+      "id": "general-very-fast-2160-60-hevc",
+      "name": "Very Fast 2160p60 (H.265)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. H.265 is roughly half the size of H.264 at the same quality. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 28,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "ultrafast"
+        }
+      }
+    },
+    {
+      "id": "general-very-fast-2160-60-av1",
+      "name": "Very Fast 2160p60 (AV1)",
+      "description": "The quickest encode in the ladder: smallest file and least work, at the cost of the most visible loss. AV1 is the smallest of the three, and the slowest to encode. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 40,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "general-fast-480-30-h264",
+      "name": "Fast 480p30 (H.264)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. H.264 plays everywhere. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 23,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "general-fast-480-30-hevc",
+      "name": "Fast 480p30 (H.265)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. H.265 is roughly half the size of H.264 at the same quality. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "general-fast-480-30-av1",
+      "name": "Fast 480p30 (AV1)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. AV1 is the smallest of the three, and the slowest to encode. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 34,
+        "scale_to": [
+          854,
+          480
+        ]
+      }
+    },
+    {
+      "id": "general-fast-576-25-h264",
+      "name": "Fast 576p25 (H.264)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. H.264 plays everywhere. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 23,
+        "scale_to": [
+          1024,
+          576
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "general-fast-576-25-hevc",
+      "name": "Fast 576p25 (H.265)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1024,
+          576
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "general-fast-576-25-av1",
+      "name": "Fast 576p25 (AV1)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 34,
+        "scale_to": [
+          1024,
+          576
+        ]
+      }
+    },
+    {
+      "id": "general-fast-720-30-h264",
+      "name": "Fast 720p30 (H.264)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. H.264 plays everywhere. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 23,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "general-fast-720-30-hevc",
+      "name": "Fast 720p30 (H.265)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "general-fast-720-30-av1",
+      "name": "Fast 720p30 (AV1)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 34,
+        "scale_to": [
+          1280,
+          720
+        ]
+      }
+    },
+    {
+      "id": "general-fast-1080-30-h264",
+      "name": "Fast 1080p30 (H.264)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. H.264 plays everywhere. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 23,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "general-fast-1080-30-hevc",
+      "name": "Fast 1080p30 (H.265)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "general-fast-1080-30-av1",
+      "name": "Fast 1080p30 (AV1)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 34,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "general-fast-2160-60-h264",
+      "name": "Fast 2160p60 (H.264)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. H.264 plays everywhere. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 23,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "general-fast-2160-60-hevc",
+      "name": "Fast 2160p60 (H.265)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. H.265 is roughly half the size of H.264 at the same quality. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "general-fast-2160-60-av1",
+      "name": "Fast 2160p60 (AV1)",
+      "description": "A speed preset that still codes sensibly; the default choice for a first pass at a long title. AV1 is the smallest of the three, and the slowest to encode. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 34,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "general-hq-480-30-h264",
+      "name": "HQ 480p30 (H.264)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. H.264 plays everywhere. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 20,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "general-hq-480-30-hevc",
+      "name": "HQ 480p30 (H.265)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. H.265 is roughly half the size of H.264 at the same quality. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 21,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "general-hq-480-30-av1",
+      "name": "HQ 480p30 (AV1)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. AV1 is the smallest of the three, and the slowest to encode. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 28,
+        "scale_to": [
+          854,
+          480
+        ]
+      }
+    },
+    {
+      "id": "general-hq-576-25-h264",
+      "name": "HQ 576p25 (H.264)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. H.264 plays everywhere. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 20,
+        "scale_to": [
+          1024,
+          576
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "general-hq-576-25-hevc",
+      "name": "HQ 576p25 (H.265)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 21,
+        "scale_to": [
+          1024,
+          576
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "general-hq-576-25-av1",
+      "name": "HQ 576p25 (AV1)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 28,
+        "scale_to": [
+          1024,
+          576
+        ]
+      }
+    },
+    {
+      "id": "general-hq-720-30-h264",
+      "name": "HQ 720p30 (H.264)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. H.264 plays everywhere. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 20,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "general-hq-720-30-hevc",
+      "name": "HQ 720p30 (H.265)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 21,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "general-hq-720-30-av1",
+      "name": "HQ 720p30 (AV1)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 28,
+        "scale_to": [
+          1280,
+          720
+        ]
+      }
+    },
+    {
+      "id": "general-hq-1080-30-h264",
+      "name": "HQ 1080p30 (H.264)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. H.264 plays everywhere. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 20,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "general-hq-1080-30-hevc",
+      "name": "HQ 1080p30 (H.265)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 21,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "general-hq-1080-30-av1",
+      "name": "HQ 1080p30 (AV1)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 28,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "general-hq-2160-60-h264",
+      "name": "HQ 2160p60 (H.264)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. H.264 plays everywhere. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 20,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "general-hq-2160-60-hevc",
+      "name": "HQ 2160p60 (H.265)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. H.265 is roughly half the size of H.264 at the same quality. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 21,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "general-hq-2160-60-av1",
+      "name": "HQ 2160p60 (AV1)",
+      "description": "Slower and larger than Fast for detail that survives a close look, and still quick to encode. AV1 is the smallest of the three, and the slowest to encode. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 28,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "general-super-hq-480-30-h264",
+      "name": "Super HQ 480p30 (H.264)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. H.264 plays everywhere. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 17,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "general-super-hq-480-30-hevc",
+      "name": "Super HQ 480p30 (H.265)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. H.265 is roughly half the size of H.264 at the same quality. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 18,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "general-super-hq-480-30-av1",
+      "name": "Super HQ 480p30 (AV1)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. AV1 is the smallest of the three, and the slowest to encode. Scaled to 854 by 480.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          854,
+          480
+        ]
+      }
+    },
+    {
+      "id": "general-super-hq-576-25-h264",
+      "name": "Super HQ 576p25 (H.264)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. H.264 plays everywhere. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 17,
+        "scale_to": [
+          1024,
+          576
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "general-super-hq-576-25-hevc",
+      "name": "Super HQ 576p25 (H.265)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 18,
+        "scale_to": [
+          1024,
+          576
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "general-super-hq-576-25-av1",
+      "name": "Super HQ 576p25 (AV1)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1024 by 576.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1024,
+          576
+        ]
+      }
+    },
+    {
+      "id": "general-super-hq-720-30-h264",
+      "name": "Super HQ 720p30 (H.264)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. H.264 plays everywhere. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 17,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "general-super-hq-720-30-hevc",
+      "name": "Super HQ 720p30 (H.265)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 18,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "general-super-hq-720-30-av1",
+      "name": "Super HQ 720p30 (AV1)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1280 by 720.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1280,
+          720
+        ]
+      }
+    },
+    {
+      "id": "general-super-hq-1080-30-h264",
+      "name": "Super HQ 1080p30 (H.264)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. H.264 plays everywhere. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 17,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "general-super-hq-1080-30-hevc",
+      "name": "Super HQ 1080p30 (H.265)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. H.265 is roughly half the size of H.264 at the same quality. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 18,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "general-super-hq-1080-30-av1",
+      "name": "Super HQ 1080p30 (AV1)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. AV1 is the smallest of the three, and the slowest to encode. Scaled to 1920 by 1080.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "general-super-hq-2160-60-h264",
+      "name": "Super HQ 2160p60 (H.264)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. H.264 plays everywhere. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 17,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "general-super-hq-2160-60-hevc",
+      "name": "Super HQ 2160p60 (H.265)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. H.265 is roughly half the size of H.264 at the same quality. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Players that read H.265 inside MP4: recent phones, desktops, and smart TVs on current firmware. Older set-top boxes and camcorders will not.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 18,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "general-super-hq-2160-60-av1",
+      "name": "Super HQ 2160p60 (AV1)",
+      "description": "The most careful software encode at this size; the slowest of the four and the best at the same quality. AV1 is the smallest of the three, and the slowest to encode. Scaled to 3840 by 2160.",
+      "category": "general",
+      "encoder": "libaom-av1",
+      "compatibility": "Players that read AV1 inside MP4: recent phones, desktops, and browsers. Support is newer than for H.265 and still growing, so a preset in this codec is a good archive rather than a safe delivery.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "general-super-hq-1080-30-mkv",
+      "name": "Super HQ 1080p30 (H.265, Matroska)",
+      "description": "A careful H.265 encode in the container that carries it best, with uncompressed audio so the sound is not the first thing thrown away.",
+      "category": "general",
+      "encoder": "libx265",
+      "compatibility": "Software players and anything that reads Matroska and H.265; an MP4 player will not open this file.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "h265",
+        "audio_codec": "flac",
+        "quality": 18,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "web-creator-720-60",
+      "name": "Creator 720p60",
+      "description": "A high frame rate H.264 file for a platform that re-encodes what it is given: the frame rate and the size are the point, so the quality is set to keep motion smooth rather than detail.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms that accept MP4 uploads; the web-optimised index is on, so playback can start before the file has finished downloading.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 22,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "web-creator-1080-60",
+      "name": "Creator 1080p60",
+      "description": "A high frame rate H.264 file for a platform that re-encodes what it is given: the frame rate and the size are the point, so the quality is set to keep motion smooth rather than detail.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms that accept MP4 uploads; the web-optimised index is on, so playback can start before the file has finished downloading.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 21,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "web-creator-1440-60",
+      "name": "Creator 1440p60",
+      "description": "A high frame rate H.264 file for a platform that re-encodes what it is given: the frame rate and the size are the point, so the quality is set to keep motion smooth rather than detail.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms that accept MP4 uploads; the web-optimised index is on, so playback can start before the file has finished downloading.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 20,
+        "scale_to": [
+          2560,
+          1440
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "web-creator-2160-60",
+      "name": "Creator 2160p60",
+      "description": "A high frame rate H.264 file for a platform that re-encodes what it is given: the frame rate and the size are the point, so the quality is set to keep motion smooth rather than detail.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms that accept MP4 uploads; the web-optimised index is on, so playback can start before the file has finished downloading.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 19,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    },
+    {
+      "id": "web-social-10mb-30s",
+      "name": "Social 10 MB (30 s cap)",
+      "description": "Encoded to fit 10 MB. The size is the target rather than the quality, so it is only honest for a title of about 30 seconds: a longer one is compressed harder to fit, and a shorter one will not use the whole allowance.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms with a file-size allowance; the cap is the length this preset was tuned for.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 26,
+        "encoding_mode": "target_size",
+        "target_size": 10000000,
+        "duration_cap_seconds": 30
+      }
+    },
+    {
+      "id": "web-social-10mb-60s",
+      "name": "Social 10 MB (60 s cap)",
+      "description": "Encoded to fit 10 MB. The size is the target rather than the quality, so it is only honest for a title of about 60 seconds: a longer one is compressed harder to fit, and a shorter one will not use the whole allowance.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms with a file-size allowance; the cap is the length this preset was tuned for.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 26,
+        "encoding_mode": "target_size",
+        "target_size": 10000000,
+        "duration_cap_seconds": 60
+      }
+    },
+    {
+      "id": "web-social-10mb-120s",
+      "name": "Social 10 MB (120 s cap)",
+      "description": "Encoded to fit 10 MB. The size is the target rather than the quality, so it is only honest for a title of about 120 seconds: a longer one is compressed harder to fit, and a shorter one will not use the whole allowance.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms with a file-size allowance; the cap is the length this preset was tuned for.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 26,
+        "encoding_mode": "target_size",
+        "target_size": 10000000,
+        "duration_cap_seconds": 120
+      }
+    },
+    {
+      "id": "web-social-10mb-300s",
+      "name": "Social 10 MB (300 s cap)",
+      "description": "Encoded to fit 10 MB. The size is the target rather than the quality, so it is only honest for a title of about 300 seconds: a longer one is compressed harder to fit, and a shorter one will not use the whole allowance.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms with a file-size allowance; the cap is the length this preset was tuned for.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 26,
+        "encoding_mode": "target_size",
+        "target_size": 10000000,
+        "duration_cap_seconds": 300
+      }
+    },
+    {
+      "id": "web-social-25mb-30s",
+      "name": "Social 25 MB (30 s cap)",
+      "description": "Encoded to fit 25 MB. The size is the target rather than the quality, so it is only honest for a title of about 30 seconds: a longer one is compressed harder to fit, and a shorter one will not use the whole allowance.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms with a file-size allowance; the cap is the length this preset was tuned for.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 26,
+        "encoding_mode": "target_size",
+        "target_size": 25000000,
+        "duration_cap_seconds": 30
+      }
+    },
+    {
+      "id": "web-social-25mb-60s",
+      "name": "Social 25 MB (60 s cap)",
+      "description": "Encoded to fit 25 MB. The size is the target rather than the quality, so it is only honest for a title of about 60 seconds: a longer one is compressed harder to fit, and a shorter one will not use the whole allowance.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms with a file-size allowance; the cap is the length this preset was tuned for.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 26,
+        "encoding_mode": "target_size",
+        "target_size": 25000000,
+        "duration_cap_seconds": 60
+      }
+    },
+    {
+      "id": "web-social-25mb-120s",
+      "name": "Social 25 MB (120 s cap)",
+      "description": "Encoded to fit 25 MB. The size is the target rather than the quality, so it is only honest for a title of about 120 seconds: a longer one is compressed harder to fit, and a shorter one will not use the whole allowance.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms with a file-size allowance; the cap is the length this preset was tuned for.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 26,
+        "encoding_mode": "target_size",
+        "target_size": 25000000,
+        "duration_cap_seconds": 120
+      }
+    },
+    {
+      "id": "web-social-25mb-300s",
+      "name": "Social 25 MB (300 s cap)",
+      "description": "Encoded to fit 25 MB. The size is the target rather than the quality, so it is only honest for a title of about 300 seconds: a longer one is compressed harder to fit, and a shorter one will not use the whole allowance.",
+      "category": "web",
+      "encoder": "libx264",
+      "compatibility": "Platforms with a file-size allowance; the cap is the length this preset was tuned for.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 26,
+        "encoding_mode": "target_size",
+        "target_size": 25000000,
+        "duration_cap_seconds": 300
+      }
+    },
+    {
+      "id": "web-vp9-1080-30",
+      "name": "Web delivery (VP9)",
+      "description": "The container every browser reads without a plugin, at a quality that suits a page rather than an archive.",
+      "category": "web",
+      "encoder": "libvpx-vp9",
+      "compatibility": "Every current browser; the oldest ones that still read VP9 in WebM.",
+      "spec": {
+        "container": "webm",
+        "video_codec": "vp9",
+        "audio_codec": "opus",
+        "quality": 30,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "device-fire-480-30-h264",
+      "name": "Amazon Fire 480p30",
+      "description": "Chosen so Fire TV will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Fire TV models that decode H.264 in hardware; the 480p entry is for the streaming sticks and older Fire TV sets that have no 1080p decoder.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 27,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-fire-720-30-h264",
+      "name": "Amazon Fire 720p30",
+      "description": "Chosen so Fire TV will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Fire TV models that decode H.264 in hardware; the 480p entry is for the streaming sticks and older Fire TV sets that have no 1080p decoder.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 25,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-fire-1080-30-h264",
+      "name": "Amazon Fire 1080p30",
+      "description": "Chosen so Fire TV will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Fire TV models that decode H.264 in hardware; the 480p entry is for the streaming sticks and older Fire TV sets that have no 1080p decoder.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 23,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-android-480-30-h264",
+      "name": "Android 480p30",
+      "description": "Chosen so Android phones and tablets will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Any Android device from about 2014 onwards; older devices that cannot do 1080p should use the 720p entry.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 27,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-android-720-30-h264",
+      "name": "Android 720p30",
+      "description": "Chosen so Android phones and tablets will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Any Android device from about 2014 onwards; older devices that cannot do 1080p should use the 720p entry.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 25,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-android-1080-30-h264",
+      "name": "Android 1080p30",
+      "description": "Chosen so Android phones and tablets will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Any Android device from about 2014 onwards; older devices that cannot do 1080p should use the 720p entry.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 23,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-apple-720-30-h264",
+      "name": "Apple 720p30",
+      "description": "Chosen so Apple devices will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "iPhone, iPad, and Mac playback; the 2160p entry needs a device with an HEVC decoder, which is every recent one but not every old one.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-apple-1080-30-h264",
+      "name": "Apple 1080p30",
+      "description": "Chosen so Apple devices will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "iPhone, iPad, and Mac playback; the 2160p entry needs a device with an HEVC decoder, which is every recent one but not every old one.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 22,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "device-apple-2160-60-hevc",
+      "name": "Apple 2160p60",
+      "description": "Chosen so Apple devices will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx265",
+      "compatibility": "iPhone, iPad, and Mac playback; the 2160p entry needs a device with an HEVC decoder, which is every recent one but not every old one.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 20,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "device-chromecast-480-30-h264",
+      "name": "Chromecast 480p30",
+      "description": "Chosen so Chromecast and Google TV will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Second-generation Chromecast and later, and Google TV receivers; the first generation has no H.264 decoder above 720p.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 27,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-chromecast-720-30-h264",
+      "name": "Chromecast 720p30",
+      "description": "Chosen so Chromecast and Google TV will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Second-generation Chromecast and later, and Google TV receivers; the first generation has no H.264 decoder above 720p.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 25,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-chromecast-1080-30-h264",
+      "name": "Chromecast 1080p30",
+      "description": "Chosen so Chromecast and Google TV will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Second-generation Chromecast and later, and Google TV receivers; the first generation has no H.264 decoder above 720p.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 23,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-playstation-720-30-h264",
+      "name": "Playstation 720p30",
+      "description": "Chosen so PlayStation consoles will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "PlayStation 4 and 5; the 60 fps entry is the one to use on a console set to 1080p60.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-playstation-1080-30-h264",
+      "name": "Playstation 1080p30",
+      "description": "Chosen so PlayStation consoles will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "PlayStation 4 and 5; the 60 fps entry is the one to use on a console set to 1080p60.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 22,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "device-playstation-1080-60-h264",
+      "name": "Playstation 1080p60",
+      "description": "Chosen so PlayStation consoles will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "PlayStation 4 and 5; the 60 fps entry is the one to use on a console set to 1080p60.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 21,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "device-roku-480-30-h264",
+      "name": "Roku 480p30",
+      "description": "Chosen so Roku players will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Roku players with an H.264 decoder; the older and lower-cost models are 720p at best.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 27,
+        "scale_to": [
+          854,
+          480
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-roku-720-30-h264",
+      "name": "Roku 720p30",
+      "description": "Chosen so Roku players will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Roku players with an H.264 decoder; the older and lower-cost models are 720p at best.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 25,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-roku-1080-30-h264",
+      "name": "Roku 1080p30",
+      "description": "Chosen so Roku players will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Roku players with an H.264 decoder; the older and lower-cost models are 720p at best.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 23,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-xbox-720-30-h264",
+      "name": "Xbox 720p30",
+      "description": "Chosen so Xbox consoles will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Xbox One and the later consoles; the 60 fps entry matches a console set to 1080p60.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "veryfast"
+        }
+      }
+    },
+    {
+      "id": "device-xbox-1080-30-h264",
+      "name": "Xbox 1080p30",
+      "description": "Chosen so Xbox consoles will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Xbox One and the later consoles; the 60 fps entry matches a console set to 1080p60.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 22,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "device-xbox-1080-60-h264",
+      "name": "Xbox 1080p60",
+      "description": "Chosen so Xbox consoles will play the file without converting it: H.264 in MP4, sized for that screen and nothing larger.",
+      "category": "devices",
+      "encoder": "libx264",
+      "compatibility": "Xbox One and the later consoles; the 60 fps entry matches a console set to 1080p60.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "quality": 21,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "matroska-h264-720-30",
+      "name": "Matroska 720p30 (H.264)",
+      "description": "Matroska with H.264 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libx264",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "h264",
+        "audio_codec": "flac",
+        "quality": 22,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "matroska-h264-1080-30",
+      "name": "Matroska 1080p30 (H.264)",
+      "description": "Matroska with H.264 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libx264",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "h264",
+        "audio_codec": "flac",
+        "quality": 21,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "matroska-h264-1080-60",
+      "name": "Matroska 1080p60 (H.264)",
+      "description": "Matroska with H.264 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libx264",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "h264",
+        "audio_codec": "flac",
+        "quality": 20,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "matroska-h264-2160-60",
+      "name": "Matroska 2160p60 (H.264)",
+      "description": "Matroska with H.264 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libx264",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "h264",
+        "audio_codec": "flac",
+        "quality": 19,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "matroska-hevc-720-30",
+      "name": "Matroska 720p30 (H.265)",
+      "description": "Matroska with H.265 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libx265",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "h265",
+        "audio_codec": "flac",
+        "quality": 22,
+        "scale_to": [
+          1280,
+          720
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "matroska-hevc-1080-30",
+      "name": "Matroska 1080p30 (H.265)",
+      "description": "Matroska with H.265 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libx265",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "h265",
+        "audio_codec": "flac",
+        "quality": 21,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "matroska-hevc-1080-60",
+      "name": "Matroska 1080p60 (H.265)",
+      "description": "Matroska with H.265 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libx265",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "h265",
+        "audio_codec": "flac",
+        "quality": 20,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "matroska-hevc-2160-60",
+      "name": "Matroska 2160p60 (H.265)",
+      "description": "Matroska with H.265 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libx265",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "h265",
+        "audio_codec": "flac",
+        "quality": 19,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "matroska-vp9-720-30",
+      "name": "Matroska 720p30 (VP9)",
+      "description": "Matroska with VP9 video and OPUS audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libvpx-vp9",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "vp9",
+        "audio_codec": "opus",
+        "quality": 22,
+        "scale_to": [
+          1280,
+          720
+        ]
+      }
+    },
+    {
+      "id": "matroska-vp9-1080-30",
+      "name": "Matroska 1080p30 (VP9)",
+      "description": "Matroska with VP9 video and OPUS audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libvpx-vp9",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "vp9",
+        "audio_codec": "opus",
+        "quality": 21,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "matroska-vp9-1080-60",
+      "name": "Matroska 1080p60 (VP9)",
+      "description": "Matroska with VP9 video and OPUS audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libvpx-vp9",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "vp9",
+        "audio_codec": "opus",
+        "quality": 20,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "matroska-vp9-2160-60",
+      "name": "Matroska 2160p60 (VP9)",
+      "description": "Matroska with VP9 video and OPUS audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libvpx-vp9",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "vp9",
+        "audio_codec": "opus",
+        "quality": 19,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "matroska-av1-720-30",
+      "name": "Matroska 720p30 (AV1)",
+      "description": "Matroska with AV1 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libaom-av1",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "av1",
+        "audio_codec": "flac",
+        "quality": 22,
+        "scale_to": [
+          1280,
+          720
+        ]
+      }
+    },
+    {
+      "id": "matroska-av1-1080-30",
+      "name": "Matroska 1080p30 (AV1)",
+      "description": "Matroska with AV1 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libaom-av1",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "av1",
+        "audio_codec": "flac",
+        "quality": 21,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "matroska-av1-1080-60",
+      "name": "Matroska 1080p60 (AV1)",
+      "description": "Matroska with AV1 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libaom-av1",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "av1",
+        "audio_codec": "flac",
+        "quality": 20,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "matroska-av1-2160-60",
+      "name": "Matroska 2160p60 (AV1)",
+      "description": "Matroska with AV1 video and FLAC audio. The container carries every codec on this page, so the file stays readable whatever a later machine can decode.",
+      "category": "matroska",
+      "encoder": "libaom-av1",
+      "compatibility": "Software players, media servers, and archive tools that read Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "av1",
+        "audio_codec": "flac",
+        "quality": 19,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "hardware-qsv-hevc-1080-30",
+      "name": "Intel Quick Sync 1080p30 (H.265)",
+      "description": "Encoded by the Intel Quick Sync part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "qsv",
+      "encoder": "hevc_qsv",
+      "compatibility": "A machine whose media tools expose Intel Quick Sync for H.265.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "hardware-qsv-hevc-2160-60",
+      "name": "Intel Quick Sync 2160p60 (H.265)",
+      "description": "Encoded by the Intel Quick Sync part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "qsv",
+      "encoder": "hevc_qsv",
+      "compatibility": "A machine whose media tools expose Intel Quick Sync for H.265.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 26,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "hardware-qsv-av1-1080-30",
+      "name": "Intel Quick Sync 1080p30 (AV1)",
+      "description": "Encoded by the Intel Quick Sync part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "qsv",
+      "encoder": "av1_qsv",
+      "compatibility": "A machine whose media tools expose Intel Quick Sync for AV1.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "hardware-qsv-av1-2160-60",
+      "name": "Intel Quick Sync 2160p60 (AV1)",
+      "description": "Encoded by the Intel Quick Sync part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "qsv",
+      "encoder": "av1_qsv",
+      "compatibility": "A machine whose media tools expose Intel Quick Sync for AV1.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 26,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "hardware-nvenc-hevc-1080-30",
+      "name": "NVIDIA NVENC 1080p30 (H.265)",
+      "description": "Encoded by the NVIDIA NVENC part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "nvenc",
+      "encoder": "hevc_nvenc",
+      "compatibility": "A machine whose media tools expose NVIDIA NVENC for H.265.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "hardware-nvenc-hevc-2160-60",
+      "name": "NVIDIA NVENC 2160p60 (H.265)",
+      "description": "Encoded by the NVIDIA NVENC part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "nvenc",
+      "encoder": "hevc_nvenc",
+      "compatibility": "A machine whose media tools expose NVIDIA NVENC for H.265.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 26,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "hardware-nvenc-av1-1080-30",
+      "name": "NVIDIA NVENC 1080p30 (AV1)",
+      "description": "Encoded by the NVIDIA NVENC part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "nvenc",
+      "encoder": "av1_nvenc",
+      "compatibility": "A machine whose media tools expose NVIDIA NVENC for AV1.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "hardware-nvenc-av1-2160-60",
+      "name": "NVIDIA NVENC 2160p60 (AV1)",
+      "description": "Encoded by the NVIDIA NVENC part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "nvenc",
+      "encoder": "av1_nvenc",
+      "compatibility": "A machine whose media tools expose NVIDIA NVENC for AV1.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 26,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "hardware-vcn-hevc-1080-30",
+      "name": "AMD AMF 1080p30 (H.265)",
+      "description": "Encoded by the AMD AMF part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "vcn",
+      "encoder": "hevc_amf",
+      "compatibility": "A machine whose media tools expose AMD AMF for H.265.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "hardware-vcn-hevc-2160-60",
+      "name": "AMD AMF 2160p60 (H.265)",
+      "description": "Encoded by the AMD AMF part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "vcn",
+      "encoder": "hevc_amf",
+      "compatibility": "A machine whose media tools expose AMD AMF for H.265.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 26,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "hardware-vcn-av1-1080-30",
+      "name": "AMD AMF 1080p30 (AV1)",
+      "description": "Encoded by the AMD AMF part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "vcn",
+      "encoder": "av1_amf",
+      "compatibility": "A machine whose media tools expose AMD AMF for AV1.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "hardware-vcn-av1-2160-60",
+      "name": "AMD AMF 2160p60 (AV1)",
+      "description": "Encoded by the AMD AMF part of the graphics chip rather than by the processor, which is several times faster at the same size. It is worth using when the chip is there; where it is not, this preset falls back to the software encoder and says so.",
+      "category": "hardware",
+      "family": "vcn",
+      "encoder": "av1_amf",
+      "compatibility": "A machine whose media tools expose AMD AMF for AV1.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "av1",
+        "audio_codec": "aac",
+        "quality": 26,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "hardware-media-foundation-hevc-1080-30",
+      "name": "Windows Media Foundation 1080p30 (H.265)",
+      "description": "Aimed at Windows playback: the file is encoded in software and the finished MP4 is handed to Media Foundation for hardware decoding, which is where the speed-up on a Windows machine comes from.",
+      "category": "hardware",
+      "family": "media_foundation",
+      "encoder": "libx265",
+      "compatibility": "Windows players that decode H.265 through Media Foundation; the media tools expose Media Foundation as a decoder, not as a video encoder, so this preset encodes in software.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "hardware-media-foundation-hevc-2160-60",
+      "name": "Windows Media Foundation 2160p60 (H.265)",
+      "description": "Aimed at Windows playback: the file is encoded in software and the finished MP4 is handed to Media Foundation for hardware decoding, which is where the speed-up on a Windows machine comes from.",
+      "category": "hardware",
+      "family": "media_foundation",
+      "encoder": "libx265",
+      "compatibility": "Windows players that decode H.265 through Media Foundation; the media tools expose Media Foundation as a decoder, not as a video encoder, so this preset encodes in software.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 26,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "hardware-videotoolbox-hevc-1080-30",
+      "name": "Apple VideoToolbox 1080p30 (H.265)",
+      "description": "Encoded by VideoToolbox, which is the video engine of the machine itself, so an encode on an Apple computer leaves the processor free.",
+      "category": "hardware",
+      "family": "video_toolbox",
+      "encoder": "hevc_videotoolbox",
+      "compatibility": "A Mac whose media tools expose VideoToolbox; everywhere else this preset falls back to the software encoder.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 24,
+        "scale_to": [
+          1920,
+          1080
+        ]
+      }
+    },
+    {
+      "id": "hardware-videotoolbox-hevc-2160-60",
+      "name": "Apple VideoToolbox 2160p60 (H.265)",
+      "description": "Encoded by VideoToolbox, which is the video engine of the machine itself, so an encode on an Apple computer leaves the processor free.",
+      "category": "hardware",
+      "family": "video_toolbox",
+      "encoder": "hevc_videotoolbox",
+      "compatibility": "A Mac whose media tools expose VideoToolbox; everywhere else this preset falls back to the software encoder.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h265",
+        "audio_codec": "aac",
+        "quality": 26,
+        "scale_to": [
+          3840,
+          2160
+        ]
+      }
+    },
+    {
+      "id": "professional-prores-422-proxy",
+      "name": "ProRes Proxy",
+      "description": "Half-resolution 10-bit 4:2:2 for an editor to work with. Not for showing anyone. Audio is uncompressed PCM so an edit never has to undo a lossy step first.",
+      "category": "professional",
+      "encoder": "prores_ks",
+      "compatibility": "Editing software that reads ProRes in Matroska. Very large files by design.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "prores",
+        "audio_codec": "pcm",
+        "video_encoding": {
+          "profile": "0"
+        }
+      }
+    },
+    {
+      "id": "professional-prores-422-lt",
+      "name": "ProRes LT",
+      "description": "Lightweight 10-bit 4:2:2 for an editor who needs the look without the size. Audio is uncompressed PCM so an edit never has to undo a lossy step first.",
+      "category": "professional",
+      "encoder": "prores_ks",
+      "compatibility": "Editing software that reads ProRes in Matroska. Very large files by design.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "prores",
+        "audio_codec": "pcm",
+        "video_encoding": {
+          "profile": "1"
+        }
+      }
+    },
+    {
+      "id": "professional-prores-422-hq",
+      "name": "ProRes 422",
+      "description": "Full-resolution 10-bit 4:2:2, the everyday editing interchange. Audio is uncompressed PCM so an edit never has to undo a lossy step first.",
+      "category": "professional",
+      "encoder": "prores_ks",
+      "compatibility": "Editing software that reads ProRes in Matroska. Very large files by design.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "prores",
+        "audio_codec": "pcm",
+        "video_encoding": {
+          "profile": "3"
+        }
+      }
+    },
+    {
+      "id": "professional-dnxhr-lb",
+      "name": "DNxHR LB",
+      "description": "The smallest of the three, for an editor that only needs to see the edit. Audio is uncompressed PCM, as it is for ProRes.",
+      "category": "professional",
+      "encoder": "dnxhd",
+      "compatibility": "Editing software that reads DNxHR in Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "dnxhr",
+        "audio_codec": "pcm",
+        "video_encoding": {
+          "profile": "dnxhr_lb"
+        }
+      }
+    },
+    {
+      "id": "professional-dnxhr-sq",
+      "name": "DNxHR SQ",
+      "description": "A middle rung: full resolution at 8-bit for a timeline that does not need more. Audio is uncompressed PCM, as it is for ProRes.",
+      "category": "professional",
+      "encoder": "dnxhd",
+      "compatibility": "Editing software that reads DNxHR in Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "dnxhr",
+        "audio_codec": "pcm",
+        "video_encoding": {
+          "profile": "dnxhr_sq"
+        }
+      }
+    },
+    {
+      "id": "professional-dnxhr-hqx",
+      "name": "DNxHR HQX",
+      "description": "Full-resolution 10-bit 4:2:2 for a master that goes to a finishing stage. Audio is uncompressed PCM, as it is for ProRes.",
+      "category": "professional",
+      "encoder": "dnxhd",
+      "compatibility": "Editing software that reads DNxHR in Matroska.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "dnxhr",
+        "audio_codec": "pcm",
+        "video_encoding": {
+          "profile": "dnxhr_hqx"
+        }
+      }
+    },
+    {
+      "id": "professional-ffv1-pcm",
+      "name": "FFV1 preservation with PCM audio",
+      "description": "FFV1 is lossless and intra-only, so every frame stands on its own and an archive can be cut at any point without generating a new file. PCM keeps the audio bit-for-bit, which is the point of a preservation copy.",
+      "category": "professional",
+      "encoder": "ffv1",
+      "compatibility": "Archive and mastering tools. The files are very large and encode slowly; that is what preservation costs.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "ffv1",
+        "audio_codec": "pcm",
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "encoding_mode": "lossless"
+      }
+    },
+    {
+      "id": "professional-ffv1-flac",
+      "name": "FFV1 preservation with FLAC audio",
+      "description": "FFV1 is lossless and intra-only, so every frame stands on its own and an archive can be cut at any point without generating a new file. FLAC keeps the audio lossless at roughly half the size PCM takes.",
+      "category": "professional",
+      "encoder": "ffv1",
+      "compatibility": "Archive and mastering tools. The files are very large and encode slowly; that is what preservation costs.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "ffv1",
+        "audio_codec": "flac",
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "encoding_mode": "lossless"
+      }
+    },
+    {
+      "id": "professional-ffv1-2160p60",
+      "name": "FFV1 preservation 4K, with PCM audio",
+      "description": "FFV1 is lossless and intra-only, so every frame stands on its own and an archive can be cut at any point without generating a new file. The same preservation master for 4K sources, which take a great deal longer to write.",
+      "category": "professional",
+      "encoder": "ffv1",
+      "compatibility": "Archive and mastering tools. The files are very large and encode slowly; that is what preservation costs.",
+      "spec": {
+        "container": "mkv",
+        "video_codec": "ffv1",
+        "audio_codec": "pcm",
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "encoding_mode": "lossless"
+      }
+    },
+    {
+      "id": "professional-x264-medium-1080-30",
+      "name": "Production H.264 1080p30 (medium)",
+      "description": "H.264 for a finished master rather than a delivery file: the encoder is given a longer preset and a lower quality number because the result is kept, not streamed.",
+      "category": "professional",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4; kept rather than delivered, so the file is larger than a streaming copy.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "flac",
+        "quality": 18,
+        "scale_to": [
+          1920,
+          1080
+        ],
+        "video_encoding": {
+          "preset": "medium"
+        }
+      }
+    },
+    {
+      "id": "professional-x264-slow-2160-60",
+      "name": "Production H.264 2160p60 (slow)",
+      "description": "H.264 for a finished master rather than a delivery file: the encoder is given a longer preset and a lower quality number because the result is kept, not streamed.",
+      "category": "professional",
+      "encoder": "libx264",
+      "compatibility": "Any player that reads MP4; kept rather than delivered, so the file is larger than a streaming copy.",
+      "spec": {
+        "container": "mp4",
+        "video_codec": "h264",
+        "audio_codec": "flac",
+        "quality": 17,
+        "scale_to": [
+          3840,
+          2160
+        ],
+        "video_encoding": {
+          "preset": "slow"
+        }
+      }
+    }
+  ]
+}

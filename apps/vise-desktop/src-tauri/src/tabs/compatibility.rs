@@ -137,6 +137,57 @@ pub fn audio_codecs_for(container: &str) -> Vec<ChoiceOption> {
         .collect()
 }
 
+/// The rate-control mode named by `text`, in the terms the job model uses.
+///
+/// The tabs name a mode in their own words; a preset has to carry the mode the
+/// job reads, so the two spellings are settled here rather than in the window.
+pub fn encoding_mode_of(text: &str) -> Option<vise_core::EncodingMode> {
+    match text
+        .trim()
+        .to_ascii_lowercase()
+        .replace(['-', ' '], "_")
+        .as_str()
+    {
+        "quality" | "crf" | "cq" | "constant_quality" => {
+            Some(vise_core::EncodingMode::ConstantQuality)
+        }
+        "bitrate" | "abr" | "average_bitrate" => Some(vise_core::EncodingMode::AverageBitrate),
+        "target_size" | "target file size" => Some(vise_core::EncodingMode::TargetSize),
+        "two_pass" => Some(vise_core::EncodingMode::TwoPass),
+        "lossless" => Some(vise_core::EncodingMode::Lossless),
+        _ => None,
+    }
+}
+
+/// The encoder a preset built from these tabs is written for.
+///
+/// The tabs choose a codec, and the codec names the encoder that writes it in
+/// software. Reading it back through the core's own table keeps one answer:
+/// a preset saved here names the encoder the pipeline would reach for on its own,
+/// and the catalog's availability rules can be asked about it.
+pub fn encoder_of(text: &str) -> Option<vise_core::EncoderId> {
+    if let Some(named) = vise_core::EncoderId::parse(text) {
+        return Some(named);
+    }
+    let codec = video_codec_of(text)?;
+    vise_core::EncoderId::parse(vise_core::HardwareCapabilities::default().software_encoder(codec))
+}
+
+/// The target file size a rate control names, in bytes.
+///
+/// The tabs ask for megabytes and the job asks for bytes, and a size-targeted
+/// preset that carried the wrong unit would aim at a different file from the one
+/// the user asked for. The conversion is the one the queue already uses, so a
+/// preset saved from the tabs and a job typed on them agree to the byte.
+pub fn target_size_bytes_of(text: &str, megabytes: Option<u32>) -> Option<u64> {
+    if !encoding_mode_of(text)?.is_target_size() {
+        return None;
+    }
+    megabytes
+        .map(u64::from)
+        .map(|mb| mb.saturating_mul(1_000_000))
+}
+
 /// Whether the encoder writes bitmap subtitle pictures rather than text.
 pub fn is_bitmap_subtitle(codec: &str) -> bool {
     matches!(
