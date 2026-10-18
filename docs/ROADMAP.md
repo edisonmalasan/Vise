@@ -435,23 +435,40 @@ Preset descriptions are localized the same way and for the same reason. The cata
 **Verified by unit tests and by inspection of the shipped resources:** every locale file parses, has every key, and fills exactly the placeholders its key declares; a duplicate key, a blank, an unknown key name, and an untranslated sentence copied over the base are each refused; the fallback chain answers exact, then base language, then base, and a deliberately incomplete locale built in a test falls back and reports itself as incomplete; a key no file has resolves to a readable label rather than an identifier; a right-to-left language mirrors the window while a pinned left-to-right direction does not move, and a left-to-right language under a pinned right-to-left direction stays mirrored; a language switch re-emits its view models with no tab view model among them and leaves the tabs byte-identical; a version two record migrates with everything it held and its language at its default; and a translated preset description is used where one exists, is not where none does, and every row in every shipped locale has a sentence.
 
 **Not verified by anything but unit tests and inspection, and called out as such:** the page was not run in a browser for this slice. The `data-i18n` mechanism, the `language-changed` event handler, and the tab strip's fallback to the window's own label are the whole of the page's change and are covered by the view models they consume rather than by a browser. The coverage of the catalog is the chrome — the masthead, the toolbar, the tab strip, the source and queue lines, the appearance and preferences surfaces — and the per-control copy inside the eight configuration tabs is still English, because threading a catalog through every tab view model is a larger change than this group asked for and half of it would be untested either way. A preset browser that is open at the moment the language changes shows the new descriptions the next time it is read rather than immediately, because the browser's view model is built from the library rather than from the language. The command line's per-job progress lines stay in the base language: they are log lines rather than sentences, and a translation there would cost a script the reader cannot grep.
-
-## Group 19 — Media depth
+## Group 19 - Media depth
 
 *Outcome: Media handling reaches the reference product's coverage in the areas still missing.*
 
-- [ ] DVD source support `(optional)`
-- [ ] Blu-ray source support `(optional)`
-- [ ] Deblock filter
-- [ ] Lossless FFV1/PCM/FLAC MKV modes
-- [ ] Dolby Vision profile and RPU handling
-- [ ] HDR10+ dynamic metadata
-- [ ] MP4 behaviors (web optimized, iPod 5G, common metadata passthrough)
-- [ ] Chapter import from CSV, TXT, and XML
-- [ ] Cover art and attachment handling with container restrictions
-- [ ] Foreign audio scan parity
+- [ ] DVD source support \(optional)- [ ] Blu-ray source support \(optional)- [x] Deblock filter
+- [x] Lossless FFV1/PCM/FLAC MKV modes
+- [x] Dolby Vision profile and RPU handling
+- [x] HDR10+ dynamic metadata
+- [x] MP4 behaviors (web optimized, iPod 5G, common metadata passthrough)
+- [x] Chapter import from CSV, TXT, and XML
+- [x] Cover art and attachment handling with container restrictions
+- [x] Foreign audio scan parity
 
-**Status:** Not started (0/10 verified)
+**Status:** In progress (8/10 verified; the two optical-disc items are optional and are not claimed.)
+
+The scan reports the Dolby Vision profile and RPU presence and the HDR10+ dynamic
+metadata from the stream side data, and marks which audio tracks are in a language
+other than the source's primary one. The video tab turns the HDR facts into two
+rows that are always present and are closed with a reason when the source carries
+nothing to keep; when the machine's HEVC encoder was built without RPU coding or
+without the user-SEI path, that is stated on the tab rather than discovered at
+encode time. Cover art and attachments are mapped where the container is known, so
+a WebM asked for a cover says which container refused it, and the MP4-only output
+flags stay closed outside an MP4.
+
+Verified by unit tests over argument construction and decision logic (nine chapter
+parser tests, four attachment-container tests, six media-depth plan tests) and by
+one real encode: an FFV1 + FLAC Matroska file produced by ffmpeg and confirmed to
+be a valid lossless MKV. The application was not launched, so the live rows were
+confirmed through their view models and the shipped page rather than the running
+window. Optical-disc input is not implemented: there is no optical drive on this
+machine to read or test a disc, and a code path that cannot be exercised would be a
+claim rather than a capability. Both optional boxes stay unchecked.
+
 
 ## Group 20 — Diagnostics and developer tools
 
@@ -520,7 +537,7 @@ Required groups: 19
 | 16 | Preset catalog and versioning | Complete (13/13) |
 | 17 | System integration | Complete (9/9) |
 | 18 | Localization | Complete (6/6) |
-| 19 | Media depth | Not started (0/10) |
+| 19 | Media depth | In progress (8/10; optical-disc input optional and not claimed) |
 | 20 | Diagnostics and developer tools | Not started (0/6) |
 
 ## Notes
