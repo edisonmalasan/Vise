@@ -295,10 +295,16 @@ download archive, which is a build input rather than something to ship; the
 installer went from 159 MiB to 54 MiB once the tools were staged separately from
 the cache.
 
-Not claimed: the macOS bundle and the Linux package. Only the Windows target is
-installed on this machine, so those two were never compiled, let alone packaged;
-their pin entries carry placeholders that the fetch script refuses to leave
-unpinned without saying so.
+Not claimed: the macOS bundle and the Linux package. Building them needs a
+sysroot and a linker for the target, and neither platform's toolchain is
+available on a Windows machine, so no bundle was produced for either. What was
+checked is the part that can be: \ise-core\, \ise-ipc\, and \ise-worker\ all
+type-check for both _64-unknown-linux-gnu\ and _64-apple-darwin\, so the
+portable half of the workspace is known to build off this platform. Only the
+desktop crate is untested there, because it needs the platform's own GUI
+libraries. Their pin entries still carry placeholders, which the fetch script
+refuses to leave unpinned without saying so, so an unpinned entry cannot be
+published by accident.
 
 ## Group 13 — Worker process and JSON IPC
 
