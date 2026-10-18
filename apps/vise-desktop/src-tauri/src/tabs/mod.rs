@@ -25,7 +25,9 @@ pub mod summary;
 pub mod video;
 
 use serde::{Deserialize, Serialize};
-use vise_core::{ColourRange, EncodingMode, JobSpec, OutputOptions, VideoEncodingOptions};
+use vise_core::{
+    ColourRange, ContainerFormat, EncodingMode, JobSpec, OutputOptions, VideoEncodingOptions,
+};
 
 use audio::AudioSettings;
 pub use audio::{AudioDefaultsInput, AudioTrackInput};
@@ -197,7 +199,11 @@ impl TabSettings {
         let audio = audio::tab_view(&self.audio, facts, container, &self.summary.audio_codec);
         let subtitles = subtitles::tab_view(&self.subtitles, facts, container);
         let chapters = chapters::tab_view(&self.chapters, facts);
-        let metadata = metadata::tab_view(&self.metadata, facts);
+        let metadata = metadata::tab_view(
+            &self.metadata,
+            facts,
+            compatibility::container_of(&self.summary.container).unwrap_or(ContainerFormat::Mkv),
+        );
 
         // Each tab is listed in one place: its identifier, its label, and whether
         // anything on it still has to be fixed.
