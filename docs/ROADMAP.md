@@ -439,7 +439,9 @@ Preset descriptions are localized the same way and for the same reason. The cata
 
 *Outcome: Media handling reaches the reference product's coverage in the areas still missing.*
 
-- [ ] DVD source support \(optional)- [ ] Blu-ray source support \(optional)- [x] Deblock filter
+- [ ] DVD source support `(optional)`
+- [ ] Blu-ray source support `(optional)`
+- [x] Deblock filter
 - [x] Lossless FFV1/PCM/FLAC MKV modes
 - [x] Dolby Vision profile and RPU handling
 - [x] HDR10+ dynamic metadata
