@@ -154,6 +154,41 @@ where
     }
 }
 
+/// Read a progress report, riding out a worker that is being replaced.
+///
+/// The supervisor restarts a worker that died, and the window simply asks for
+/// progress again. A client that happened to be mid-request across that handover
+/// sees a reset connection rather than a state, which says nothing about the
+/// behaviour under test. Retrying briefly mirrors what the window does, so a
+/// test is not failed by a restart it did not ask for.
+fn read_progress<F>(mut read: F, label: &str) -> ProgressReport
+where
+    F: FnMut() -> Result<ProgressReport, vise_ipc::client::ClientError>,
+{
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        match read() {
+            Ok(report) => return report,
+            Err(error) => {
+                if Instant::now() >= deadline {
+                    panic!("{label} could not be read for 30s: {error}");
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+    }
+}
+
+/// Progress of an encode, tolerating a worker handover.
+fn encode_progress(client: &WorkerClient) -> ProgressReport {
+    read_progress(|| client.poll_encode_progress(), "encode progress")
+}
+
+/// Progress of a scan, tolerating a worker handover.
+fn scan_progress(client: &WorkerClient) -> ProgressReport {
+    read_progress(|| client.poll_scan_progress(), "scan progress")
+}
+
 // ---------------------------------------------------------------------------
 // Crash isolation
 // ---------------------------------------------------------------------------
@@ -257,11 +292,7 @@ fn a_worker_killed_mid_encode_fails_only_its_job_and_the_next_job_still_runs() {
     client
         .start_scan(&scan_command(&source, &logs))
         .expect("StartScan");
-    poll_until(
-        || client.poll_scan_progress().expect("PollScanProgress"),
-        Duration::from_secs(60),
-        "scan",
-    );
+    poll_until(|| scan_progress(&client), Duration::from_secs(60), "scan");
 
     let job = |output: &Path| JobSpec {
         input_path: source.to_string_lossy().to_string(),
@@ -279,10 +310,7 @@ fn a_worker_killed_mid_encode_fails_only_its_job_and_the_next_job_still_runs() {
         })
         .expect("StartEncode");
     assert!(started.was_successful, "encode refused: {}", started.error);
-    wait_until_encoding(
-        || client.poll_encode_progress().expect("PollEncodeProgress"),
-        "job one",
-    );
+    wait_until_encoding(|| encode_progress(&client), "job one");
 
     // Kill the worker outright: no shutdown request, no chance to tidy up.
     let connection = supervisor.connection().expect("a running worker");
@@ -393,16 +421,13 @@ fn a_worker_killed_mid_encode_fails_only_its_job_and_the_next_job_still_runs() {
     // once the replacement has proved it is really encoding. What is being
     // asserted is that a fresh worker took the job on at all: the failure being
     // tested is the first worker dying, not this one finishing.
-    wait_until_encoding(
-        || next.poll_encode_progress().expect("PollEncodeProgress"),
-        "job two",
-    );
+    wait_until_encoding(|| encode_progress(&next), "job two");
     assert!(
         stop_when_ready(&next),
         "the replacement accepts the control routes"
     );
     let _ = poll_until(
-        || next.poll_encode_progress().expect("PollEncodeProgress"),
+        || encode_progress(&next),
         Duration::from_secs(60),
         "the second encode",
     );
@@ -423,11 +448,7 @@ fn a_user_requested_stop_is_not_reported_as_a_crash() {
     client
         .start_scan(&scan_command(&source, &logs))
         .expect("StartScan");
-    poll_until(
-        || client.poll_scan_progress().expect("PollScanProgress"),
-        Duration::from_secs(60),
-        "scan",
-    );
+    poll_until(|| scan_progress(&client), Duration::from_secs(60), "scan");
 
     let job = JobSpec {
         input_path: source.to_string_lossy().to_string(),
@@ -443,10 +464,7 @@ fn a_user_requested_stop_is_not_reported_as_a_crash() {
         })
         .expect("StartEncode");
     assert!(started.was_successful, "encode refused: {}", started.error);
-    wait_until_encoding(
-        || client.poll_encode_progress().expect("PollEncodeProgress"),
-        "the job",
-    );
+    wait_until_encoding(|| encode_progress(&client), "the job");
 
     // The user presses stop. The window records that before it asks the worker,
     // because the worker may be killed while the request is in flight.
@@ -458,7 +476,7 @@ fn a_user_requested_stop_is_not_reported_as_a_crash() {
     );
 
     let report = poll_until(
-        || client.poll_encode_progress().expect("PollEncodeProgress"),
+        || encode_progress(&client),
         Duration::from_secs(60),
         "the stopped encode",
     );
@@ -620,11 +638,7 @@ fn scan_contract_reports_titles_and_progress() {
         .expect("StartScan");
     assert!(started.was_successful, "scan refused: {}", started.error);
 
-    let report = poll_until(
-        || client.poll_scan_progress().expect("PollScanProgress"),
-        Duration::from_secs(60),
-        "scan",
-    );
+    let report = poll_until(|| scan_progress(&client), Duration::from_secs(60), "scan");
     assert!(
         report.work_done.as_ref().expect("WorkDone").was_successful,
         "scan failed: {report:?}"
@@ -692,11 +706,7 @@ fn encode_contract_runs_pauses_resumes_and_stops() {
             .expect("StartScan")
             .was_successful
     );
-    poll_until(
-        || client.poll_scan_progress().expect("PollScanProgress"),
-        Duration::from_secs(60),
-        "scan",
-    );
+    poll_until(|| scan_progress(&client), Duration::from_secs(60), "scan");
 
     let output = dir.join("out.mp4");
     let job = JobSpec {
@@ -722,14 +732,14 @@ fn encode_contract_runs_pauses_resumes_and_stops() {
     let mut pause_guard = ResumeGuard::new(&client);
     let mut paused = false;
     while Instant::now() < deadline {
-        let report = client.poll_encode_progress().expect("PollEncodeProgress");
+        let report = encode_progress(&client);
         if report.state != WorkState::Working {
             break;
         }
         match client.pause_encode() {
             Ok(result) if result.was_successful => {
                 pause_guard.armed = true;
-                let paused_report = client.poll_encode_progress().expect("PollEncodeProgress");
+                let paused_report = encode_progress(&client);
                 assert!(
                     paused_report
                         .working
@@ -750,7 +760,7 @@ fn encode_contract_runs_pauses_resumes_and_stops() {
     assert!(paused, "the encode finished before it could be paused");
 
     let report = poll_until(
-        || client.poll_encode_progress().expect("PollEncodeProgress"),
+        || encode_progress(&client),
         Duration::from_secs(180),
         "encode",
     );
@@ -785,7 +795,7 @@ fn encode_contract_stops_a_running_job() {
     let deadline = Instant::now() + Duration::from_secs(60);
     let mut stopped = false;
     while Instant::now() < deadline {
-        let report = client.poll_encode_progress().expect("PollEncodeProgress");
+        let report = encode_progress(&client);
         if report.state != WorkState::Working {
             break;
         }
@@ -800,7 +810,7 @@ fn encode_contract_stops_a_running_job() {
     assert!(stopped, "the encode finished before it could be stopped");
 
     let report = poll_until(
-        || client.poll_encode_progress().expect("PollEncodeProgress"),
+        || encode_progress(&client),
         Duration::from_secs(60),
         "encode",
     );
