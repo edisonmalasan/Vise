@@ -404,6 +404,22 @@ impl InitCommand {
         };
         Some(dir.join(name))
     }
+
+    /// Resolve the folder per-encode logs are written into.
+    ///
+    /// The session log and the per-encode logs share one folder, which is what
+    /// makes "open the folder and look at the last thing that happened" a thing
+    /// a person can do. The folder is resolved even when disk logging is
+    /// switched off, because a session log file name and a per-encode log
+    /// folder are both asked for by the same preference and a window that
+    /// resolved one and not the other would produce two answers to one question.
+    pub fn log_folder(&self) -> Option<std::path::PathBuf> {
+        let dir = self.log_directory.trim();
+        if dir.is_empty() {
+            return None;
+        }
+        Some(std::path::PathBuf::from(dir))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -751,5 +767,18 @@ mod tests {
         init.log_directory = "/tmp/vise-logs".into();
         let path = init.log_file_path().expect("path");
         assert!(path.to_string_lossy().contains("vise-logs"));
+        assert_eq!(init.log_folder(), Some(std::path::PathBuf::from("/tmp/vise-logs")));
+    }
+
+    #[test]
+    fn init_command_resolves_the_per_encode_log_folder() {
+        let mut init = InitCommand::default();
+        assert!(init.log_folder().is_none(), "no directory names no folder");
+        init.log_directory = "  /tmp/vise-logs  ".into();
+        assert_eq!(
+            init.log_folder(),
+            Some(std::path::PathBuf::from("/tmp/vise-logs")),
+            "the folder does not depend on whether the session log is enabled"
+        );
     }
 }

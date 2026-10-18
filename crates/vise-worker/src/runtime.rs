@@ -231,6 +231,7 @@ impl WorkerRuntime {
     pub fn apply_init(&self, init: &InitCommand) {
         self.logs.set_verbosity(init.log_verbosity);
         self.logs.set_disk_target(init.log_file_path());
+        self.logs.set_log_folder(init.log_folder());
         for note in init.unsupported_notes() {
             self.logs.warn(note);
         }
