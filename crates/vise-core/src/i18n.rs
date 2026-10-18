@@ -580,11 +580,45 @@ pub enum MessageKey {
     CliRenamingOutput,
     /// The batch finished with failures. Takes `{summary}`.
     CliBatchFailures,
+    /// The diagnostics window title.
+    DiagnosticsTitle,
+    /// The quality sweep tool.
+    DiagnosticsSweep,
+    /// The hardware capability report.
+    DiagnosticsCapabilities,
+    /// The per-encode log files.
+    DiagnosticsEncodeLogs,
+    /// The bundle of reports.
+    DiagnosticsBundle,
+    /// Start a quality sweep.
+    DiagnosticsStartSweep,
+    /// Stop a quality sweep.
+    DiagnosticsCancelSweep,
+    /// Write the queue's results out.
+    DiagnosticsExportResults,
+    /// Write the capability report out.
+    DiagnosticsExportCapabilities,
+    /// Build the diagnostic bundle.
+    DiagnosticsExportBundle,
+    /// Ask the machine what it can do again.
+    DiagnosticsRecheck,
+    /// The column a sweep result's quality value sits under.
+    DiagnosticsQuality,
+    /// The column a sweep result's size sits under.
+    DiagnosticsSize,
+    /// The column a sweep result's size against the smallest run sits under.
+    DiagnosticsRelative,
+    /// Confirm a range wider than this build will sweep on its own.
+    DiagnosticsConfirmSweep,
+    /// Write the queue's results out as a spreadsheet.
+    DiagnosticsExportResultsCsv,
+    /// Write the queue's results out for a program.
+    DiagnosticsExportResultsJson,
 }
 
 impl MessageKey {
     /// Every key, in the order the files are written in.
-    pub const ALL: [MessageKey; 76] = [
+    pub const ALL: [MessageKey; 93] = [
         MessageKey::AppTitle,
         MessageKey::AppTagline,
         MessageKey::CommonOk,
@@ -661,6 +695,23 @@ impl MessageKey {
         MessageKey::CliRemovingOutput,
         MessageKey::CliRenamingOutput,
         MessageKey::CliBatchFailures,
+        MessageKey::DiagnosticsTitle,
+        MessageKey::DiagnosticsSweep,
+        MessageKey::DiagnosticsCapabilities,
+        MessageKey::DiagnosticsEncodeLogs,
+        MessageKey::DiagnosticsBundle,
+        MessageKey::DiagnosticsStartSweep,
+        MessageKey::DiagnosticsCancelSweep,
+        MessageKey::DiagnosticsExportResults,
+        MessageKey::DiagnosticsExportCapabilities,
+        MessageKey::DiagnosticsExportBundle,
+        MessageKey::DiagnosticsRecheck,
+        MessageKey::DiagnosticsQuality,
+        MessageKey::DiagnosticsSize,
+        MessageKey::DiagnosticsRelative,
+        MessageKey::DiagnosticsConfirmSweep,
+        MessageKey::DiagnosticsExportResultsCsv,
+        MessageKey::DiagnosticsExportResultsJson,
     ];
 
     /// The identifier the locale files use.
@@ -724,7 +775,7 @@ impl MessageKey {
 ///
 /// The length is checked against [`MessageKey::ALL`] by a test rather than by
 /// the type system, because an array length is not part of an enum's identity.
-const NAMES: [&str; 76] = [
+const NAMES: [&str; 93] = [
     "app.title",
     "app.tagline",
     "common.ok",
@@ -801,6 +852,23 @@ const NAMES: [&str; 76] = [
     "cli.removingOutput",
     "cli.renamingOutput",
     "cli.batchFailures",
+    "diagnostics.title",
+    "diagnostics.sweep",
+    "diagnostics.capabilities",
+    "diagnostics.encodeLogs",
+    "diagnostics.bundle",
+    "diagnostics.startSweep",
+    "diagnostics.cancelSweep",
+    "diagnostics.exportResults",
+    "diagnostics.exportCapabilities",
+    "diagnostics.exportBundle",
+    "diagnostics.recheck",
+    "diagnostics.quality",
+    "diagnostics.size",
+    "diagnostics.relative",
+    "diagnostics.confirmSweep",
+    "diagnostics.exportResultsCsv",
+    "diagnostics.exportResultsJson",
 ];
 
 /// Upper-case the first letter of a word, leaving the rest as written.

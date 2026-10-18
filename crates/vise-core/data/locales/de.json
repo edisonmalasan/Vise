@@ -84,5 +84,22 @@
   "cli.transcodeFailed": "Die Umwandlung ist fehlgeschlagen: {problem}",
   "cli.removingOutput": "Die alte Ausgabe konnte nicht entfernt werden: {problem}",
   "cli.renamingOutput": "Die Ausgabe konnte nicht an ihren Platz bewegt werden: {problem}",
-  "cli.batchFailures": "Der Stapel endete mit Fehlern: {summary}"
+  "cli.batchFailures": "Der Stapel endete mit Fehlern: {summary}",
+  "diagnostics.title": "Diagnose",
+  "diagnostics.sweep": "Qualitätsdurchlauf",
+  "diagnostics.capabilities": "Hardware-Fähigkeiten",
+  "diagnostics.encodeLogs": "Kodierprotokolle",
+  "diagnostics.bundle": "Diagnosepaket",
+  "diagnostics.startSweep": "Durchlauf starten",
+  "diagnostics.cancelSweep": "Durchlauf abbrechen",
+  "diagnostics.exportResults": "Ergebnisse exportieren",
+  "diagnostics.exportCapabilities": "Fähigkeiten exportieren",
+  "diagnostics.exportBundle": "Paket erstellen",
+  "diagnostics.recheck": "Erneut prüfen",
+  "diagnostics.quality": "Qualität",
+  "diagnostics.size": "Größe",
+  "diagnostics.relative": "Relativ",
+  "diagnostics.confirmSweep": "Diesen weiteren Bereich verwenden",
+  "diagnostics.exportResultsCsv": "CSV exportieren",
+  "diagnostics.exportResultsJson": "JSON exportieren"
 }

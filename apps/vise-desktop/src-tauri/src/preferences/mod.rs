@@ -223,6 +223,22 @@ impl PreferencesSettings {
         }
     }
 
+    /// The same command, with the worker told where to write its logs.
+    ///
+    /// The folder is the one the storage rules resolved, so a portable install's
+    /// worker logs beside the executable and an installed one's logs stay in the
+    /// configuration directory. The worker is told the folder rather than a file
+    /// because it writes two kinds of file into it — one per session and one per
+    /// encode — and a worker given a single file name would have to guess the
+    /// second convention.
+    pub fn to_worker_init_in(&self, log_folder: &Path) -> vise_ipc::contract::InitCommand {
+        let mut init = self.to_worker_init();
+        init.enable_disk_logging = true;
+        init.log_directory = log_folder.to_string_lossy().to_string();
+        init.log_file = String::new();
+        init
+    }
+
     /// Whether a source should be scanned the moment it is opened.
     pub fn scans_on_open(&self) -> bool {
         self.general.scan_on_open

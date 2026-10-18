@@ -404,6 +404,22 @@ impl InitCommand {
         };
         Some(dir.join(name))
     }
+
+    /// Resolve the folder per-encode logs are written into.
+    ///
+    /// The session log and the per-encode logs share one folder, which is what
+    /// makes "open the folder and look at the last thing that happened" a thing
+    /// a person can do. The folder is resolved even when disk logging is
+    /// switched off, because a session log file name and a per-encode log
+    /// folder are both asked for by the same preference and a window that
+    /// resolved one and not the other would produce two answers to one question.
+    pub fn log_folder(&self) -> Option<std::path::PathBuf> {
+        let dir = self.log_directory.trim();
+        if dir.is_empty() {
+            return None;
+        }
+        Some(std::path::PathBuf::from(dir))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -618,6 +634,14 @@ pub struct LogMessagesFromIndex {
     pub next_index: usize,
     /// Whether older entries were dropped before `next_index`.
     pub truncated: bool,
+    /// Which worker this page came from, and which buffer it is.
+    ///
+    /// A caller that has been paging one worker cannot page another by index
+    /// alone: a worker that was replaced starts numbering at zero again, so its
+    /// first page looks exactly like a worker that simply has nothing new to
+    /// say. This is what tells the two apart. It is `pid:resets`, so it changes
+    /// when the process changes and again whenever the buffer is cleared.
+    pub session: String,
 }
 
 /// Reply from the loopback banner route.
@@ -751,5 +775,41 @@ mod tests {
         init.log_directory = "/tmp/vise-logs".into();
         let path = init.log_file_path().expect("path");
         assert!(path.to_string_lossy().contains("vise-logs"));
+        assert_eq!(
+            init.log_folder(),
+            Some(std::path::PathBuf::from("/tmp/vise-logs"))
+        );
+    }
+
+    #[test]
+    fn init_command_resolves_the_per_encode_log_folder() {
+        let mut init = InitCommand::default();
+        assert!(init.log_folder().is_none(), "no directory names no folder");
+        init.log_directory = "  /tmp/vise-logs  ".into();
+        assert_eq!(
+            init.log_folder(),
+            Some(std::path::PathBuf::from("/tmp/vise-logs")),
+            "the folder does not depend on whether the session log is enabled"
+        );
+    }
+
+    #[test]
+    fn a_log_page_names_the_worker_it_came_from() {
+        // The field is what lets a caller notice that the worker under it was
+        // replaced, so it has to be present and has to survive the round trip.
+        let page = LogMessagesFromIndex {
+            messages: vec![LogMessage {
+                log_level: LogLevel::Info,
+                message: "a line".into(),
+                index: 0,
+            }],
+            next_index: 1,
+            truncated: false,
+            session: "4242:0".into(),
+        };
+        let json = serde_json::to_string(&page).expect("page");
+        assert!(json.contains("\"Session\":\"4242:0\""), "{json}");
+        let back: LogMessagesFromIndex = serde_json::from_str(&json).expect("decode");
+        assert_eq!(back, page);
     }
 }

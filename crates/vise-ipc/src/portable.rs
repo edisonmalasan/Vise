@@ -233,6 +233,14 @@ pub const SETTINGS_FILE: &str = "settings.json";
 pub const QUEUE_FILE: &str = "queue.json";
 /// Conventional file name of the preset library.
 pub const PRESETS_FILE: &str = "presets.json";
+/// Conventional folder name of the per-encode log files.
+///
+/// Unlike the other three kinds this one names a *folder* rather than a single
+/// document, because there is one log per encode and no single file that is the
+/// log. The `file` member of a `StorageLocation` for this kind is therefore the
+/// folder itself, and the member is still named after where it is rather than
+/// after what it is so that one list describes every kind.
+pub const LOGS_FOLDER: &str = "logs";
 
 /// What one kind of state is stored as.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -243,6 +251,8 @@ pub enum StorageKind {
     Queue,
     /// The user's own presets.
     Presets,
+    /// One log file per encode, written by the worker.
+    Logs,
 }
 
 impl StorageKind {
@@ -255,6 +265,7 @@ impl StorageKind {
             StorageKind::Settings => "storage.settings.directory",
             StorageKind::Queue => "storage.queue.directory",
             StorageKind::Presets => "storage.presets.directory",
+            StorageKind::Logs => "storage.logs.directory",
         }
     }
 
@@ -264,14 +275,21 @@ impl StorageKind {
             StorageKind::Settings => SETTINGS_FILE,
             StorageKind::Queue => QUEUE_FILE,
             StorageKind::Presets => PRESETS_FILE,
+            StorageKind::Logs => LOGS_FOLDER,
         }
     }
 
+    /// Whether this kind's stored item is a folder rather than a document.
+    pub const fn is_folder(self) -> bool {
+        matches!(self, StorageKind::Logs)
+    }
+
     /// Every kind, so the rules can be checked for all of them at once.
-    pub const ALL: [StorageKind; 3] = [
+    pub const ALL: [StorageKind; 4] = [
         StorageKind::Settings,
         StorageKind::Queue,
         StorageKind::Presets,
+        StorageKind::Logs,
     ];
 }
 
@@ -306,6 +324,11 @@ pub struct StorageRoots {
     pub queue: StorageLocation,
     /// Where the preset library lives.
     pub presets: StorageLocation,
+    /// Where the per-encode log folder lives.
+    ///
+    /// The `file` member of this location is the folder itself; see
+    /// [`StorageKind::Logs`].
+    pub logs: StorageLocation,
     /// Anything that was refused, in the order it was found.
     pub refusals: Vec<String>,
 }
@@ -330,6 +353,7 @@ impl Default for StorageRoots {
             settings: place(StorageKind::Settings),
             queue: place(StorageKind::Queue),
             presets: place(StorageKind::Presets),
+            logs: place(StorageKind::Logs),
             refusals: Vec::new(),
         }
     }
@@ -342,6 +366,7 @@ impl StorageRoots {
             StorageKind::Settings => &self.settings,
             StorageKind::Queue => &self.queue,
             StorageKind::Presets => &self.presets,
+            StorageKind::Logs => &self.logs,
         }
     }
 
@@ -435,6 +460,10 @@ pub fn resolve_storage(
             } else {
                 portable_root.join(candidate)
             };
+            // A folder kind names its own folder rather than a document inside
+            // one, so the resolved `file` is the folder the log files live in.
+            // The `directory` is still where the operator pointed, which is what
+            // the rest of the resolution rules are about.
             return StorageLocation {
                 file: directory.join(kind.file_name()),
                 directory,
@@ -452,12 +481,14 @@ pub fn resolve_storage(
     let settings_location = resolve(StorageKind::Settings);
     let queue = resolve(StorageKind::Queue);
     let presets = resolve(StorageKind::Presets);
+    let logs = resolve(StorageKind::Logs);
     StorageRoots {
         portable,
         root: base.to_path_buf(),
         settings: settings_location,
         queue,
         presets,
+        logs,
         refusals,
     }
 }
@@ -648,6 +679,44 @@ mod tests {
         assert_eq!(
             roots.of(StorageKind::Presets).file,
             PathBuf::from("/media/stick/vise/presets.json")
+        );
+        assert_eq!(
+            roots.of(StorageKind::Logs).file,
+            PathBuf::from("/media/stick/vise/logs"),
+            "per-encode logs travel with a portable install"
+        );
+        assert!(StorageKind::Logs.is_folder());
+    }
+
+    #[test]
+    fn the_log_folder_can_be_pointed_somewhere_else_on_its_own() {
+        // A machine with a small system drive and a large scratch one keeps its
+        // logs on the large one without moving the rest of its state.
+        let roots = resolve_storage(
+            &settings_from(
+                "storage.directory = data\nstorage.logs.directory = scratch\n",
+                true,
+            ),
+            Path::new("/media/stick/vise"),
+            Path::new("/home/user/.config/vise"),
+        );
+        assert_eq!(
+            roots.logs.file,
+            PathBuf::from("/media/stick/vise/scratch/logs"),
+            "the logs folder is inside the directory the operator pointed at"
+        );
+        assert_eq!(
+            roots.logs.directory,
+            PathBuf::from("/media/stick/vise/scratch"),
+            "the directory is where the operator pointed"
+        );
+        assert_eq!(
+            roots.logs.from_key.as_deref(),
+            Some("storage.logs.directory")
+        );
+        assert_eq!(
+            roots.settings.file,
+            PathBuf::from("/media/stick/vise/data/settings.json")
         );
     }
 

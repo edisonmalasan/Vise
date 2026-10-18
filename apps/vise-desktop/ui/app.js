@@ -800,11 +800,17 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         state.preferences = view;
         paintPreferences(shell, view);
       });
+    },
+    diagnostics: function (shell) {
+      return call("diagnostics_window").then(function (view) {
+        state.diagnostics = view;
+        paintDiagnostics(shell, view);
+      });
     }
   };
 
   /* Which surfaces keep themselves up to date while they are open. */
-  var POLLED = { queue: 1500, error: 1500, activity: 1500 };
+  var POLLED = { queue: 1500, error: 1500, activity: 1500, diagnostics: 2000 };
 
   function shellOf(id) {
     return el("surface-" + id);
@@ -1564,6 +1570,226 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     if (view.follow) {
       list.scrollTop = list.scrollHeight;
     }
+  }
+
+  /* ----------------------------------------------------------- diagnostics */
+
+  /* The diagnostics window.
+   *
+   * Five things, in the order somebody reaches for them: the per-encode logs,
+   * what the machine can do, the quality sweep, the reports already written, and
+   * the bundle. Every sentence, every refusal, and every number is composed by
+   * the window; this only puts them on the page and sends back the range the
+   * three fields describe.
+   */
+  function paintDiagnostics(shell, view) {
+    var host = bodyOf(shell);
+    clear(host);
+    host.appendChild(para(view.summary, "surface-summary"));
+
+    host.appendChild(sectionTitle("diagnostics.encodeLogs"));
+    host.appendChild(para(view.logsSummary));
+    host.appendChild(para(view.logFolder, "hint"));
+    if ((view.encodeLogs || []).length) {
+      var logs = node("div", "logs");
+      logs.id = "diagnosticsEncodeLogs";
+      logs.setAttribute("role", "list");
+      view.encodeLogs.forEach(function (log) {
+        var entry = node("div", "log-line");
+        entry.setAttribute("role", "listitem");
+        entry.dataset.tone = log.kept ? "info" : "warn";
+        entry.appendChild(node("span", "log-message", log.name));
+        entry.appendChild(node("span", "log-level", log.sizeLabel));
+        logs.appendChild(entry);
+      });
+      host.appendChild(logs);
+    } else {
+      host.appendChild(emptyNote(strings("diagnostics.encodeLogs")));
+    }
+
+    host.appendChild(sectionTitle("diagnostics.capabilities"));
+    var capabilities = node("div", "controls");
+    var recheck = button("diagnostics.recheck", function () {
+      call("detect_capabilities").then(function (answer) {
+        state.diagnostics = answer;
+        paintDiagnostics(shell, answer);
+      });
+    });
+    capabilities.appendChild(recheck);
+    var exportCapabilities = button("diagnostics.exportCapabilities", function () {
+      call("export_capabilities").then(function (answer) {
+        state.diagnostics = answer;
+        paintDiagnostics(shell, answer);
+      });
+    });
+    capabilities.appendChild(exportCapabilities);
+    host.appendChild(capabilities);
+    var capability = view.capability;
+    if (capability) {
+      host.appendChild(para(capability.summary));
+      if ((capability.notes || []).length) {
+        var notes = para("");
+        notes.dataset.tone = "warn";
+        notes.textContent = capability.notes.join(" ");
+        host.appendChild(notes);
+      }
+      host.appendChild(
+        para(
+          "Dolby Vision RPU: " +
+            (capability.dolbyVisionRpu ? "available" : "not available") +
+            " · HDR10+: " +
+            (capability.hdr10PlusSei ? "available" : "not available")
+        )
+      );
+    } else {
+      host.appendChild(emptyNote(strings("diagnostics.capabilities")));
+    }
+
+    host.appendChild(sectionTitle("diagnostics.sweep"));
+    var sweep = view.sweep || {};
+    var range = sweep.range || { from: 0, to: 0, step: 1 };
+    var controls = node("div", "controls");
+    var from = numberField("diagnosticsSweepFrom", String(range.from));
+    var to = numberField("diagnosticsSweepTo", String(range.to));
+    var step = numberField("diagnosticsSweepStep", String(range.step));
+    controls.appendChild(labelledField(strings("diagnostics.quality"), from, ""));
+    controls.appendChild(labelledField(strings("diagnostics.relative"), to, ""));
+    controls.appendChild(labelledField(strings("diagnostics.size"), step, ""));
+    function applyRange() {
+      call("set_sweep_range", {
+        from: Number(from.value) || 0,
+        to: Number(to.value) || 0,
+        step: Number(step.value) || 1
+      }).then(function (answer) {
+        state.diagnostics = answer;
+        paintDiagnostics(shell, answer);
+      });
+    }
+    from.onchange = applyRange;
+    to.onchange = applyRange;
+    step.onchange = applyRange;
+    host.appendChild(controls);
+    host.appendChild(para(sweep.planSummary || "", "hint"));
+    if (sweep.refusal) {
+      var refused = para(sweep.refusal, "notice");
+      refused.dataset.tone = "warn";
+      host.appendChild(refused);
+      host.appendChild(
+        textButton("diagnostics.confirmSweep", function () {
+          call("confirm_sweep_range", { confirmed: true }).then(function (answer) {
+            state.diagnostics = answer;
+            paintDiagnostics(shell, answer);
+          });
+        })
+      );
+    }
+    var sweepActions = node("div", "controls");
+    var start = button("diagnostics.startSweep", function () {
+      call("start_sweep").then(function (answer) {
+        state.diagnostics = answer;
+        paintDiagnostics(shell, answer);
+      });
+    });
+    start.disabled = !sweep.canStart;
+    if (!sweep.canStart) {
+      start.title = sweep.startReason || "";
+    }
+    sweepActions.appendChild(start);
+    var cancel = button("diagnostics.cancelSweep", function () {
+      call("cancel_sweep").then(function (answer) {
+        state.diagnostics = answer;
+        paintDiagnostics(shell, answer);
+      });
+    });
+    cancel.disabled = !(sweep.progress && sweep.progress.state !== "Idle" && !sweep.progress.cancelled);
+    sweepActions.appendChild(cancel);
+    host.appendChild(sweepActions);
+    host.appendChild(para((sweep.progress && sweep.progress.summary) || "", "hint"));
+    if ((sweep.rows || []).length) {
+      var table = node("table", "grid");
+      var head = node("tr");
+      [strings("diagnostics.quality"), strings("diagnostics.size"), strings("diagnostics.relative")].forEach(
+        function (name) {
+          head.appendChild(node("th", null, name));
+        }
+      );
+      table.appendChild(head);
+      sweep.rows.forEach(function (row) {
+        var line = node("tr");
+        line.dataset.tone = row.succeeded ? "info" : "warn";
+        line.appendChild(node("td", null, String(row.quality)));
+        line.appendChild(node("td", null, row.sizeLabel));
+        line.appendChild(node("td", null, row.relativeLabel));
+        table.appendChild(line);
+      });
+      host.appendChild(table);
+    }
+    host.appendChild(para(sweep.resultsSummary || "", "hint"));
+
+    host.appendChild(sectionTitle("diagnostics.bundle"));
+    var reports = node("div", "controls");
+    ["csv", "json"].forEach(function (format) {
+      reports.appendChild(
+        button("diagnostics.exportResults." + format, function () {
+          call("export_queue_results", { format: format }).then(function (answer) {
+            state.diagnostics = answer;
+            paintDiagnostics(shell, answer);
+          });
+        })
+      );
+    });
+    reports.appendChild(
+      button("diagnostics.exportBundle", function () {
+        call("export_diagnostics").then(function (answer) {
+          state.diagnostics = answer;
+          paintDiagnostics(shell, answer);
+        });
+      })
+    );
+    host.appendChild(reports);
+    (view.reports || []).forEach(function (report) {
+      var line = para(report.summary + " — " + report.path);
+      if (!report.written) {
+        line.dataset.tone = "warn";
+      }
+      host.appendChild(line);
+    });
+  }
+
+  function sectionTitle(key) {
+    var heading = node("h3", null, strings(key));
+    heading.dataset.section = key;
+    return heading;
+  }
+
+  function numberField(id, value) {
+    var input = node("input");
+    input.type = "number";
+    input.id = id;
+    input.value = value;
+    return input;
+  }
+
+  /* A labelled control whose text comes from the window's catalog. */
+  function button(key, onUse) {
+    var made = node("button", null, strings(key));
+    made.type = "button";
+    made.setAttribute("data-message", key);
+    made.onclick = onUse;
+    return made;
+  }
+
+  function textButton(key, onUse) {
+    var made = button(key, onUse);
+    made.className = "quiet";
+    return made;
+  }
+
+  /* One message from the window's catalog, or nothing when there is no catalog
+     yet. A page that has not been told the language yet keeps whatever the
+     window gave it, which is why this never writes an identifier. */
+  function strings(key) {
+    return (state.strings && state.strings[key]) || "";
   }
 
   /* ----------------------------------------------------------------- preview */

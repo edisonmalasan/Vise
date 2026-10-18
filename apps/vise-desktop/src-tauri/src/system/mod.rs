@@ -19,10 +19,12 @@
 //! window closes.
 
 pub mod actions;
+pub mod bundle;
 pub mod diskspace;
 pub mod notify;
 pub mod persistence;
 pub mod power;
+pub mod results;
 pub mod tray;
 pub mod updates;
 

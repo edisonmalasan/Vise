@@ -14,14 +14,17 @@
 //! - [`client`] — loopback HTTP client with typed command wrappers.
 //! - [`supervisor`] — worker process lifecycle, handshake, and restart.
 //! - [`portable`] — portable-mode file: the process-isolation switch and where
-//!   the settings, the queue, and the presets are written.
+//!   the settings, the queue, the presets, and the logs are written.
 //! - [`power`] — holding the machine awake while an encode runs.
 //! - [`numa`] — what the processor layout is, and where the worker is put.
+//! - [`enclog`] — per-encode log file names and the rotation policy that keeps
+//!   the log folder inside its bounds.
 
 pub mod api;
 pub mod base64;
 pub mod client;
 pub mod contract;
+pub mod enclog;
 pub mod http;
 pub mod numa;
 pub mod portable;

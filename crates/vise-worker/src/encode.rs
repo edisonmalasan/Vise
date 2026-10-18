@@ -278,6 +278,13 @@ impl EncodeService {
 
         self.logs
             .info(format!("encode started for {}", job.input_path));
+        // The per-encode log is opened here, before any work happens, so that
+        // the reason a job was *refused* is in the same file as the reason it
+        // failed. A log that starts when the encoder starts cannot answer "why
+        // did this one not run".
+        if let Some(path) = self.logs.begin_encode(&encode_log_label(job)) {
+            self.logs.info(format!("encoding log: {}", path.display()));
+        }
         // The hold is taken here, after the job has been accepted and before any
         // work happens, and released on every path out of the encode thread. An
         // encode that never started cannot need a machine held awake for it.
@@ -617,10 +624,51 @@ fn finish(inner: &Arc<Mutex<EncodeSlot>>, done: WorkDone, logs: &LogService, mes
         vise_ipc::contract::LogLevel::Warning
     };
     logs.log(level, message.to_string());
+    // Closing the encode log and trimming the folder happen here rather than on
+    // a timer, so the file is never rotated while something is being written to
+    // it, and a worker that is not encoding never spends time on housekeeping.
+    // It runs before the level is chosen so that a log about the log lands in
+    // the session file only, after the encode file is closed.
+    close_encode_log(logs);
     let mut slot = lock(inner);
     slot.state = WorkState::WorkDone;
     slot.progress.paused = false;
     slot.done = done;
+}
+
+/// Close the running encode's log and record what the folder looks like now.
+fn close_encode_log(logs: &LogService) {
+    let report = logs.end_encode();
+    if let Some(problem) = report.problem {
+        logs.warn(format!("encode logs could not be trimmed: {problem}"));
+    }
+    if !report.removed.is_empty() {
+        logs.info(format!(
+            "trimmed {} older encode log(s), {} file(s) and {} byte(s) remain",
+            report.removed.len(),
+            report.kept,
+            report.bytes_kept
+        ));
+    }
+}
+
+/// The name one encode's log file is written under.
+///
+/// The output file is preferred because that is what the person queueing the
+/// job recognises; the input is the fallback for a job whose output has not been
+/// decided yet, and the last resort keeps the file name usable rather than
+/// refusing to log.
+pub fn encode_log_label(job: &JobSpec) -> String {
+    let stem = |path: &str| {
+        std::path::Path::new(path)
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .map(|stem| stem.to_string())
+    };
+    stem(&job.output_path)
+        .or_else(|| stem(&job.input_path))
+        .filter(|stem| !stem.trim().is_empty())
+        .unwrap_or_else(|| "job".to_string())
 }
 
 /// Temporary output path used while an encode runs.
@@ -732,6 +780,25 @@ mod tests {
         let rewritten = rewrite_output(&args, Path::new("out.part.mp4"));
         assert_eq!(rewritten[..3], args[..3]);
         assert_eq!(rewritten[3], "out.part.mp4");
+    }
+
+    #[test]
+    fn an_encode_log_is_named_after_the_output_the_user_recognises() {
+        let job = JobSpec {
+            input_path: "C:\\media\\raw.mkv".into(),
+            output_path: "D:\\out\\Episode 1.mkv".into(),
+            ..JobSpec::default()
+        };
+        assert_eq!(encode_log_label(&job), "Episode 1");
+
+        // A job with no destination yet still gets a usable name rather than an
+        // empty one, because the log is opened before the job is refused.
+        let unnamed = JobSpec {
+            input_path: "C:\\media\\raw.mkv".into(),
+            ..JobSpec::default()
+        };
+        assert_eq!(encode_log_label(&unnamed), "raw");
+        assert_eq!(encode_log_label(&JobSpec::default()), "job");
     }
 
     #[test]

@@ -84,5 +84,22 @@
   "cli.transcodeFailed": "変換に失敗しました: {problem}",
   "cli.removingOutput": "以前の出力ファイルを削除できませんでした: {problem}",
   "cli.renamingOutput": "出力ファイルを所定の位置に移動できませんでした: {problem}",
-  "cli.batchFailures": "一括処理が失敗で終わりました: {summary}"
+  "cli.batchFailures": "一括処理が失敗で終わりました: {summary}",
+  "diagnostics.title": "診断",
+  "diagnostics.sweep": "品質スイープ",
+  "diagnostics.capabilities": "ハードウェア機能",
+  "diagnostics.encodeLogs": "エンコードログ",
+  "diagnostics.bundle": "診断バンドル",
+  "diagnostics.startSweep": "スイープを開始",
+  "diagnostics.cancelSweep": "スイープを中止",
+  "diagnostics.exportResults": "結果を書き出す",
+  "diagnostics.exportCapabilities": "機能情報を書き出す",
+  "diagnostics.exportBundle": "バンドルを作成",
+  "diagnostics.recheck": "再チェック",
+  "diagnostics.quality": "品質",
+  "diagnostics.size": "サイズ",
+  "diagnostics.relative": "相対値",
+  "diagnostics.confirmSweep": "この広い範囲を使う",
+  "diagnostics.exportResultsCsv": "CSV を書き出す",
+  "diagnostics.exportResultsJson": "JSON を書き出す"
 }

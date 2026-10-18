@@ -14,6 +14,7 @@
 //! worker for stills; all of that is arranged in `main.rs`, and every decision
 //! those surfaces make is a plain function or method covered by unit tests.
 
+pub mod diagnostics;
 pub mod dialogs;
 pub mod log;
 pub mod presets;
@@ -202,6 +203,13 @@ pub fn surfaces() -> Vec<SurfaceSpec> {
             "Everything this window is configured with, one tab at a time.",
             &format!("{}close", crate::preferences::SURFACE),
         ),
+        SurfaceSpec::of(
+            SurfaceKind::Window,
+            diagnostics::SURFACE,
+            "Diagnostics",
+            "Encode logs, hardware capabilities, a quality sweep, and a report bundle.",
+            &format!("{}close", diagnostics::SURFACE),
+        ),
     ]
 }
 
@@ -327,7 +335,7 @@ mod tests {
     #[test]
     fn every_surface_carries_the_focus_and_escape_rules_the_page_needs() {
         let all = surfaces();
-        assert_eq!(all.len(), 9);
+        assert_eq!(all.len(), 10);
         for spec in &all {
             assert!(!spec.id.is_empty());
             assert!(!spec.label.is_empty());

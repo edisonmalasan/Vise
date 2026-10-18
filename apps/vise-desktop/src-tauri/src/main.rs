@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::IsMenuItem;
@@ -49,6 +49,7 @@ use tabs::{
 use viewmodel::{
     RangeSelection, ScanPhase, ScanProgressViewModel, SelectionViewModel, TrackSelectionInput,
 };
+use windows::diagnostics::{DiagnosticsState, DiagnosticsViewModel, ReportViewModel};
 use windows::dialogs::{self, AboutViewModel, AlertAction, AlertState, ErrorState, ErrorViewModel};
 use windows::log::ActivityLog;
 use windows::presets::{PresetAction, PresetInput, PresetState};
@@ -180,6 +181,9 @@ struct DesktopState {
     queue_pause: Option<String>,
     /// Where the preferences and the queue are written.
     storage: vise_ipc::portable::StorageRoots,
+    /// The diagnostics surface: per-encode logs, the hardware report, the
+    /// quality sweep, and the reports this window has produced.
+    diagnostics: DiagnosticsState,
     /// Whether the window is on screen and in front.
     ///
     /// An observation rather than a preference, and it is the difference between a
@@ -1032,11 +1036,12 @@ impl ScanOptions {
         &self,
         paths: Vec<String>,
         settings: &PreferencesSettings,
+        log_folder: &Path,
     ) -> Result<ScanCommand, String> {
         Ok(ScanCommand {
             initialise_command: InitCommand {
                 keep_duplicate_titles: settings.general.keep_duplicate_titles,
-                ..settings.to_worker_init()
+                ..settings.to_worker_init_in(log_folder)
             },
             paths,
             // The preview window owns how many stills a scan extracts once the
@@ -1206,7 +1211,8 @@ fn begin_scan_with(
         options.preview_count = Some(guard.preview.still_count());
     }
     let settings = guard.preferences.settings().clone();
-    let command = options.to_command(vec![source.path.clone()], &settings)?;
+    let log_folder = guard.storage.logs.file.clone();
+    let command = options.to_command(vec![source.path.clone()], &settings, &log_folder)?;
     match worker {
         Some(client) => {
             let started = client.start_scan(&command).map_err(|e| e.to_string())?;
@@ -2485,12 +2491,17 @@ fn run_through_worker(shared: SharedState, client: WorkerClient, id: JobId, spec
     push_log(&shared, format!("encoding job {}", id));
     let settings = shared
         .lock()
-        .map(|guard| guard.preferences.settings().clone())
+        .map(|guard| {
+            (
+                guard.preferences.settings().clone(),
+                guard.storage.logs.file.clone(),
+            )
+        })
         .unwrap_or_default();
     let command = EncodeCommand {
         // The same initialise command a scan would send, so a preference that
         // was changed between the last scan and this encode takes effect on it.
-        initialise_command: settings.to_worker_init(),
+        initialise_command: settings.0.to_worker_init_in(&settings.1),
         encode_job: spec.clone(),
     };
     match client.start_encode(&command) {
@@ -2812,6 +2823,485 @@ fn clear_logs(state: State<'_, SharedState>) -> Result<windows::log::ActivityVie
         "cleared {cleared} line(s) from the activity window"
     ));
     Ok(guard.activity.view())
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostics and developer tools
+// ---------------------------------------------------------------------------
+
+/// The per-encode log files as the worker left them.
+///
+/// The folder is read here rather than asked of the worker: the worker owns
+/// writing them, and the rule about which of them survive is the same pure
+/// policy the worker applied, so asking again would be a second opinion rather
+/// than a second measurement.
+fn encode_log_files(state: &SharedState) -> Vec<vise_ipc::enclog::LogFile> {
+    let Some(folder) = state
+        .lock()
+        .ok()
+        .map(|guard| guard.diagnostics.log_folder().clone())
+    else {
+        return Vec::new();
+    };
+    vise_ipc::enclog::list_encode_logs(&folder, vise_ipc::enclog::now_seconds())
+}
+
+/// Whether the real queue has an encode running.
+fn queue_is_running(guard: &DesktopState) -> bool {
+    !guard.queue.active(guard.session.jobs()).is_empty()
+}
+
+/// The diagnostics surface, as the page renders it.
+#[tauri::command]
+fn diagnostics_window(state: State<'_, SharedState>) -> Result<DiagnosticsViewModel, String> {
+    let files = encode_log_files(&state);
+    let guard = state.lock().map_err(|e| e.to_string())?;
+    Ok(guard.diagnostics.view(
+        &files,
+        &vise_ipc::enclog::RotationPolicy::default(),
+        queue_is_running(&guard),
+    ))
+}
+
+/// Choose the quality range the next sweep would use.
+#[tauri::command]
+fn set_sweep_range(
+    state: State<'_, SharedState>,
+    from: u32,
+    to: u32,
+    step: u32,
+) -> Result<DiagnosticsViewModel, String> {
+    let range = vise_core::SweepRange::new(from, to, step);
+    let files = encode_log_files(&state);
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let base = sweep_base_job(&guard);
+    let folder = sweep_output_folder(&guard);
+    guard.diagnostics.set_range(range);
+    guard.diagnostics.set_base_job(base);
+    guard.diagnostics.set_output_folder(folder);
+    let running = queue_is_running(&guard);
+    Ok(guard.diagnostics.view(
+        &files,
+        &vise_ipc::enclog::RotationPolicy::default(),
+        running,
+    ))
+}
+
+/// Confirm a range wider than this build will sweep on its own.
+#[tauri::command]
+fn confirm_sweep_range(
+    state: State<'_, SharedState>,
+    confirmed: bool,
+) -> Result<DiagnosticsViewModel, String> {
+    let files = encode_log_files(&state);
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.diagnostics.set_confirmed(confirmed);
+    Ok(guard.diagnostics.view(
+        &files,
+        &vise_ipc::enclog::RotationPolicy::default(),
+        queue_is_running(&guard),
+    ))
+}
+
+/// The job a sweep's runs are copies of: the one that is loaded right now.
+///
+/// Built from the current tabs exactly as a queued job is, so a sweep measures
+/// the settings the user has actually chosen rather than a default set. The
+/// destination is inside the sweep's own folder, and each run replaces it with
+/// one of its own.
+fn sweep_base_job(guard: &DesktopState) -> JobSpec {
+    let Some(source) = guard.flow.source().map(|source| source.path.clone()) else {
+        return JobSpec::default();
+    };
+    let facts = title_facts(guard);
+    let hardware =
+        preferences::hardware::to_hardware_options(&guard.preferences.settings().hardware);
+    let stem = Path::new(&source)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .filter(|stem| !stem.trim().is_empty())
+        .unwrap_or("title");
+    let extension = output_extension(guard);
+    let extension = if extension.is_empty() {
+        "mkv".to_string()
+    } else {
+        extension
+    };
+    let output = format!(
+        "{}\\{stem}.{extension}",
+        vise_core::sweep::sweep_folder(&sweep_output_folder(guard))
+    );
+    guard
+        .tabs
+        .to_job_spec(&source, &output, &facts, &hardware)
+        .unwrap_or_default()
+}
+
+/// Where a sweep's runs are written: the chosen output folder, or beside it.
+fn sweep_output_folder(guard: &DesktopState) -> String {
+    let folder = guard
+        .preferences
+        .settings()
+        .output
+        .folder
+        .trim()
+        .to_string();
+    if folder.is_empty() {
+        std::env::temp_dir().to_string_lossy().to_string()
+    } else {
+        folder
+    }
+}
+
+/// Start a quality sweep.
+///
+/// The sweep runs on its own thread and its own jobs, and it is refused while
+/// the queue has an encode running: two encodes on one machine would be a
+/// measurement of contention rather than of quality.
+#[tauri::command]
+fn start_sweep(state: State<'_, SharedState>) -> Result<DiagnosticsViewModel, String> {
+    let worker = worker_client(&state)?;
+    let Some(client) = worker else {
+        return Err(
+            "a quality sweep needs the worker process; switch process isolation back on to run one."
+                .to_string(),
+        );
+    };
+    let shared = state.inner().clone();
+    {
+        let mut guard = shared.lock().map_err(|e| e.to_string())?;
+        let base = sweep_base_job(&guard);
+        let folder = sweep_output_folder(&guard);
+        let running = queue_is_running(&guard);
+        guard.diagnostics.set_base_job(base);
+        guard.diagnostics.set_output_folder(folder);
+        if let Some(reason) = guard.diagnostics.sweep_refusal(running) {
+            return Err(reason);
+        }
+        guard.diagnostics.start_sweep()?;
+        let plan_summary = guard.diagnostics.plan().summary();
+        guard
+            .activity
+            .record(format!("started a quality sweep: {plan_summary}"));
+    }
+    thread::spawn(move || run_sweep(shared, client));
+    diagnostics_window(state)
+}
+
+/// Stop the sweep from handing out another run, and stop the run in flight.
+#[tauri::command]
+fn cancel_sweep(state: State<'_, SharedState>) -> Result<DiagnosticsViewModel, String> {
+    let worker = worker_client(&state)?;
+    {
+        let mut guard = state.lock().map_err(|e| e.to_string())?;
+        if !guard.diagnostics.cancel_sweep() {
+            return Err("there is no quality sweep to cancel.".to_string());
+        }
+        guard.activity.record("cancelled the quality sweep");
+    }
+    // A run already in flight is stopped at the worker rather than left to
+    // finish: the user asked for the sweep to stop, not for it to stop asking.
+    if let Some(client) = worker {
+        if let Ok(result) = client.stop_encode() {
+            if !result.was_successful {
+                push_log(
+                    &state,
+                    format!("the running sweep encode was not stopped: {}", result.error),
+                );
+            }
+        }
+    }
+    diagnostics_window(state)
+}
+
+/// Drive a sweep's runs, one at a time, through the worker.
+///
+/// The shape is the queue's own runner with the session left out of it: the
+/// same encode command, the same poll, and nothing written back to a job.
+fn run_sweep(shared: SharedState, client: WorkerClient) {
+    loop {
+        let (run, init) = {
+            let Ok(mut guard) = shared.lock() else {
+                return;
+            };
+            match guard.diagnostics.next_run() {
+                Some(run) => (
+                    Some(run),
+                    guard
+                        .preferences
+                        .settings()
+                        .to_worker_init_in(&guard.storage.logs.file),
+                ),
+                None => {
+                    let summary = guard.diagnostics.sweep_progress().summary;
+                    guard
+                        .activity
+                        .record(format!("quality sweep finished: {summary}"));
+                    return;
+                }
+            }
+        };
+        let Some(run) = run else {
+            return;
+        };
+        let command = EncodeCommand {
+            initialise_command: init,
+            encode_job: run.job.clone(),
+        };
+        let outcome = match client.start_encode(&command) {
+            Ok(result) if result.was_successful => wait_for_sweep_run(&client, run.quality),
+            Ok(CommandResult { error, .. }) => {
+                push_log(
+                    &shared,
+                    format!("sweep run q{} refused: {error}", run.quality),
+                );
+                vise_core::SweepOutcome::failed(run.quality, error)
+            }
+            Err(e) => {
+                push_log(
+                    &shared,
+                    format!("sweep run q{} lost its worker: {e}", run.quality),
+                );
+                vise_core::SweepOutcome::failed(run.quality, e.to_string())
+            }
+        };
+        let mut outcome = outcome;
+        if let Ok(mut guard) = shared.lock() {
+            if guard.diagnostics.sweep_progress().cancelled {
+                outcome.cancelled = true;
+            }
+            guard.diagnostics.finish_run(outcome);
+        }
+    }
+}
+
+/// Poll the worker until one sweep run has finished, and measure what it made.
+fn wait_for_sweep_run(client: &WorkerClient, quality: u32) -> vise_core::SweepOutcome {
+    let started = Instant::now();
+    let mut path: Option<PathBuf> = None;
+    loop {
+        match client.poll_encode_progress() {
+            Ok(report) => {
+                if let Some(working) = &report.working {
+                    if path.is_none() && !working.output_path.is_empty() {
+                        path = Some(PathBuf::from(&working.output_path));
+                    }
+                }
+                if report.state == vise_ipc::WorkState::WorkDone {
+                    let done = report.work_done.unwrap_or_default();
+                    let seconds = started.elapsed().as_secs_f64();
+                    if !done.was_successful {
+                        return vise_core::SweepOutcome::failed(quality, done.message);
+                    }
+                    let bytes = path
+                        .as_ref()
+                        .and_then(|path| std::fs::metadata(path).ok())
+                        .map(|meta| meta.len())
+                        .unwrap_or(0);
+                    return vise_core::SweepOutcome::succeeded(quality, bytes, seconds);
+                }
+            }
+            Err(e) => return vise_core::SweepOutcome::failed(quality, e.to_string()),
+        }
+        thread::sleep(Duration::from_millis(250));
+    }
+}
+
+/// Write one file and report what was written.
+fn write_report(
+    guard: &mut DesktopState,
+    kind: &str,
+    folder: &Path,
+    name: &str,
+    bytes: &[u8],
+    summary: String,
+) -> ReportViewModel {
+    let path = folder.join(name);
+    let written = std::fs::create_dir_all(folder).and_then(|()| std::fs::write(&path, bytes));
+    let report = match written {
+        Ok(()) => {
+            guard
+                .activity
+                .record(format!("wrote {kind} to {}", path.display()));
+            ReportViewModel {
+                kind: kind.to_string(),
+                path: path.to_string_lossy().to_string(),
+                summary,
+                written: true,
+                problem: String::new(),
+            }
+        }
+        Err(e) => {
+            let problem = format!("{kind} could not be written ({}): {e}", path.display());
+            record_warning_in(guard, "diagnostics", kind, problem.clone());
+            ReportViewModel {
+                kind: kind.to_string(),
+                path: path.to_string_lossy().to_string(),
+                summary,
+                written: false,
+                problem,
+            }
+        }
+    };
+    guard.diagnostics.record_report(report.clone());
+    report
+}
+
+/// Record a warning without taking the lock again.
+fn record_warning_in(guard: &mut DesktopState, source: &str, context: &str, detail: String) {
+    guard.errors.push_warning(source, context, detail);
+}
+
+/// Where exports are written: the diagnostics folder beside the state.
+fn export_folder(guard: &DesktopState) -> PathBuf {
+    guard.storage.logs.file.clone()
+}
+
+/// Export the finished queue as CSV and JSON.
+#[tauri::command]
+fn export_queue_results(
+    state: State<'_, SharedState>,
+    format: String,
+) -> Result<DiagnosticsViewModel, String> {
+    let files = encode_log_files(&state);
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let results =
+        system::results::QueueResults::of(guard.session.jobs(), &guard.queue, &|spec: &JobSpec| {
+            std::fs::metadata(&spec.output_path)
+                .map(|meta| meta.len())
+                .unwrap_or(0)
+        });
+    let wanted = format.trim().to_ascii_lowercase();
+    let (extension, bytes, summary): (&str, Vec<u8>, String) = match wanted.as_str() {
+        "json" => ("json", results.to_json().into_bytes(), results.summary()),
+        "csv" | "" => ("csv", results.to_csv().into_bytes(), results.summary()),
+        other => {
+            return Err(format!(
+                "'{other}' is not an export this build writes; choose csv or json."
+            ))
+        }
+    };
+    let folder = export_folder(&guard);
+    write_report(
+        &mut guard,
+        "results",
+        &folder,
+        &format!("vise-queue-results.{extension}"),
+        &bytes,
+        summary,
+    );
+    Ok(guard.diagnostics.view(
+        &files,
+        &vise_ipc::enclog::RotationPolicy::default(),
+        queue_is_running(&guard),
+    ))
+}
+
+/// Ask the machine what it can do, and record the answer.
+///
+/// Detection is two subprocess calls, so it is done here rather than on every
+/// read of the surface: the page re-asks through this command when the user asks
+/// it to.
+#[tauri::command]
+fn detect_capabilities(state: State<'_, SharedState>) -> Result<DiagnosticsViewModel, String> {
+    let report = vise_core::CapabilityReport::detect();
+    let files = encode_log_files(&state);
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    guard.diagnostics.observe_capabilities(report.clone());
+    guard
+        .activity
+        .record(format!("capability report: {}", report.summary()));
+    Ok(guard.diagnostics.view(
+        &files,
+        &vise_ipc::enclog::RotationPolicy::default(),
+        queue_is_running(&guard),
+    ))
+}
+
+/// Write the capability report out as text and as JSON.
+#[tauri::command]
+fn export_capabilities(state: State<'_, SharedState>) -> Result<DiagnosticsViewModel, String> {
+    let files = encode_log_files(&state);
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let report = match guard.diagnostics.capabilities() {
+        Some(report) => report.clone(),
+        None => {
+            let report = vise_core::CapabilityReport::detect();
+            guard.diagnostics.observe_capabilities(report.clone());
+            report
+        }
+    };
+    let folder = export_folder(&guard);
+    let summary = report.summary();
+    write_report(
+        &mut guard,
+        "capabilities",
+        &folder,
+        "vise-capabilities.txt",
+        report.to_text().as_bytes(),
+        summary,
+    );
+    Ok(guard.diagnostics.view(
+        &files,
+        &vise_ipc::enclog::RotationPolicy::default(),
+        queue_is_running(&guard),
+    ))
+}
+
+/// Build the diagnostic bundle and write it out.
+///
+/// The worker's session token is handed to the redactor as a value, because that
+/// is where it appears: inside an error message, not under a key with an obvious
+/// name.
+#[tauri::command]
+fn export_diagnostics(state: State<'_, SharedState>) -> Result<DiagnosticsViewModel, String> {
+    let files = encode_log_files(&state);
+    let mut guard = state.lock().map_err(|e| e.to_string())?;
+    let report = match guard.diagnostics.capabilities() {
+        Some(report) => report.clone(),
+        None => {
+            let report = vise_core::CapabilityReport::detect();
+            guard.diagnostics.observe_capabilities(report.clone());
+            report
+        }
+    };
+    let secrets = worker_token(&state);
+    let redactor = system::bundle::Redactor::for_this_machine(secrets);
+    let queue =
+        system::results::QueueResults::of(guard.session.jobs(), &guard.queue, &|spec: &JobSpec| {
+            std::fs::metadata(&spec.output_path)
+                .map(|meta| meta.len())
+                .unwrap_or(0)
+        });
+    let input = system::bundle::BundleInput {
+        version: vise_core::VISE_VERSION.to_string(),
+        settings: serde_json::to_string_pretty(guard.preferences.settings())
+            .unwrap_or_else(|_| "{}".to_string()),
+        capabilities: report.to_json(),
+        capabilities_text: report.to_text(),
+        log: guard.activity.copy_text(),
+        queue: format!("{}\n{}", queue.summary(), queue.to_csv()),
+        extra: Vec::new(),
+    };
+    let bundle = system::bundle::DiagnosticBundle::build(&input, &redactor);
+    let summary = bundle.summary();
+    let name = bundle.file_name().to_string();
+    let bytes = bundle.to_bytes();
+    let folder = export_folder(&guard);
+    write_report(&mut guard, "bundle", &folder, &name, &bytes, summary);
+    Ok(guard.diagnostics.view(
+        &files,
+        &vise_ipc::enclog::RotationPolicy::default(),
+        queue_is_running(&guard),
+    ))
+}
+
+/// The worker session token, so it can be kept out of an export.
+fn worker_token(state: &SharedState) -> Vec<String> {
+    match worker_client(state) {
+        Ok(Some(client)) => vec![client.token().to_string()],
+        _ => Vec::new(),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -3901,6 +4391,7 @@ fn main() {
     let recovered = system::persistence::load(&storage.queue.file);
     let mut session = vise_core::Session::new();
     let recovered_queue = recovered.install(&mut session);
+    let diagnostics = DiagnosticsState::new(storage.logs.file.clone());
     let state: SharedState = Arc::new(Mutex::new(DesktopState {
         // Build the backend before the window opens so the first scan does not
         // pay for process start-up.
@@ -3914,6 +4405,7 @@ fn main() {
         preview: windows::preview::PreviewState::with_still_count(stills),
         integration: Integration::new(storage.queue.file.clone()),
         storage,
+        diagnostics,
         queue: recovered_queue,
         session,
         ..DesktopState::default()
@@ -4097,6 +4589,15 @@ fn main() {
             set_log_level,
             set_follow_logs,
             clear_logs,
+            diagnostics_window,
+            set_sweep_range,
+            confirm_sweep_range,
+            start_sweep,
+            cancel_sweep,
+            export_queue_results,
+            detect_capabilities,
+            export_capabilities,
+            export_diagnostics,
             error_view,
             error_report,
             clear_errors,
@@ -4273,7 +4774,11 @@ mod tests {
         let mut settings = PreferencesSettings::new();
         settings.general.keep_duplicate_titles = true;
         let command = options
-            .to_command(vec!["C:\\media\\clips".to_string()], &settings)
+            .to_command(
+                vec!["C:\\media\\clips".to_string()],
+                &settings,
+                Path::new("logs"),
+            )
             .expect("command");
         assert_eq!(command.paths, vec!["C:\\media\\clips".to_string()]);
         assert_eq!(command.preview_count, 32, "clamped to something sane");
@@ -4290,6 +4795,129 @@ mod tests {
     }
 
     #[test]
+    fn a_scan_is_told_where_to_write_its_logs_from_the_resolved_storage_root() {
+        // The same folder the storage rules resolved, so a portable install's
+        // worker logs beside the executable and an installed one's stay in the
+        // configuration directory.
+        let settings = PreferencesSettings::new();
+        let folder = Path::new("C:\\cfg\\vise\\logs");
+        let init = settings.to_worker_init_in(folder);
+        assert!(init.enable_disk_logging);
+        assert_eq!(init.log_directory, folder.to_string_lossy());
+        assert_eq!(init.log_folder().as_deref(), Some(folder));
+        assert!(init.log_file_path().is_some());
+    }
+
+    #[test]
+    fn a_sweep_without_a_source_says_so_rather_than_planning_an_encode_of_nothing() {
+        let mut window = DesktopState {
+            diagnostics: windows::diagnostics::DiagnosticsState::new(PathBuf::from("logs")),
+            ..DesktopState::default()
+        };
+        assert_eq!(sweep_base_job(&window).input_path, "");
+        window
+            .diagnostics
+            .set_range(vise_core::SweepRange::new(20, 24, 2));
+        let reason = window.diagnostics.sweep_refusal(false).expect("a refusal");
+        assert!(reason.contains("open a source"), "{reason}");
+    }
+
+    #[test]
+    fn a_sweep_is_refused_while_the_real_queue_has_an_encode_running() {
+        let jobs = [spec_named("One")];
+        let mut window = window_with(&jobs);
+        window
+            .diagnostics
+            .set_range(vise_core::SweepRange::new(20, 24, 2));
+        assert!(!queue_is_running(&window), "nothing is running yet");
+
+        let id = window.session.jobs()[0].id;
+        set_job_state_holding(&mut window, id, JobState::Running, "encoding");
+        assert!(queue_is_running(&window));
+        let reason = window.diagnostics.sweep_refusal(true).expect("a refusal");
+        assert!(reason.contains("competing"), "{reason}");
+    }
+
+    #[test]
+    fn the_diagnostics_surface_opens_with_an_empty_honest_table() {
+        let window = DesktopState {
+            diagnostics: windows::diagnostics::DiagnosticsState::new(PathBuf::from("logs")),
+            ..DesktopState::default()
+        };
+        let view =
+            window
+                .diagnostics
+                .view(&[], &vise_ipc::enclog::RotationPolicy::default(), false);
+        assert!(view.encode_logs.is_empty());
+        assert!(view.capability.is_none());
+        assert!(view.reports.is_empty());
+        assert_eq!(view.log_folder, "logs");
+        assert!(
+            view.summary.contains("No quality sweep"),
+            "{}",
+            view.summary
+        );
+    }
+
+    #[test]
+    fn an_export_that_cannot_be_written_is_reported_rather_than_saved_over() {
+        // A file where a folder should be: the only way to be sure of an
+        // unwritable path on a machine whose temporary folder is writable.
+        let blocker = std::env::temp_dir().join("vise-desktop-export-blocker");
+        std::fs::write(&blocker, b"not a folder").expect("blocker");
+        let mut guard = DesktopState::default();
+        let report = write_report(
+            &mut guard,
+            "results",
+            &blocker,
+            "vise-queue-results.csv",
+            b"a,b\n1,2\n",
+            "one row".to_string(),
+        );
+        assert!(!report.written, "{report:?}");
+        assert!(
+            report.problem.contains("could not be written"),
+            "{report:?}"
+        );
+        assert!(
+            !guard.errors.entries().is_empty(),
+            "and it is on the problem list rather than only in the reply"
+        );
+        let _ = std::fs::remove_file(&blocker);
+    }
+
+    #[test]
+    fn an_export_that_can_be_written_is_recorded_once_per_kind() {
+        let dir = std::env::temp_dir().join("vise-desktop-export-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut guard = DesktopState::default();
+        let first = write_report(
+            &mut guard,
+            "bundle",
+            &dir,
+            "one.zip",
+            b"first",
+            "first".to_string(),
+        );
+        let second = write_report(
+            &mut guard,
+            "bundle",
+            &dir,
+            "two.zip",
+            b"second",
+            "second".to_string(),
+        );
+        assert!(first.written && second.written, "{first:?} {second:?}");
+        assert_eq!(
+            std::fs::read(dir.join("two.zip")).expect("written"),
+            b"second"
+        );
+        assert_eq!(guard.diagnostics.reports().len(), 1);
+        assert_eq!(guard.diagnostics.reports()[0].path, second.path);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn scan_options_default_to_no_previews_and_no_limits() {
         let options: ScanOptions = serde_json::from_str("{}").expect("empty options");
         let settings = PreferencesSettings {
@@ -4300,7 +4928,7 @@ mod tests {
             ..Default::default()
         };
         let command = options
-            .to_command(vec!["in.mkv".to_string()], &settings)
+            .to_command(vec!["in.mkv".to_string()], &settings, Path::new("logs"))
             .expect("command");
         assert_eq!(command.preview_count, 0);
         assert!(command.file_exclusion_list.is_empty());
@@ -4315,7 +4943,7 @@ mod tests {
         let settings = PreferencesSettings::new();
         assert_eq!(
             options
-                .to_command(vec!["in.mkv".to_string()], &settings)
+                .to_command(vec!["in.mkv".to_string()], &settings, Path::new("logs"))
                 .expect("command")
                 .preview_count,
             preferences::general::DEFAULT_PREVIEW_FRAMES
@@ -4324,7 +4952,7 @@ mod tests {
             serde_json::from_str(r#"{"previewCount":3}"#).expect("asked for three");
         assert_eq!(
             asked
-                .to_command(vec!["in.mkv".to_string()], &settings)
+                .to_command(vec!["in.mkv".to_string()], &settings, Path::new("logs"))
                 .expect("command")
                 .preview_count,
             3,
@@ -4596,11 +5224,15 @@ mod tests {
         assert!(surfaces.open_surfaces().is_empty());
 
         let catalog = surfaces.catalog();
-        assert_eq!(catalog.surfaces.len(), 9);
+        assert_eq!(catalog.surfaces.len(), 10);
         assert!(catalog
             .surfaces
             .iter()
             .any(|surface| surface.id == preferences::SURFACE));
+        assert!(catalog
+            .surfaces
+            .iter()
+            .any(|surface| surface.id == windows::diagnostics::SURFACE));
         assert!(catalog
             .surfaces
             .iter()
