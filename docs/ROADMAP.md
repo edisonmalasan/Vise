@@ -227,10 +227,10 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [x] Job retry and failure reporting
 - [x] Queue persistence across app restarts
 - [x] Cancel behavior without corrupting output
-- [ ] Job validation before pipeline start (mux, codec, filter and audio-layout compatibility)
-- [ ] Engine crash isolation (a worker failure fails only its job)
+- [x] Job validation before pipeline start (mux, codec, filter and audio-layout compatibility)
+- [x] Engine crash isolation (a worker failure fails only its job)
 
-**Status:** In progress (8/10 verified; validation and crash isolation pending)
+**Status:** Complete (10/10 verified; a job is judged before the pipeline starts by one rule set that is a pure function of the job and the machine facts handed to it, so the window runs it before a job is queued — through the page, the selection sheet, the title batch, and once more before the job is claimed — and the worker runs the identical rules on `StartEncode` and again on the encode thread as a defence in depth. It reports every problem at once against the field that carries it, covering container/codec and subtitle-mode compatibility, filters the chosen encoder cannot apply (deblocking and telecine removal need inter prediction, which an intra-only codec never has, and a deblock block size outside the filter's own range), audio layouts the source cannot produce (a channel count or mixdown wider than the source, and a mixdown to the layout it already has), rate-control sanity (a lossless request carrying a quality or bitrate value, a bitrate job with none, a two-pass job with nothing to gain from a second pass), and paths that are blank, missing, unreadable, unwritable, or the wrong container for the extension. Crash isolation is a pure attribution of an outcome: the supervisor reads a dead worker's exit status without starting a replacement, the in-flight job is marked failed with that status and its partial output swept (or named, when an orphaned encoder still holds it), the queue continues on a fresh worker, a stop the user asked for is a cancellation on either side of the worker dying, and a worker that dies on consecutive jobs is replaced with a growing wait until the third, which is reported and stops the queue instead of looping. Verified by test: every rule and its valid counterpart; the queue refusing an unencodable job and carrying on with the ones behind it; a real worker killed with `taskkill /F` during an encode, after which only that job failed, the partial was swept, and the next job encoded on a replacement process; a user-requested stop arriving as a cancellation; and three consecutive deaths replaced twice and then reported. Not exercised here: the desktop's own poll loop is covered by its unit tests against the same policy rather than against a live worker, because the desktop test binary has no built worker to point at; the signal half of a worker's death is implemented for unix and only the exit-code half ran on this platform; a hardware encoder was never the subject of a crash, so the tests are all against the software path; and the in-process fallback has no worker process to isolate, so nothing was tested for it)
 
 ---
 
@@ -592,7 +592,7 @@ Required groups: 19
 | 7 | Audio pipeline | Complete (11/11) |
 | 8 | Subtitles | Complete (7/7) |
 | 9 | Chapters and metadata | Complete (6/6) |
-| 10 | Encoding control and job reliability | In progress (8/10) |
+| 10 | Encoding control and job reliability | Complete (10/10) |
 | 11 | Hardware acceleration | Complete (7/7) |
 | 12 | Platform packaging and release | In progress (3/8) |
 | 13 | Worker process and JSON IPC | Complete (9/9) |
