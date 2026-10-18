@@ -4,7 +4,7 @@
 
 A feature-by-feature build guide. This describes **what** is built and **in what order**, not how it is implemented. Features are grouped; a group is only complete when every item in it is checked.
 
-Last updated: 2026-10-17  
+Last updated: 2026-10-18  
 Target parity: reference transcoder architecture at version 1.11.2 and its user-facing capability set.
 
 > **Scope expansion (2026-10-16):** Groups 13–20 were added after a reverse-engineering
@@ -476,14 +476,76 @@ claim rather than a capability. Both optional boxes stay unchecked.
 
 *Outcome: Support and debugging workflows match the reference product's operational tooling.*
 
-- [ ] Per-encode log files and log rotation
-- [ ] Activity log streaming to the UI
-- [ ] Quality sweep tool for the queue
-- [ ] Queue result data extraction tool
-- [ ] Hardware capability report export
-- [ ] Reproducible diagnostic bundle export
+- [x] Per-encode log files and log rotation
+- [x] Activity log streaming to the UI
+- [x] Quality sweep tool for the queue
+- [x] Queue result data extraction tool
+- [x] Hardware capability report export
+- [x] Reproducible diagnostic bundle export
 
-**Status:** Not started (0/6 verified)
+**Status:** Complete (6/6 verified)
+
+The worker writes one log file per encode beside its session log and trims
+the folder when an encode ends, against a byte bound and a file-count
+bound. Which files may go is a pure function of the policy, the measured
+sizes and ages, and the role of each file, so the two cases that matter —
+the log being appended to right now, and a log somebody has open — are
+pinned by tests rather than by hope. Logs live under the portable-mode
+storage roots, so a portable install keeps them beside the executable.
+
+The activity window reads the worker by index and never re-reads, and both
+ways a stream can stop being a stream are made visible rather than
+swallowed: a worker that was replaced or whose buffer was cleared (the
+reply now carries which worker and buffer it came from, so a cursor is not
+held across it) and a window that cannot hold every line (the oldest go, the
+count is kept, and the summary says the history is no longer whole).
+
+The quality sweep is a plan, an executor and a table. The plan is pure and
+bounded: at most twelve encodes, a range wider than twenty-six values only
+with the user's confirmation, and a step widened rather than a range
+changed when the bound would otherwise be broken — with the narrowing said
+out loud. The executor hands out one run at a time, which is the failure
+mode a sweep is most likely to cause and the one it makes unrepresentable.
+Its runs are ordinary jobs written to a folder of their own, so it never
+touches the session or the queue, and it is refused outright while the queue
+has an encode running.
+
+The queue's results export as CSV and JSON, deterministically: the rows are
+in the run order, the columns are a fixed list, and the JSON comes from a
+struct. A title carrying a comma, a quote or a line break round-trips
+through a parser written the way a spreadsheet writes one. Paths are
+exported as file names, because an export is a document that travels.
+
+The capability report is a pure function of an injected detection, so it is
+pinned against media-tool builds this repository cannot run, and it sorts
+and de-duplicates every list so two reports of one machine can be diffed. A
+machine with no tools is reported rather than left out.
+
+The diagnostic bundle is a stored ZIP with no clock in it: entries are
+sorted, stamped at the archive epoch, and the file is named for the SHA-256
+of its own contents, so two exports of one session are byte-for-byte
+identical. Before anything is written, a redactor removes tokens by value
+and by key name and reduces every absolute path to a root placeholder plus
+its last two components, inside documents and inside free text alike. The
+archive carries a manifest of per-file digests and a README that says to
+treat the whole thing as untrusted input.
+
+Verified by unit tests over the rotation policy (twelve cases, including
+the in-progress and being-read files), the streaming state machine
+(ordering, de-duplication, reset on a replaced worker, reset on a cleared
+buffer, and the window's own back-pressure), the sweep plan (bounds across
+every width and step, refusals, narrowing, cancellation, and the table's
+ordering and relative size), the CSV and JSON writers (commas, quotes,
+newlines, and determinism over the same queue twice), the capability report
+against injected detections, and the bundle's redaction, reproducibility
+and archive shape. Plus six window-level tests over the desktop command
+paths and an integration test over the public core API.
+
+The application was not launched, so the diagnostics window was confirmed
+through its view models and the shipped page rather than in a running
+window, and no real encode was driven through a sweep; the sweep's
+executor is pinned by tests and its encode path is the queue's own, not a
+live measurement.
 
 ## Deferred / Future Work
 
@@ -540,7 +602,7 @@ Required groups: 19
 | 17 | System integration | Complete (9/9) |
 | 18 | Localization | Complete (6/6) |
 | 19 | Media depth | In progress (8/10; optical-disc input optional and not claimed) |
-| 20 | Diagnostics and developer tools | Not started (0/6) |
+| 20 | Diagnostics and developer tools | Complete (6/6) |
 
 ## Notes
 
