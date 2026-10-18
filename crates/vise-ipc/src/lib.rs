@@ -6,27 +6,32 @@
 //!
 //! Module map:
 //!
-//! - [`contract`] — request/response payloads shared by both sides.
-//! - [`http`] — the minimal HTTP/1.1 message layer both sides agree on.
-//! - [`token`] — token generation and authentication checks.
-//! - [`timespan`] — strict duration parsing used by the scan contract.
-//! - [`validation`] — pre-flight job validation.
-//! - [`client`] — loopback HTTP client with typed command wrappers.
-//! - [`supervisor`] — worker process lifecycle, handshake, and restart.
-//! - [`portable`] — portable-mode file: the process-isolation switch and where
+//! - [`contract`] - request/response payloads shared by both sides.
+//! - [`http`] - the minimal HTTP/1.1 message layer both sides agree on.
+//! - [`token`] - token generation and authentication checks.
+//! - [`timespan`] - strict duration parsing used by the scan contract.
+//! - [`validation`] - pre-flight job validation.
+//! - [`partial`] - where an encode writes while it runs, and sweeping what a
+//!   dead worker left behind.
+//! - [`crash`] - failure attribution when the worker dies mid-job.
+//! - [`client`] - loopback HTTP client with typed command wrappers.
+// - [`supervisor`] - worker process lifecycle, handshake, and restart.
+// - [`portable`] - portable-mode file: the process-isolation switch and where
 //!   the settings, the queue, the presets, and the logs are written.
-//! - [`power`] — holding the machine awake while an encode runs.
-//! - [`numa`] — what the processor layout is, and where the worker is put.
-//! - [`enclog`] — per-encode log file names and the rotation policy that keeps
+// - [`power`] - holding the machine awake while an encode runs.
+// - [`numa`] - what the processor layout is, and where the worker is put.
+// - [`enclog`] - per-encode log file names and the rotation policy that keeps
 //!   the log folder inside its bounds.
 
 pub mod api;
 pub mod base64;
 pub mod client;
 pub mod contract;
+pub mod crash;
 pub mod enclog;
 pub mod http;
 pub mod numa;
+pub mod partial;
 pub mod portable;
 pub mod power;
 pub mod route;
@@ -37,6 +42,8 @@ pub mod validation;
 
 pub use client::{ClientError, WorkerClient};
 pub use contract::*;
+pub use crash::{CrashGuard, EncodeOutcome, IsolationPolicy, Resolution, WorkerDeath};
+pub use partial::{partial_output_path, remove_partial_outputs};
 pub use portable::{PortableError, PortableSettings, StorageKind, StorageRoots};
 pub use power::{PowerError, PowerRequest, PowerScope};
 pub use route::{Route, TOKEN_HEADER};

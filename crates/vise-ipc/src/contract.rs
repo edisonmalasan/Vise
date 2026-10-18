@@ -738,7 +738,10 @@ mod tests {
         assert_eq!(cmd.encode_job.input_path, "in.mkv");
         assert_eq!(cmd.encode_job.container, vise_core::ContainerFormat::Mp4);
         assert_eq!(cmd.initialise_command, InitCommand::default());
-        let report = crate::validation::validate_job(&cmd.encode_job, None);
+        let report = crate::validation::validate_job(
+            &cmd.encode_job,
+            &crate::validation::MachineFacts::unknown(),
+        );
         assert!(!report.is_valid(), "the job has no output destination yet");
         assert!(
             report.summary().contains("OutputPath"),
