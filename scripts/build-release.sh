@@ -77,12 +77,14 @@ rm -rf "$stage"
 mkdir -p "$stage"
 
 if [[ "$bundled" -eq 1 ]]; then
+  staged="$root/apps/vise-desktop/src-tauri/vendor/ffmpeg/staged"
+  if [[ ! -d "$staged" ]]; then
+    echo "build-release: nothing was staged for bundling" >&2
+    echo "  run ./scripts/fetch-media-tools.sh $platform first" >&2
+    exit 1
+  fi
   mkdir -p "$stage/media"
-  for tool in ffmpeg ffprobe ffmpeg.exe ffprobe.exe; do
-    [[ -f "$tools/$tool" ]] && cp "$tools/$tool" "$stage/media/$tool"
-  done
-  cp "$tools/media-tools.manifest.json" "$stage/media/media-tools.manifest.json" 2>/dev/null || true
-  cp "$root/LICENSE-MEDIA-TOOLS" "$stage/media/LICENSE.txt" 2>/dev/null || true
+  cp "$staged"/* "$stage/media/"
 fi
 
 cp "$desktop" "$stage/"
@@ -98,3 +100,15 @@ EOF
 echo "build-release: staged in $stage"
 echo "  contents:"
 ( cd "$stage" && find . -type f | sed 's|^\./|    |' | sort )
+
+# The Tauri bundle needs the worker beside the application too: the window
+# resolves it from the executable's own directory, so an installer without it
+# would fall back to running the pipeline in-process, which is exactly what
+# process isolation exists to avoid.
+sidecar="$root/apps/vise-desktop/src-tauri/vendor/sidecar"
+rm -rf "$sidecar"
+mkdir -p "$sidecar"
+worker_name="vise-worker"
+[[ "$(uname -s)" == "MINGW"* || "$(uname -s)" == "CYGWIN"* ]] && worker_name="vise-worker.exe"
+cp "$worker" "$sidecar/$worker_name"
+echo "build-release: worker staged for bundling in $sidecar"
