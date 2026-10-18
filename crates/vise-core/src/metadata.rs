@@ -180,12 +180,6 @@ impl MetadataProcessingOptions {
         if self.effective_copy() && !self.effective_none() {
             parts.push("-map_metadata 0".to_string());
         }
-        if self.cover_art {
-            parts.push("-map 0:v?".to_string());
-        }
-        if self.attachments || self.attachment_copy {
-            parts.push("-map 0:t?".to_string());
-        }
         for (k, v) in self.user_tags() {
             parts.push(format!("-metadata {}={}", k, v));
         }
@@ -206,14 +200,6 @@ impl MetadataProcessingOptions {
         if self.effective_copy() && !self.effective_none() {
             args.push("-map_metadata".into());
             args.push("0".into());
-        }
-        if self.cover_art {
-            args.push("-map".into());
-            args.push("0:v?".into());
-        }
-        if self.attachments || self.attachment_copy {
-            args.push("-map".into());
-            args.push("0:t?".into());
         }
         for (k, v) in self.user_tags() {
             args.push("-metadata".into());

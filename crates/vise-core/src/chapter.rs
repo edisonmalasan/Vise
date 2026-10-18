@@ -168,12 +168,6 @@ impl ChapterProcessingOptions {
         if self.effective_copy() && !self.effective_none() && !self.uses_edited_chapters() {
             parts.push("-map_chapters 0".to_string());
         }
-        if self.cover_art {
-            parts.push("-map 0:v?".to_string());
-        }
-        if self.attachments || self.attachment_copy {
-            parts.push("-map 0:t?".to_string());
-        }
         if self.extract_cover {
             parts.push("extract_cover_art".to_string());
         }

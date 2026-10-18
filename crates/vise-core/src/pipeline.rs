@@ -149,6 +149,7 @@ impl Transcoder {
             audio_codec_name,
             lossless_claim: plan.lossless_claim.clone(),
             hdr_claims: plan.hdr_claims.clone(),
+            attachment_claims: plan.attachment_claims.clone(),
         })
     }
 
@@ -408,6 +409,24 @@ impl Transcoder {
         // Chapter/metadata copy-edit handling through ffmpeg arguments.
         args.extend(chapter_opts.build_ffmpeg_args());
         args.extend(metadata_opts.build_metadata_args());
+        // Cover art and attachments are extra streams, and which containers can
+        // carry them is a property of the container rather than of the request,
+        // so the decision is made here, where the container is known, and its
+        // mapping arguments are the only ones that reach the encoder. A request
+        // the container cannot honour is reported rather than mapped anyway.
+        let attachment_decision = crate::attachments::resolve(
+            container,
+            metadata_opts.cover_art || chapter_opts.cover_art,
+            metadata_opts.attachments
+                || metadata_opts.attachment_copy
+                || chapter_opts.attachments
+                || chapter_opts.attachment_copy,
+        );
+        args.extend(attachment_decision.args.iter().cloned());
+        let attachment_claims = match attachment_decision.reason() {
+            Some(reason) => vec![reason],
+            None => Vec::new(),
+        };
         if chapter_metadata_path.is_some() {
             // The marker list the window holds wins over anything the source
             // carried, so it is mapped last.
@@ -495,6 +514,7 @@ impl Transcoder {
                 None
             },
             hdr_claims: hdr_claims.clone(),
+            attachment_claims: attachment_claims.clone(),
         })
     }
 
@@ -591,6 +611,8 @@ pub struct TranscodeResult {
     pub lossless_claim: Option<String>,
     /// Dolby Vision and HDR10+ requests this build could not honour, if any.
     pub hdr_claims: Vec<String>,
+    /// Cover-art and attachment requests the container could not honour, if any.
+    pub attachment_claims: Vec<String>,
 }
 
 /// A fully resolved encoder invocation.
@@ -630,6 +652,8 @@ pub struct TranscodePlan {
     pub lossless_claim: Option<String>,
     /// Dolby Vision and HDR10+ requests this build could not honour, if any.
     pub hdr_claims: Vec<String>,
+    /// Cover-art and attachment requests the container could not honour, if any.
+    pub attachment_claims: Vec<String>,
 }
 
 impl TranscodePlan {
