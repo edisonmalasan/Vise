@@ -20,10 +20,12 @@ use tauri::menu::IsMenuItem;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use vise_core::{Job, JobId, JobSpec, JobState, Progress, Session};
 use vise_ipc::contract::{CommandResult, EncodeCommand, InitCommand, ScanCommand, WorkState};
+use vise_ipc::crash::{EncodeOutcome, IsolationPolicy, Resolution, WorkerDeath};
+use vise_ipc::partial::PartialCleanup;
 use vise_ipc::portable::PortableSettings;
 use vise_ipc::timespan::TimeSpan;
 use vise_ipc::validation::ValidationReport;
-use vise_ipc::{WorkerClient, WorkerConfig, WorkerSupervisor};
+use vise_ipc::{ClientError, WorkerClient, WorkerConfig, WorkerSupervisor};
 
 mod appearance;
 mod locale;
@@ -102,6 +104,19 @@ impl Backend {
                     }
                 }
             }
+            Backend::InProcess => None,
+        }
+    }
+
+    /// Look at the worker without starting a replacement.
+    ///
+    /// Reading the exit status is a query about a process that is already gone,
+    /// and it is worth asking before the next operation spawns a replacement and
+    /// the answer stops existing. Nothing is started here: this is called from
+    /// the encode thread while it is deciding what just happened to its job.
+    fn notice_death(&mut self) -> Option<WorkerDeath> {
+        match self {
+            Backend::Worker(supervisor) => supervisor.notice_death(),
             Backend::InProcess => None,
         }
     }
@@ -2280,6 +2295,34 @@ fn set_job_state(
     }
 }
 
+/// What running one job did to the queue.
+///
+/// A crashed worker is contained here rather than above: the job that was running
+/// has failed and the next one may start on a fresh worker. The one case that
+/// reaches the queue is a worker that keeps dying, where carrying on would be a
+/// restart loop rather than work.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum JobRun {
+    /// The queue may go on to the next job.
+    Continued,
+    /// The queue may go on, after waiting: the worker died and the replacement
+    /// is held back so a machine that keeps killing its worker cannot spin.
+    ContinueAfter { backoff: Duration },
+    /// Stop the queue and report.
+    StopQueue { reason: String },
+}
+
+impl JobRun {
+    /// How long to wait before the next job starts, when there is a wait.
+    #[cfg_attr(not(test), allow(dead_code, reason = "read by the tests"))]
+    fn backoff(&self) -> Duration {
+        match self {
+            JobRun::ContinueAfter { backoff } => *backoff,
+            _ => Duration::ZERO,
+        }
+    }
+}
+
 #[tauri::command]
 fn run_job(app: AppHandle, state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
     let spec = match prepare_job(state.inner(), id) {
@@ -2300,7 +2343,13 @@ fn run_job(app: AppHandle, state: State<'_, SharedState>, id: JobId) -> Result<(
     let worker = worker_client(&state)?;
     thread::spawn(move || {
         match worker {
-            Some(client) => run_through_worker(shared.clone(), client, id, spec),
+            Some(client) => {
+                if let JobRun::StopQueue { reason } =
+                    run_through_worker(shared.clone(), client, id, spec)
+                {
+                    record_problem(&shared, "queue", format!("job {id}"), &reason);
+                }
+            }
             None => run_in_process(shared.clone(), id, spec),
         }
         // The queue may have drained with this job, and the When-done preference
@@ -2539,7 +2588,31 @@ fn start_queue(
             // replaced by the supervisor on the next connection.
             let client = worker_client(&shared).ok().flatten();
             match client {
-                Some(client) => run_through_worker(shared.clone(), client, id, spec),
+                Some(client) => match run_through_worker(shared.clone(), client, id, spec) {
+                    // A crashed worker failed one job; the next one starts on a
+                    // fresh worker, after waiting longer each time one dies in a
+                    // row so a machine that cannot encode cannot spin.
+                    JobRun::ContinueAfter { backoff } => {
+                        if !backoff.is_zero() {
+                            push_log(
+                                &shared,
+                                format!(
+                                    "waiting {backoff:?} before the next job so a worker that keeps dying cannot spin"
+                                ),
+                            );
+                            thread::sleep(backoff);
+                        }
+                    }
+                    JobRun::Continued => {}
+                    JobRun::StopQueue { reason } => {
+                        // The worker keeps dying. Say so and leave the jobs behind
+                        // this one queued rather than replacing a process that has
+                        // already failed this many times.
+                        record_problem(&shared, "queue", format!("starting job {id}"), &reason);
+                        refresh_system(&shared);
+                        break;
+                    }
+                },
                 None => run_in_process(shared.clone(), id, spec),
             }
         }
@@ -2658,7 +2731,20 @@ fn cancel_job_confirmed(state: State<'_, SharedState>, id: JobId) -> Result<(), 
 }
 
 /// Drive one job through the worker and mirror its progress into the queue.
-fn run_through_worker(shared: SharedState, client: WorkerClient, id: JobId, spec: JobSpec) {
+///
+/// Every way this can end goes through one decision — [`IsolationPolicy`]
+/// classifies the outcome and says whether the job finished, was cancelled,
+/// lost its worker, or whether the queue has to stop — so the classification is
+/// in one place and cannot differ between the ways out. The parts that touch the
+/// machine are here: polling, asking the supervisor what became of its worker,
+/// and sweeping the partial files a dead worker cannot sweep itself.
+fn run_through_worker(
+    shared: SharedState,
+    client: WorkerClient,
+    id: JobId,
+    spec: JobSpec,
+) -> JobRun {
+    let mut policy = IsolationPolicy::new();
     push_log(&shared, format!("encoding job {}", id));
     let settings = shared
         .lock()
@@ -2675,32 +2761,16 @@ fn run_through_worker(shared: SharedState, client: WorkerClient, id: JobId, spec
         initialise_command: settings.0.to_worker_init_in(&settings.1),
         encode_job: spec.clone(),
     };
-    match client.start_encode(&command) {
-        Ok(result) if result.was_successful => {}
-        Ok(CommandResult { error, .. }) => {
-            push_log(&shared, format!("job {id} refused: {error}"));
-            set_job_state(
-                &shared,
-                id,
-                JobState::Failed,
-                Progress::new(0.0),
-                Some(error),
-            );
-            return;
-        }
-        Err(e) => {
-            // A worker that died mid-job is a job failure, not an application
-            // failure; the supervisor replaces it on the next operation.
-            push_log(&shared, format!("job {id} lost its worker: {e}"));
-            set_job_state(
-                &shared,
-                id,
-                JobState::Failed,
-                Progress::new(0.0),
-                Some(e.to_string()),
-            );
-            return;
-        }
+
+    let start = match client.start_encode(&command) {
+        Ok(result) if result.was_successful => None,
+        // The worker refused the job outright. That is the job's own failure and
+        // nothing was started, so there is nothing to sweep.
+        Ok(CommandResult { error, .. }) => Some(EncodeOutcome::refused(error)),
+        Err(e) => Some(attributed(&shared, &e)),
+    };
+    if let Some(outcome) = start {
+        return apply_outcome(&shared, &mut policy, id, &spec, outcome);
     }
 
     loop {
@@ -2724,47 +2794,173 @@ fn run_through_worker(shared: SharedState, client: WorkerClient, id: JobId, spec
                 }
                 if report.state == vise_ipc::WorkState::WorkDone {
                     let done = report.work_done.unwrap_or_default();
-                    set_job_state(
-                        &shared,
-                        id,
-                        if done.was_successful {
-                            JobState::Completed
-                        } else {
-                            JobState::Failed
-                        },
-                        Progress::new(if done.was_successful { 1.0 } else { 0.0 }),
-                        Some(done.message.clone()),
-                    );
-                    push_log(
-                        &shared,
-                        if done.was_successful {
-                            format!("completed job {id}")
-                        } else {
-                            format!("job {id} failed: {}", done.message)
-                        },
-                    );
-                    // The post-action runs whether the encode worked or not: a
-                    // program that was told to tidy up after a failed encode is
-                    // exactly the program that wants to know about it.
-                    run_post_action(&shared, id, &spec);
-                    persist_queue(&shared);
-                    refresh_system(&shared);
-                    return;
+                    let outcome = EncodeOutcome::Finished {
+                        was_successful: done.was_successful,
+                        message: done.message.clone(),
+                        error_code: done.error,
+                    };
+                    return apply_outcome(&shared, &mut policy, id, &spec, outcome);
                 }
             }
             Err(e) => {
-                set_job_state(
-                    &shared,
-                    id,
-                    JobState::Failed,
-                    Progress::new(0.0),
-                    Some(e.to_string()),
-                );
-                push_log(&shared, format!("job {id} lost its worker: {e}"));
-                return;
+                return apply_outcome(&shared, &mut policy, id, &spec, attributed(&shared, &e))
             }
         }
         thread::sleep(Duration::from_millis(250));
+    }
+}
+
+/// Turn a failed request into the outcome it actually was.
+///
+/// A request that fails because nothing is listening is not the same thing as a
+/// request that was refused: the first means the worker died, and that is a fact
+/// about a process worth reporting rather than a string about a socket.
+fn attributed(state: &SharedState, error: &ClientError) -> EncodeOutcome {
+    if error.is_worker_gone() {
+        EncodeOutcome::WorkerGone(worker_death(state, error))
+    } else {
+        // The worker answered badly rather than not at all: a reply that could
+        // not be read is this job's problem, not a dead process.
+        EncodeOutcome::failed(error.to_string())
+    }
+}
+
+/// Ask the supervisor what became of the worker, with the exit status.
+///
+/// Recorded here rather than at the next operation, because the next operation
+/// replaces the worker and the exit status is the one piece of information that
+/// stops being available once it does.
+fn worker_death(state: &SharedState, error: &ClientError) -> WorkerDeath {
+    let Ok(mut guard) = state.lock() else {
+        return WorkerDeath::unexplained(0, error.to_string());
+    };
+    let Some(backend) = guard.backend.as_mut() else {
+        return WorkerDeath::unexplained(0, error.to_string());
+    };
+    backend
+        .notice_death()
+        .unwrap_or_else(|| WorkerDeath::unexplained(0, error.to_string()))
+}
+
+/// Record one attempt's outcome on the job, and do what the outcome calls for.
+///
+/// A job whose worker died fails on its own and the queue carries on; a worker
+/// that keeps dying stops the queue and says so rather than being replaced
+/// forever; the partial files beside the destination are swept, because a dead
+/// worker cannot sweep them and a partial the user cannot explain is worse than
+/// no file at all.
+fn apply_outcome(
+    shared: &SharedState,
+    policy: &mut IsolationPolicy,
+    id: JobId,
+    spec: &JobSpec,
+    outcome: EncodeOutcome,
+) -> JobRun {
+    let resolution = policy.resolved(outcome, std::path::Path::new(&spec.output_path));
+
+    match &resolution {
+        Resolution::JobCancelled { message } => {
+            set_job_state(
+                shared,
+                id,
+                JobState::Cancelled,
+                current_progress(shared, id),
+                Some(message.clone()),
+            );
+            push_log(shared, format!("job {id} cancelled: {message}"));
+            persist_queue(shared);
+            refresh_system(shared);
+            JobRun::Continued
+        }
+        Resolution::JobFinished { state, message } => {
+            let progress = Progress::new(if *state == JobState::Completed {
+                1.0
+            } else {
+                0.0
+            });
+            set_job_state(shared, id, *state, progress, Some(message.clone()));
+            push_log(
+                shared,
+                format!("job {id} {}: {message}", state_label(*state)),
+            );
+            // The post-action runs whether the encode worked or not: a program
+            // that was told to tidy up after a failed encode is exactly the
+            // program that wants to know about it.
+            run_post_action(shared, id, spec);
+            persist_queue(shared);
+            refresh_system(shared);
+            JobRun::Continued
+        }
+        Resolution::JobCrashed { reason, output, .. }
+        | Resolution::QueueStopped { reason, output } => {
+            let cleanup = sweep_partials(shared, output);
+            let reason = if cleanup.is_clean() {
+                reason.clone()
+            } else {
+                format!("{reason}. {}", cleanup.summary())
+            };
+            set_job_state(
+                shared,
+                id,
+                JobState::Failed,
+                Progress::new(0.0),
+                Some(reason.clone()),
+            );
+            record_problem(
+                shared,
+                "worker",
+                format!("job {id} lost its worker"),
+                &reason,
+            );
+            push_log(shared, format!("job {id}: {reason}"));
+            persist_queue(shared);
+            refresh_system(shared);
+            match &resolution {
+                Resolution::QueueStopped { reason, .. } => JobRun::StopQueue {
+                    reason: reason.clone(),
+                },
+                // A first death is replaced at once, so there is nothing to wait
+                // for; only a later one is held back.
+                _ if resolution.backoff().is_zero() => JobRun::Continued,
+                _ => JobRun::ContinueAfter {
+                    backoff: resolution.backoff(),
+                },
+            }
+        }
+    }
+}
+
+/// Remove what a dead worker left beside the destination, and say what happened.
+///
+/// The sweep runs on the window side because the worker that wrote the file is
+/// the process that died; anything it could not remove is named rather than
+/// dropped, so the user is told which file is still there instead of finding it
+/// later with no explanation.
+fn sweep_partials(state: &SharedState, output: &std::path::Path) -> PartialCleanup {
+    let cleanup = vise_ipc::partial::remove_partial_outputs(output);
+    if !cleanup.removed.is_empty() {
+        push_log(state, cleanup.summary());
+    }
+    for (path, reason) in &cleanup.failed {
+        record_problem(
+            state,
+            "output",
+            format!("removing {}", path.display()),
+            reason.clone(),
+        );
+    }
+    cleanup
+}
+
+/// The state label a job's row shows.
+fn state_label(state: JobState) -> &'static str {
+    match state {
+        JobState::Queued => "queued",
+        JobState::Running => "running",
+        JobState::Paused => "paused",
+        JobState::Completed => "finished",
+        JobState::Failed => "failed",
+        JobState::Cancelled => "cancelled",
     }
 }
 
@@ -5053,6 +5249,274 @@ mod tests {
             state.lock().expect("lock").session.jobs()[0].status.state,
             JobState::Running
         );
+    }
+
+    /// A window whose state is written to a temporary folder, so a test that ends a
+    /// job does not leave a queue file in the working directory.
+    fn isolated_window(specs: &[JobSpec]) -> SharedState {
+        let dir = std::env::temp_dir().join("vise-desktop-isolation");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let mut window = window_with(specs);
+        window.integration = system::Integration::new(dir.join("queue.json"));
+        Arc::new(Mutex::new(window))
+    }
+
+    #[test]
+    fn a_request_that_cannot_be_answered_is_told_apart_from_a_dead_worker() {
+        let state: SharedState = isolated_window(&[]);
+        let gone = attributed(
+            &state,
+            &ClientError::Unreachable("127.0.0.1:1: connection refused".into()),
+        );
+        assert!(
+            matches!(gone, EncodeOutcome::WorkerGone(_)),
+            "nothing listening means the worker died: {gone:?}"
+        );
+
+        // A reply that could not be read is this job's problem, not a dead
+        // process: nothing was lost but the answer.
+        let unreadable = attributed(
+            &state,
+            &ClientError::Decode("the reply was not json".into()),
+        );
+        assert!(
+            matches!(unreadable, EncodeOutcome::Finished { .. }),
+            "a bad reply is not a crash: {unreadable:?}"
+        );
+    }
+
+    #[test]
+    fn a_worker_that_dies_mid_job_fails_that_job_tidies_its_partial_and_clears_the_streak() {
+        let dir = std::env::temp_dir().join("vise-desktop-isolation");
+        let output = dir.join("crashed.mkv");
+        let spec = JobSpec {
+            container: vise_core::ContainerFormat::Mkv,
+            input_path: dir.join("in.mkv").to_string_lossy().to_string(),
+            output_path: output.to_string_lossy().to_string(),
+            ..Default::default()
+        };
+        let state = isolated_window(std::slice::from_ref(&spec));
+        let id = state.lock().expect("lock").session.jobs()[0].id;
+
+        // What a killed worker leaves behind: a partial beside the destination.
+        let partial = vise_ipc::partial::partial_output_path_for(&output, 999);
+        std::fs::write(&partial, b"half an encode").expect("write a partial");
+
+        let mut policy = IsolationPolicy::new();
+        let run = apply_outcome(
+            &state,
+            &mut policy,
+            id,
+            &spec,
+            EncodeOutcome::WorkerGone(WorkerDeath {
+                pid: 999,
+                code: Some(3),
+                signal: None,
+                reason: "the encode thread panicked".into(),
+            }),
+        );
+        assert_eq!(run, JobRun::Continued, "the queue carries on");
+        assert_eq!(
+            run.backoff(),
+            Duration::ZERO,
+            "the first death is replaced at once"
+        );
+        assert!(
+            !matches!(run, JobRun::StopQueue { .. }),
+            "one dead worker must not stop the queue: {run:?}"
+        );
+
+        let job = state.lock().expect("lock").session.jobs()[0].clone();
+        assert_eq!(job.status.state, JobState::Failed, "only this job failed");
+        let message = job.status.message.clone().unwrap_or_default();
+        assert!(message.contains("worker process 999"), "{message}");
+        assert!(message.contains("exited with code 3"), "{message}");
+        assert!(
+            !output.exists(),
+            "a crashed job is never promoted to a finished file"
+        );
+        assert!(!partial.exists(), "the partial was swept: {partial:?}");
+        assert_eq!(
+            policy.guard().consecutive(),
+            1,
+            "one death is a streak of one, not an application fault"
+        );
+    }
+
+    #[test]
+    fn a_worker_that_keeps_dying_stops_the_queue_instead_of_looping() {
+        let dir = std::env::temp_dir().join("vise-desktop-isolation");
+        let spec = JobSpec {
+            container: vise_core::ContainerFormat::Mkv,
+            input_path: dir.join("in.mkv").to_string_lossy().to_string(),
+            output_path: dir.join("streak.mkv").to_string_lossy().to_string(),
+            ..Default::default()
+        };
+        let state = isolated_window(&[spec.clone(), spec.clone(), spec.clone()]);
+        let ids: Vec<JobId> = state
+            .lock()
+            .expect("lock")
+            .session
+            .jobs()
+            .iter()
+            .map(|job| job.id)
+            .collect();
+        assert_eq!(ids.len(), 3, "a queue of three jobs");
+
+        let death = || WorkerDeath {
+            pid: 4242,
+            code: None,
+            signal: None,
+            reason: "the process was killed".into(),
+        };
+        let mut policy = IsolationPolicy::new();
+
+        // Jobs one and two: replaced, each one after a longer wait.
+        let mut backoffs = Vec::new();
+        for id in ids.iter().take(2) {
+            let run = apply_outcome(
+                &state,
+                &mut policy,
+                *id,
+                &spec,
+                EncodeOutcome::WorkerGone(death()),
+            );
+            backoffs.push(run.backoff());
+            assert!(
+                !matches!(run, JobRun::StopQueue { .. }),
+                "the queue carries on while the streak is short: {run:?}"
+            );
+        }
+        assert_eq!(backoffs[0], Duration::ZERO);
+        assert_eq!(
+            backoffs[1],
+            vise_ipc::crash::DEFAULT_DEATH_BACKOFF,
+            "each replacement waits longer than the last"
+        );
+
+        // Job three: the streak is reported rather than restarted again, and the
+        // jobs behind it are left alone.
+        let run = apply_outcome(
+            &state,
+            &mut policy,
+            ids[2],
+            &spec,
+            EncodeOutcome::WorkerGone(death()),
+        );
+        match run {
+            JobRun::StopQueue { reason } => {
+                assert!(reason.contains("3 time(s) in a row"), "{reason}");
+            }
+            other => panic!("the queue must stop after three deaths, got {other:?}"),
+        }
+        let states: Vec<JobState> = state
+            .lock()
+            .expect("lock")
+            .session
+            .jobs()
+            .iter()
+            .map(|job| job.status.state)
+            .collect();
+        assert_eq!(
+            states,
+            vec![JobState::Failed, JobState::Failed, JobState::Failed],
+            "each job that ran failed on its own; none was left marked running"
+        );
+        assert!(
+            state.lock().expect("lock").queue_pause.is_none(),
+            "a crash is not a disk-space pause"
+        );
+    }
+
+    #[test]
+    fn a_job_the_user_stopped_is_cancelled_and_never_counted_against_the_worker() {
+        let dir = std::env::temp_dir().join("vise-desktop-isolation");
+        let spec = JobSpec {
+            container: vise_core::ContainerFormat::Mkv,
+            input_path: dir.join("in.mkv").to_string_lossy().to_string(),
+            output_path: dir.join("stopped.mkv").to_string_lossy().to_string(),
+            ..Default::default()
+        };
+        let state = isolated_window(std::slice::from_ref(&spec));
+        let id = state.lock().expect("lock").session.jobs()[0].id;
+
+        let mut policy = IsolationPolicy::new();
+        policy.request_stop();
+        let run = apply_outcome(
+            &state,
+            &mut policy,
+            id,
+            &spec,
+            EncodeOutcome::cancelled("encode cancelled before completion"),
+        );
+        assert_eq!(run, JobRun::Continued);
+        let job = state.lock().expect("lock").session.jobs()[0].clone();
+        assert_eq!(job.status.state, JobState::Cancelled, "{job:?}");
+        assert_eq!(policy.guard().consecutive(), 0, "a stop is not a crash");
+
+        // The same stop, arriving as a worker that went away in the meantime.
+        let run = apply_outcome(
+            &state,
+            &mut policy,
+            id,
+            &spec,
+            EncodeOutcome::WorkerGone(WorkerDeath {
+                pid: 7,
+                code: Some(1),
+                signal: None,
+                reason: "the process ended".into(),
+            }),
+        );
+        assert_eq!(run, JobRun::Continued);
+        assert_eq!(
+            state.lock().expect("lock").session.jobs()[0].status.state,
+            JobState::Cancelled,
+            "still a cancellation"
+        );
+        assert_eq!(policy.guard().consecutive(), 0);
+    }
+
+    #[test]
+    fn a_partial_the_sweep_cannot_remove_is_named_rather_than_hidden() {
+        let state = isolated_window(&[]);
+        let dir = std::env::temp_dir().join("vise-desktop-isolation");
+        let output = dir.join("held.mkv");
+        // A folder wearing a partial's name cannot be deleted as a file, which
+        // is the same situation as a file an orphaned encoder still holds: the
+        // sweep cannot remove it, so it has to say which one it was.
+        let partial = vise_ipc::partial::partial_output_path_for(&output, 5);
+        std::fs::create_dir_all(&partial).expect("a stubborn partial");
+
+        let cleanup = sweep_partials(&state, &output);
+        assert!(
+            cleanup.failed.iter().any(|(path, _)| *path == partial),
+            "a partial the sweep cannot remove is reported: {cleanup:?}"
+        );
+        assert!(!cleanup.is_clean());
+        assert!(
+            cleanup.summary().contains("held.vise-part-5.mkv"),
+            "the user is told which file is still there: {}",
+            cleanup.summary()
+        );
+        assert!(
+            cleanup.summary().contains("could not be removed"),
+            "{}",
+            cleanup.summary()
+        );
+        assert!(
+            !output.exists(),
+            "nothing is promoted to the destination while sweeping"
+        );
+        let _ = std::fs::remove_dir_all(&partial);
+    }
+
+    #[test]
+    fn a_job_state_is_named_the_way_the_queue_shows_it() {
+        assert_eq!(state_label(JobState::Completed), "finished");
+        assert_eq!(state_label(JobState::Failed), "failed");
+        assert_eq!(state_label(JobState::Cancelled), "cancelled");
+        assert_eq!(state_label(JobState::Running), "running");
     }
 
     #[test]

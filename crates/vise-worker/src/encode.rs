@@ -683,17 +683,11 @@ pub fn encode_log_label(job: &JobSpec) -> String {
 }
 
 /// Temporary output path used while an encode runs.
+///
+/// The naming is shared with the window, which has to be able to find and sweep
+/// these files when a worker dies before it can tidy up after itself.
 pub fn partial_output_path(output: &Path) -> PathBuf {
-    let parent = output.parent().unwrap_or_else(|| Path::new("."));
-    let stem = output
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("output");
-    let extension = output.extension().and_then(|e| e.to_str()).unwrap_or("mkv");
-    parent.join(format!(
-        "{stem}.vise-part-{}.{extension}",
-        std::process::id()
-    ))
+    vise_ipc::partial::partial_output_path(output)
 }
 
 /// Replace the destination argument in a resolved command line.
