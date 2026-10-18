@@ -147,11 +147,15 @@ pub struct FfprobeScanner {
 }
 
 impl Default for FfprobeScanner {
+    /// The tools a shipped build carries, found beside the executable, falling
+    /// back to the machine only when the application bundles none.
+    ///
+    /// The executable's own directory is used as the search root so a packaged
+    /// build and a development build from the same tree resolve the same way.
     fn default() -> Self {
-        Self {
-            ffprobe: find_tool("ffprobe"),
-            ffmpeg: find_tool("ffmpeg"),
-        }
+        Self::from_tooling(crate::tooling::MediaTooling::resolve(
+            application_root().as_deref(),
+        ))
     }
 }
 
@@ -160,8 +164,45 @@ impl FfprobeScanner {
         Self::default()
     }
 
+    /// Build a scanner from a resolved set of tools, keeping their paths.
+    pub fn from_tooling(tooling: crate::tooling::MediaTooling) -> Self {
+        Self {
+            ffprobe: tooling.ffprobe.path().map(Path::to_path_buf),
+            ffmpeg: tooling.ffmpeg.path().map(Path::to_path_buf),
+        }
+    }
+
+    /// Build a scanner that looks for the application's own tools under `root`.
+    ///
+    /// This is what a release build uses, where the tools sit beside the
+    /// executable rather than beside the crate.
+    pub fn with_application_root(root: &Path) -> Self {
+        Self::from_tooling(crate::tooling::MediaTooling::resolve(Some(root)))
+    }
+
+    /// Where the running executable is, when it can be named.
+    pub fn application_root() -> Option<PathBuf> {
+        std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().map(Path::to_path_buf))
+    }
+
     pub fn with_tools(ffprobe: Option<PathBuf>, ffmpeg: Option<PathBuf>) -> Self {
         Self { ffprobe, ffmpeg }
+    }
+
+    /// What this scanner is using and where it came from.
+    pub fn tooling(&self) -> crate::tooling::MediaTooling {
+        let source = |found: &Option<PathBuf>| match found {
+            Some(path) => crate::tooling::ToolSource::Path(path.clone()),
+            None => crate::tooling::ToolSource::Missing,
+        };
+        crate::tooling::MediaTooling {
+            ffmpeg: source(&self.ffmpeg),
+            ffprobe: source(&self.ffprobe),
+            fully_bundled: false,
+            root: None,
+        }
     }
 
     pub fn ffprobe_path(&self) -> Option<&Path> {
@@ -693,6 +734,17 @@ impl ScanResult {
 // ---------------------------------------------------------------------------
 // tool discovery
 // ---------------------------------------------------------------------------
+
+/// The directory the running executable lives in.
+///
+/// `None` when the executable cannot be named, which is not an error: a
+/// development build simply has nothing bundled beside it and falls back to the
+/// machine's own tools.
+fn application_root() -> Option<PathBuf> {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(Path::to_path_buf))
+}
 
 fn find_tool(name: &str) -> Option<PathBuf> {
     // PATH

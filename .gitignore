@@ -1,2 +1,8 @@
 re
 target/
+
+# Fetched media tooling is never tracked: the lock file records which binaries
+# belong here, and scripts/verify-media-tools.sh checks what is actually present.
+vendor/
+# Fetched media tooling also lands under the desktop crate for the Tauri bundle.
+apps/vise-desktop/src-tauri/vendor/

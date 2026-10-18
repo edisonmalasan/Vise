@@ -257,15 +257,39 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [ ] Windows build and installer
 - [ ] macOS build and app bundle
 - [ ] Linux build and package
-- [ ] Bundle FFmpeg and ffprobe with release builds
-- [ ] Prefer bundled media tooling before PATH discovery
+- [x] Bundle FFmpeg and ffprobe with release builds
+- [x] Prefer bundled media tooling before PATH discovery
 - [x] Versioned release notes
 - [x] Reproducible build process
-- [x] Update delivery mechanism `(optional)`
+- [x] Update delivery mechanism \(optional)
+**Status:** In progress (5/8 verified; the three platform installers are pending.)
 
-**Status:** In progress (3/8 verified; platform installers and bundled media tooling pending)
+A shipped build carries its own encoder rather than relying on whatever the
+machine has, because the filters and encoders the application offers are only
+present in some builds. \crates/vise-core/src/tooling.rs\ owns the order and it
+is fixed: the application's own copy under any of the packaged layouts, then the
+machine's \PATH\, then a per-user install. A file only counts when it exists, is
+a file, and is executable, so a directory called \fmpeg.exe\ is not mistaken for
+a binary and found at the first spawn instead. When nothing is bundled the build
+says so rather than behaving quietly differently from a shipped one, and that
+reaches the Group 20 diagnostics bundle.
 
----
+Verified end to end on this machine rather than by inspection. The tools are
+fetched into a pin file, the archive digest was compared against the digest the
+publisher publishes, and the extracted binaries' digests were then pinned, so a
+release job can re-check the claim with \erify-media-tools.sh\ before it
+publishes. That script was confirmed to pass on the fetched tools and to fail on a
+binary altered by one byte. A real \uild-release.sh --bundled\ produced a
+staged package whose bundled \fmpeg\ runs (8.1.2) and which the tooling resolver
+reports as bundled while a different ffmpeg is on the \PATH\.
+
+Not claimed: the three platform installers. The Tauri bundle configuration is in
+place and the resource path resolves, but the \	auri\ CLI is not installed here,
+so no installer was produced and neither a macOS bundle nor a Linux package was
+built; only the Windows target was compiled. The pin file carries real archive
+digests for Windows and Linux and placeholders for macOS and for the Linux
+per-binary digests, which the fetch script refuses to leave unpinned without
+saying so.
 
 ## Group 13 — Worker process and JSON IPC
 
@@ -594,7 +618,7 @@ Required groups: 19
 | 9 | Chapters and metadata | Complete (6/6) |
 | 10 | Encoding control and job reliability | In progress (8/10) |
 | 11 | Hardware acceleration | Complete (7/7) |
-| 12 | Platform packaging and release | In progress (3/8) |
+| 12 | Platform packaging and release | In progress (5/8; bundled tooling done, platform installers pending) |
 | 13 | Worker process and JSON IPC | Complete (9/9) |
 | 14 | Desktop parity with reference product | Complete (18/18) |
 | 15 | Preferences surface | Complete (8/8) |
