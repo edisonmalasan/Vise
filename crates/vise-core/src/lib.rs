@@ -6,6 +6,7 @@
 
 pub mod attachments;
 mod audio;
+mod capability;
 mod catalog;
 mod chapter;
 mod error;
@@ -23,9 +24,11 @@ mod progress;
 mod release;
 mod session;
 mod subtitle;
+pub mod sweep;
 mod video;
 pub use attachments::*;
 pub use audio::*;
+pub use capability::*;
 pub use catalog::*;
 pub use chapter::*;
 pub use error::CoreError;

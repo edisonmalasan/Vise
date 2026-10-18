@@ -87,7 +87,10 @@ pub fn sanitize_label(raw: &str) -> String {
 
 /// The log file name one encode writes to.
 pub fn encode_log_name(label: &str) -> String {
-    format!("{ENCODE_LOG_PREFIX}{}{ENCODE_LOG_SUFFIX}", sanitize_label(label))
+    format!(
+        "{ENCODE_LOG_PREFIX}{}{ENCODE_LOG_SUFFIX}",
+        sanitize_label(label)
+    )
 }
 
 /// Whether a name is one of this build's encode logs.
@@ -386,8 +389,7 @@ mod tests {
         // The open file is both the oldest and the largest, which is exactly
         // what happens when one encode writes for a day.
         let files = vec![
-            LogFile::retained("encode-open.log", 9000, 10_000)
-                .with_role(LogRole::InProgress),
+            LogFile::retained("encode-open.log", 9000, 10_000).with_role(LogRole::InProgress),
             LogFile::retained("encode-finished.log", 9000, 1),
         ];
         let plan = decide_rotation(&policy(1000, 1), &files);
@@ -406,8 +408,7 @@ mod tests {
     fn a_log_the_user_is_reading_is_never_removed() {
         let files = vec![
             LogFile::retained("encode-open.log", 100, 5).with_role(LogRole::InProgress),
-            LogFile::retained("encode-reading.log", 100, 500)
-                .with_role(LogRole::BeingRead),
+            LogFile::retained("encode-reading.log", 100, 500).with_role(LogRole::BeingRead),
         ];
         let plan = decide_rotation(&policy(1, 1), &files);
         assert!(plan.is_empty(), "nothing else was disposable: {plan:?}");
@@ -425,7 +426,10 @@ mod tests {
         let plan = decide_rotation(&policy(1, 1), &files);
         assert!(plan.is_empty());
         assert_eq!(plan.keep.len(), 3);
-        assert_eq!(plan.bytes_kept, 30, "and it says so rather than claiming to have met the bound");
+        assert_eq!(
+            plan.bytes_kept, 30,
+            "and it says so rather than claiming to have met the bound"
+        );
     }
 
     #[test]

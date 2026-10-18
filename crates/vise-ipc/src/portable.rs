@@ -710,8 +710,14 @@ mod tests {
             PathBuf::from("/media/stick/vise/scratch"),
             "the directory is where the operator pointed"
         );
-        assert_eq!(roots.logs.from_key.as_deref(), Some("storage.logs.directory"));
-        assert_eq!(roots.settings.file, PathBuf::from("/media/stick/vise/data/settings.json"));
+        assert_eq!(
+            roots.logs.from_key.as_deref(),
+            Some("storage.logs.directory")
+        );
+        assert_eq!(
+            roots.settings.file,
+            PathBuf::from("/media/stick/vise/data/settings.json")
+        );
     }
 
     #[test]

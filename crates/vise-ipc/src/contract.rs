@@ -767,7 +767,10 @@ mod tests {
         init.log_directory = "/tmp/vise-logs".into();
         let path = init.log_file_path().expect("path");
         assert!(path.to_string_lossy().contains("vise-logs"));
-        assert_eq!(init.log_folder(), Some(std::path::PathBuf::from("/tmp/vise-logs")));
+        assert_eq!(
+            init.log_folder(),
+            Some(std::path::PathBuf::from("/tmp/vise-logs"))
+        );
     }
 
     #[test]

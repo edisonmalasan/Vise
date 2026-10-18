@@ -283,8 +283,7 @@ impl EncodeService {
         // failed. A log that starts when the encoder starts cannot answer "why
         // did this one not run".
         if let Some(path) = self.logs.begin_encode(&encode_log_label(job)) {
-            self.logs
-                .info(format!("encoding log: {}", path.display()));
+            self.logs.info(format!("encoding log: {}", path.display()));
         }
         // The hold is taken here, after the job has been accepted and before any
         // work happens, and released on every path out of the encode thread. An

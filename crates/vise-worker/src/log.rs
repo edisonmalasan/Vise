@@ -188,7 +188,11 @@ impl LogService {
         // the same two-line entry. A failure on one is not a reason to lose the
         // other, so neither is allowed to stop the other being tried.
         let session = self.disk_target.lock().ok().and_then(|guard| guard.clone());
-        let encode = self.encode_target.lock().ok().and_then(|guard| guard.clone());
+        let encode = self
+            .encode_target
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone());
         for path in [session, encode].into_iter().flatten() {
             append_line(&path, &line);
         }
@@ -202,7 +206,11 @@ impl LogService {
     /// for: a log is worth writing, and an encode that cannot be logged is still
     /// an encode somebody asked for.
     pub fn begin_encode(&self, label: &str) -> Option<PathBuf> {
-        let folder = self.log_folder.lock().ok().and_then(|guard| guard.clone())?;
+        let folder = self
+            .log_folder
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())?;
         if std::fs::create_dir_all(&folder).is_err() {
             return None;
         }
@@ -234,11 +242,7 @@ impl LogService {
         let Some(folder) = self.log_folder.lock().ok().and_then(|guard| guard.clone()) else {
             return RotationReport::clean();
         };
-        let policy = self
-            .rotation
-            .lock()
-            .map(|guard| *guard)
-            .unwrap_or_default();
+        let policy = self.rotation.lock().map(|guard| *guard).unwrap_or_default();
         let files: Vec<LogFile> = enclog::list_encode_logs(&folder, enclog::now_seconds());
         // Nothing is open right now, so nothing is protected: the folder holds
         // only finished logs. The policy still supports the protected roles,
@@ -266,7 +270,10 @@ impl LogService {
 
     /// The log the running encode is being written to.
     pub fn encode_log(&self) -> Option<PathBuf> {
-        self.encode_target.lock().ok().and_then(|guard| guard.clone())
+        self.encode_target
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone())
     }
 
     /// The folder per-encode logs are written into.
