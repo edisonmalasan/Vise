@@ -376,6 +376,15 @@ impl DiagnosticsState {
         self.reports.push(report);
     }
 
+    /// The reports this surface has produced, newest last.
+    ///
+    /// Read through the view model by the page; this is for the tests that check
+    /// one report per kind was kept rather than one per export.
+    #[cfg_attr(not(test), allow(dead_code, reason = "the view model carries them"))]
+    pub fn reports(&self) -> &[ReportViewModel] {
+        &self.reports
+    }
+
     /// The per-encode logs, newest first, with the rotation policy applied.
     ///
     /// `files` is injected rather than read from a folder so that the listing

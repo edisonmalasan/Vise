@@ -4795,6 +4795,129 @@ mod tests {
     }
 
     #[test]
+    fn a_scan_is_told_where_to_write_its_logs_from_the_resolved_storage_root() {
+        // The same folder the storage rules resolved, so a portable install's
+        // worker logs beside the executable and an installed one's stay in the
+        // configuration directory.
+        let settings = PreferencesSettings::new();
+        let folder = Path::new("C:\\cfg\\vise\\logs");
+        let init = settings.to_worker_init_in(folder);
+        assert!(init.enable_disk_logging);
+        assert_eq!(init.log_directory, folder.to_string_lossy());
+        assert_eq!(init.log_folder().as_deref(), Some(folder));
+        assert!(init.log_file_path().is_some());
+    }
+
+    #[test]
+    fn a_sweep_without_a_source_says_so_rather_than_planning_an_encode_of_nothing() {
+        let mut window = DesktopState {
+            diagnostics: windows::diagnostics::DiagnosticsState::new(PathBuf::from("logs")),
+            ..DesktopState::default()
+        };
+        assert_eq!(sweep_base_job(&window).input_path, "");
+        window
+            .diagnostics
+            .set_range(vise_core::SweepRange::new(20, 24, 2));
+        let reason = window.diagnostics.sweep_refusal(false).expect("a refusal");
+        assert!(reason.contains("open a source"), "{reason}");
+    }
+
+    #[test]
+    fn a_sweep_is_refused_while_the_real_queue_has_an_encode_running() {
+        let jobs = [spec_named("One")];
+        let mut window = window_with(&jobs);
+        window
+            .diagnostics
+            .set_range(vise_core::SweepRange::new(20, 24, 2));
+        assert!(!queue_is_running(&window), "nothing is running yet");
+
+        let id = window.session.jobs()[0].id;
+        set_job_state_holding(&mut window, id, JobState::Running, "encoding");
+        assert!(queue_is_running(&window));
+        let reason = window.diagnostics.sweep_refusal(true).expect("a refusal");
+        assert!(reason.contains("competing"), "{reason}");
+    }
+
+    #[test]
+    fn the_diagnostics_surface_opens_with_an_empty_honest_table() {
+        let window = DesktopState {
+            diagnostics: windows::diagnostics::DiagnosticsState::new(PathBuf::from("logs")),
+            ..DesktopState::default()
+        };
+        let view =
+            window
+                .diagnostics
+                .view(&[], &vise_ipc::enclog::RotationPolicy::default(), false);
+        assert!(view.encode_logs.is_empty());
+        assert!(view.capability.is_none());
+        assert!(view.reports.is_empty());
+        assert_eq!(view.log_folder, "logs");
+        assert!(
+            view.summary.contains("No quality sweep"),
+            "{}",
+            view.summary
+        );
+    }
+
+    #[test]
+    fn an_export_that_cannot_be_written_is_reported_rather_than_saved_over() {
+        // A file where a folder should be: the only way to be sure of an
+        // unwritable path on a machine whose temporary folder is writable.
+        let blocker = std::env::temp_dir().join("vise-desktop-export-blocker");
+        std::fs::write(&blocker, b"not a folder").expect("blocker");
+        let mut guard = DesktopState::default();
+        let report = write_report(
+            &mut guard,
+            "results",
+            &blocker,
+            "vise-queue-results.csv",
+            b"a,b\n1,2\n",
+            "one row".to_string(),
+        );
+        assert!(!report.written, "{report:?}");
+        assert!(
+            report.problem.contains("could not be written"),
+            "{report:?}"
+        );
+        assert!(
+            !guard.errors.entries().is_empty(),
+            "and it is on the problem list rather than only in the reply"
+        );
+        let _ = std::fs::remove_file(&blocker);
+    }
+
+    #[test]
+    fn an_export_that_can_be_written_is_recorded_once_per_kind() {
+        let dir = std::env::temp_dir().join("vise-desktop-export-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut guard = DesktopState::default();
+        let first = write_report(
+            &mut guard,
+            "bundle",
+            &dir,
+            "one.zip",
+            b"first",
+            "first".to_string(),
+        );
+        let second = write_report(
+            &mut guard,
+            "bundle",
+            &dir,
+            "two.zip",
+            b"second",
+            "second".to_string(),
+        );
+        assert!(first.written && second.written, "{first:?} {second:?}");
+        assert_eq!(
+            std::fs::read(dir.join("two.zip")).expect("written"),
+            b"second"
+        );
+        assert_eq!(guard.diagnostics.reports().len(), 1);
+        assert_eq!(guard.diagnostics.reports()[0].path, second.path);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn scan_options_default_to_no_previews_and_no_limits() {
         let options: ScanOptions = serde_json::from_str("{}").expect("empty options");
         let settings = PreferencesSettings {
