@@ -4,8 +4,8 @@
 //! packet types, progress/state model, and geometry helpers used by all
 //! frontends. It has no UI dependency.
 
-mod audio;
 pub mod attachments;
+mod audio;
 mod catalog;
 mod chapter;
 mod error;
@@ -24,8 +24,8 @@ mod release;
 mod session;
 mod subtitle;
 mod video;
-pub use audio::*;
 pub use attachments::*;
+pub use audio::*;
 pub use catalog::*;
 pub use chapter::*;
 pub use error::CoreError;
@@ -33,10 +33,10 @@ pub use geometry::*;
 pub use hardware::*;
 pub use hdr::*;
 pub use i18n::*;
-pub use lossless::*;
 pub use job::{
     AudioCodec, ContainerFormat, EncodingMode, JobSpec, OutputOptions, SubtitleMode, VideoCodec,
 };
+pub use lossless::*;
 pub use media::{
     optical_source_kind, parse_ffprobe_output, ChapterInfo, CropDetection, FfprobeScanner,
     FormatInfo, MediaBuffer, MediaScanner, OpticalSourceKind, Packet, ScanResult, StreamInfo,

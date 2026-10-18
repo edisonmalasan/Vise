@@ -502,9 +502,7 @@ fn convert_stream(s: FfprobeStream) -> StreamInfo {
 /// profile and an RPU-present flag; HDR10+ announces itself as SMPTE 2094-40
 /// dynamic metadata. Both are side data rather than codec properties, which
 /// is why a stream can be plain HEVC and still carry a Dolby Vision RPU.
-fn read_hdr_side_data(
-    side_data: Option<&[FfprobeSideData]>,
-) -> (Option<u8>, bool, bool) {
+fn read_hdr_side_data(side_data: Option<&[FfprobeSideData]>) -> (Option<u8>, bool, bool) {
     let mut profile = None;
     let mut rpu = false;
     let mut hdr10_plus = false;
@@ -679,7 +677,11 @@ impl ScanResult {
         self.streams
             .iter()
             .filter(|stream| stream.kind == TrackKind::Video)
-            .find_map(|stream| stream.dolby_vision_profile.map(|profile| (profile, stream.dolby_vision_rpu)))
+            .find_map(|stream| {
+                stream
+                    .dolby_vision_profile
+                    .map(|profile| (profile, stream.dolby_vision_rpu))
+            })
     }
 
     /// Whether any stream carries HDR10+ dynamic metadata.

@@ -302,11 +302,14 @@ impl Transcoder {
                 .map(|outcome| outcome.claim.clone())
                 .collect()
         } else {
-            [spec.dolby_vision_outcome(&hdr_caps), spec.hdr10_plus_outcome(&hdr_caps)]
-                .iter()
-                .filter(|outcome| !outcome.supported)
-                .map(|outcome| outcome.claim.clone())
-                .collect()
+            [
+                spec.dolby_vision_outcome(&hdr_caps),
+                spec.hdr10_plus_outcome(&hdr_caps),
+            ]
+            .iter()
+            .filter(|outcome| !outcome.supported)
+            .map(|outcome| outcome.claim.clone())
+            .collect()
         };
         if audio_opts.passthrough || audio_opts.copy {
             args.push("-c:a".into());
@@ -338,16 +341,13 @@ impl Transcoder {
         // Keep broad compatibility for software baseline encoding, and pin the
         // lossless plan's pixel format when the job is a lossless write so the
         // encoder is not handed a format the plan did not choose.
-        let pix_fmt = lossless_plan
-            .pix_fmt
-            .clone()
-            .unwrap_or_else(|| {
-                if video_opts.ten_bit {
-                    "yuv420p10le".to_string()
-                } else {
-                    "yuv420p".to_string()
-                }
-            });
+        let pix_fmt = lossless_plan.pix_fmt.clone().unwrap_or_else(|| {
+            if video_opts.ten_bit {
+                "yuv420p10le".to_string()
+            } else {
+                "yuv420p".to_string()
+            }
+        });
         args.push("-pix_fmt".into());
         args.push(pix_fmt);
         // constant frame rate handling

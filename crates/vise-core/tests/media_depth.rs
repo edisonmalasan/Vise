@@ -86,7 +86,9 @@ fn a_real_lossless_ffv1_flac_mkv_is_produced() {
         .transcode(&spec)
         .expect("lossless transcode");
     assert!(out.exists(), "the encoder wrote no file");
-    let claim = result.lossless_claim.expect("a lossless job carries a claim");
+    let claim = result
+        .lossless_claim
+        .expect("a lossless job carries a claim");
     assert!(claim.contains("Lossless FFV1"), "{claim}");
 
     let scan = FfprobeScanner::default()
@@ -120,18 +122,20 @@ fn a_lossless_job_never_hands_the_encoder_a_rate_control_value() {
         .expect("plan");
     // An intra lossless encoder takes no `-crf`; handing it one makes ffmpeg
     // refuse the whole job.
-    assert!(!plan.args.iter().any(|arg| arg == "-crf"), "{:?}", plan.args);
-    assert!(plan
-        .args
-        .windows(2)
-        .any(|pair| pair == ["-c:v", "ffv1"]));
+    assert!(
+        !plan.args.iter().any(|arg| arg == "-crf"),
+        "{:?}",
+        plan.args
+    );
+    assert!(plan.args.windows(2).any(|pair| pair == ["-c:v", "ffv1"]));
     assert!(plan
         .args
         .windows(2)
         .any(|pair| pair == ["-pix_fmt", "yuv420p"]));
-    assert_eq!(plan.lossless_claim.as_deref(), Some(
-        "Lossless FFV1 video in Matroska with lossless FLAC audio."
-    ));
+    assert_eq!(
+        plan.lossless_claim.as_deref(),
+        Some("Lossless FFV1 video in Matroska with lossless FLAC audio.")
+    );
 }
 
 #[test]
@@ -186,7 +190,10 @@ fn mp4_faststart_and_ipod_profile_are_applied() {
         .args
         .windows(2)
         .any(|pair| pair == ["-movflags", "+faststart"]));
-    assert!(plan.args.windows(2).any(|pair| pair == ["-profile:v", "baseline"]));
+    assert!(plan
+        .args
+        .windows(2)
+        .any(|pair| pair == ["-profile:v", "baseline"]));
     assert!(plan.args.windows(2).any(|pair| pair == ["-level", "3.0"]));
     assert!(plan
         .args
@@ -246,6 +253,9 @@ fn dolby_vision_and_hdr10_plus_arguments_follow_the_capable_encoder() {
     let plan = Transcoder::default().plan(&spec).expect("plan");
     // The software HEVC encoder is the one that carries both private options.
     assert_eq!(plan.video_encoder, "libx265");
-    assert!(plan.args.windows(2).any(|pair| pair == ["-dolbyvision", "1"]));
+    assert!(plan
+        .args
+        .windows(2)
+        .any(|pair| pair == ["-dolbyvision", "1"]));
     assert!(plan.args.windows(2).any(|pair| pair == ["-udu_sei", "1"]));
 }

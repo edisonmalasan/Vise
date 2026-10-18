@@ -110,10 +110,7 @@ impl LosslessPlan {
             ));
         }
         if !passthrough && !audio_is_lossless(audio_codec) {
-            reasons.push(format!(
-                "{} audio is not lossless",
-                audio_codec.label()
-            ));
+            reasons.push(format!("{} audio is not lossless", audio_codec.label()));
         }
 
         let lossless = reasons.is_empty();
@@ -129,10 +126,7 @@ impl LosslessPlan {
                 audio
             )
         } else {
-            format!(
-                "Not a lossless write: {}.",
-                reasons.join("; ")
-            )
+            format!("Not a lossless write: {}.", reasons.join("; "))
         };
         let reason = if lossless {
             None
@@ -267,7 +261,11 @@ mod tests {
         aac.audio_codec = AudioCodec::Aac;
         let plan = LosslessPlan::resolve(&aac);
         assert!(!plan.lossless);
-        assert!(plan.claim.contains("AAC audio is not lossless"), "{}", plan.claim);
+        assert!(
+            plan.claim.contains("AAC audio is not lossless"),
+            "{}",
+            plan.claim
+        );
     }
 
     #[test]

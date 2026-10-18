@@ -539,18 +539,12 @@ impl JobSpec {
     /// The compatibility profile is a hard requirement of the output flags, so
     /// it wins over a profile the user picked while the flag is on.
     /// The resolved Dolby Vision decision for this job, against the machine.
-    pub fn dolby_vision_outcome(
-        &self,
-        caps: &crate::HdrCapabilities,
-    ) -> crate::HdrOutcome {
+    pub fn dolby_vision_outcome(&self, caps: &crate::HdrCapabilities) -> crate::HdrOutcome {
         self.dolby_vision.resolve(caps, self.video_codec)
     }
 
     /// The resolved HDR10+ decision for this job, against the machine.
-    pub fn hdr10_plus_outcome(
-        &self,
-        caps: &crate::HdrCapabilities,
-    ) -> crate::HdrOutcome {
+    pub fn hdr10_plus_outcome(&self, caps: &crate::HdrCapabilities) -> crate::HdrOutcome {
         self.hdr10_plus.resolve(caps, self.video_codec)
     }
 

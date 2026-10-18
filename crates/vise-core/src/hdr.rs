@@ -331,10 +331,13 @@ mod tests {
         assert!(!bare.dolby_vision_rpu);
         assert!(!bare.hdr10_plus_sei);
         // A build that cannot be probed at all reports nothing rather than guessing.
-        assert_eq!(HdrCapabilities::default(), HdrCapabilities {
-            dolby_vision_rpu: false,
-            hdr10_plus_sei: false
-        });
+        assert_eq!(
+            HdrCapabilities::default(),
+            HdrCapabilities {
+                dolby_vision_rpu: false,
+                hdr10_plus_sei: false
+            }
+        );
     }
 
     #[test]
@@ -414,19 +417,32 @@ mod tests {
             action: Some(Hdr10PlusAction::Strip),
             ..Default::default()
         };
-        assert!(strip.resolve(&HdrCapabilities::default(), VideoCodec::H265).supported);
+        assert!(
+            strip
+                .resolve(&HdrCapabilities::default(), VideoCodec::H265)
+                .supported
+        );
     }
 
     #[test]
     fn the_actions_read_back_every_way_this_build_spells_them() {
-        assert_eq!(DolbyVisionAction::parse("copy"), Some(DolbyVisionAction::PassThrough));
+        assert_eq!(
+            DolbyVisionAction::parse("copy"),
+            Some(DolbyVisionAction::PassThrough)
+        );
         assert_eq!(
             DolbyVisionAction::parse("extract-rpu"),
             Some(DolbyVisionAction::ExtractRpu)
         );
-        assert_eq!(DolbyVisionAction::parse("strip"), Some(DolbyVisionAction::Strip));
+        assert_eq!(
+            DolbyVisionAction::parse("strip"),
+            Some(DolbyVisionAction::Strip)
+        );
         assert_eq!(DolbyVisionAction::parse("shred"), None);
-        assert_eq!(Hdr10PlusAction::parse("passthrough"), Some(Hdr10PlusAction::PassThrough));
+        assert_eq!(
+            Hdr10PlusAction::parse("passthrough"),
+            Some(Hdr10PlusAction::PassThrough)
+        );
         assert_eq!(Hdr10PlusAction::parse("drop"), Some(Hdr10PlusAction::Strip));
         assert_eq!(Hdr10PlusAction::parse("maybe"), None);
         assert_eq!(DolbyVisionAction::default(), DolbyVisionAction::PassThrough);

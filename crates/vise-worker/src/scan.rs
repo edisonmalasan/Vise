@@ -466,7 +466,9 @@ pub fn build_titles(
         // The HDR facts travel with the title's own video stream, so a title
         // whose picture carries a Dolby Vision RPU or HDR10+ metadata says so.
         let title_video = streams.iter().find(|s| s.kind == TrackKind::Video);
-        let dv_profile = title_video.and_then(|s| s.dolby_vision_profile).unwrap_or(0) as u32;
+        let dv_profile = title_video
+            .and_then(|s| s.dolby_vision_profile)
+            .unwrap_or(0) as u32;
         let dv_rpu = title_video.is_some_and(|s| s.dolby_vision_rpu);
         let hdr10_plus = streams.iter().any(|s| s.hdr10_plus);
 
