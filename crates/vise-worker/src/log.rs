@@ -45,6 +45,8 @@ pub struct LogService {
     encode_target: Mutex<Option<PathBuf>>,
     /// How much of the folder is allowed to exist at once.
     rotation: Mutex<RotationPolicy>,
+    /// How many times this buffer has been cleared.
+    generations: AtomicUsize,
 }
 
 impl Default for LogService {
@@ -91,6 +93,7 @@ impl LogService {
             log_folder: Mutex::new(None),
             encode_target: Mutex::new(None),
             rotation: Mutex::new(RotationPolicy::default()),
+            generations: AtomicUsize::new(0),
         }
     }
 
@@ -333,7 +336,22 @@ impl LogService {
             messages,
             next_index,
             truncated,
+            session: self.session(),
         }
+    }
+
+    /// Which worker and which buffer this is.
+    ///
+    /// Sent with every page rather than asked for separately, because the answer
+    /// has to be true *of that page*: a caller that fetched it before a restart
+    /// and compared it afterwards would be comparing two things that were never
+    /// the same.
+    pub fn session(&self) -> String {
+        format!(
+            "{}:{}",
+            std::process::id(),
+            self.generations.load(Ordering::SeqCst)
+        )
     }
 
     /// Number of buffered entries.
@@ -347,6 +365,11 @@ impl LogService {
     }
 
     /// Drop every entry and restart indexing.
+    ///
+    /// The generation is bumped even though the indices keep counting, because
+    /// a caller holding a cursor cannot tell "the worker cleared its buffer" from
+    /// "the worker has nothing new", and the second reading is the one that
+    /// leaves a window showing a log that has quietly stopped.
     pub fn reset(&self) {
         if let Ok(mut guard) = self.entries.lock() {
             guard.clear();
@@ -354,6 +377,7 @@ impl LogService {
         if let Ok(mut flag) = self.truncated.lock() {
             *flag = false;
         }
+        self.generations.fetch_add(1, Ordering::SeqCst);
     }
 }
 
@@ -439,9 +463,32 @@ mod tests {
         for i in 0..5 {
             log.info(format!("entry {i}"));
         }
+        let before = log.session();
         log.reset();
         assert!(log.is_empty());
         assert!(!log.from_index(0).truncated);
+        assert_ne!(
+            log.session(),
+            before,
+            "a caller paging this worker is told the buffer was cleared"
+        );
+    }
+
+    #[test]
+    fn every_page_says_which_worker_and_buffer_it_came_from() {
+        let log = LogService::default();
+        log.info("one");
+        let first = log.from_index(0);
+        assert_eq!(first.session, log.session());
+        assert!(first.session.starts_with(&std::process::id().to_string()));
+        log.reset();
+        log.info("two");
+        let second = log.from_index(1);
+        assert_ne!(
+            second.session, first.session,
+            "the buffer changed even though the indices did not"
+        );
+        assert_eq!(second.messages.len(), 1, "index 1 is the new first entry");
     }
 
     fn log_folder(name: &str) -> PathBuf {
