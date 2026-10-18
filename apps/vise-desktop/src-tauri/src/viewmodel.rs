@@ -576,8 +576,17 @@ pub fn audio_track_view(track: &ScanAudioTrack, selected: &[u32]) -> TrackViewMo
     } else {
         track.codec_name.clone()
     };
+    // A track in a language other than the source's primary one says so in the
+    // row itself. It is a fact about the track, not a warning: many discs carry
+    // a commentary or a second-language track that the user wants to keep or
+    // drop deliberately, so the row names it rather than asking about it.
+    let origin = if track.foreign_language {
+        " · foreign language"
+    } else {
+        ""
+    };
     let detail = format!(
-        "{codec} · {} · {} · {}",
+        "{codec} · {} · {} · {}{origin}",
         format_channels(track.channel_count, &track.channel_layout),
         format_sample_rate(track.sample_rate),
         format_bit_rate(track.bit_rate)
@@ -1115,6 +1124,32 @@ mod tests {
         let view = audio_track_view(&bare, &[]);
         assert_eq!(view.summary, "Audio 4 · jpn");
         assert!(view.label.starts_with("Audio 4 · jpn · opus"));
+    }
+
+    #[test]
+    fn a_foreign_language_audio_track_says_so_on_its_own_row() {
+        let track = ScanAudioTrack {
+            track_number: 2,
+            codec_name: "ac3".into(),
+            channel_count: 2,
+            channel_layout: "stereo".into(),
+            sample_rate: 48_000,
+            bit_rate: 192_000,
+            language: "Japanese".into(),
+            language_code: "jpn".into(),
+            description: String::new(),
+            foreign_language: true,
+        };
+        let view = audio_track_view(&track, &[]);
+        assert!(
+            view.detail.contains("foreign language"),
+            "the row has to name it: {}",
+            view.detail
+        );
+        // It is a fact, not a problem: the row is still selectable.
+        assert_eq!(view.number, 2);
+        let chosen = audio_track_view(&track, &[2]);
+        assert!(chosen.selected);
     }
 
     #[test]

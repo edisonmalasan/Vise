@@ -31,7 +31,7 @@ use vise_core::{
 
 use audio::AudioSettings;
 pub use audio::{AudioDefaultsInput, AudioTrackInput};
-pub use chapters::{ChapterSettings, ChaptersInput, MarkerInput};
+pub use chapters::{ChapterImportInput, ChapterSettings, ChaptersInput, MarkerInput};
 pub use dimensions::DimensionsInput;
 pub use filters::{FilterInput, FilterSettings};
 pub use metadata::{MetadataInput, MetadataSettings};
@@ -361,6 +361,23 @@ impl TabSettings {
             chapter_processing,
             metadata_processing: self.metadata.to_job_options(),
             hardware_acceleration: hardware.clone(),
+            // HDR metadata is described by what the source carried and what the
+            // user chose to do about it. The encoder the user picked is not part
+            // of the request: the job resolves the outcome against the machine's
+            // capabilities, so a job saved on one machine and run on another
+            // reports the difference rather than encoding with the wrong thing.
+            dolby_vision: vise_core::DolbyVisionOptions {
+                enabled: facts.dolby_vision_rpu || facts.dolby_vision_profile > 0,
+                profile: (facts.dolby_vision_profile > 0)
+                    .then_some(facts.dolby_vision_profile as u8),
+                rpu_present: facts.dolby_vision_rpu,
+                action: vise_core::DolbyVisionAction::parse(&self.video.dolby_vision),
+            },
+            hdr10_plus: vise_core::Hdr10PlusOptions {
+                enabled: facts.hdr10_plus,
+                present: facts.hdr10_plus,
+                action: vise_core::Hdr10PlusAction::parse(&self.video.hdr10_plus),
+            },
             ..Default::default()
         })
     }
@@ -515,6 +532,7 @@ mod tests {
                 sample_rate: 48_000,
                 bit_rate: 640_000,
                 label: "Audio 1 · English".into(),
+                foreign_language: false,
             }],
             subtitles: vec![SubtitleFacts {
                 number: 1,

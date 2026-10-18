@@ -395,6 +395,13 @@
             </div>
             <p class="hint" id="videoPlan"></p>
           </fieldset>
+          <fieldset>
+            <legend>HDR metadata</legend>
+            <div class="grid two">
+              <div class="field"><label for="videoDolbyVision">Dolby Vision</label><select id="videoDolbyVision"></select><span class="hint" id="videoDolbyVisionHint"></span></div>
+              <div class="field"><label for="videoHdr10Plus">HDR10+</label><select id="videoHdr10Plus"></select><span class="hint" id="videoHdr10PlusHint"></span></div>
+            </div>
+          </fieldset>
         </div>
 
         <!-- Audio ----------------------------------------------------------- -->
@@ -473,6 +480,19 @@
             <button type="button" id="addMarkerBtn">Add marker</button>
           </div>
           <p class="hint" id="chaptersSummary"></p>
+          <fieldset class="import">
+            <legend>Import a chapter file</legend>
+            <div class="row">
+              <div class="field"><label for="chapterImportFormat">File type</label><select id="chapterImportFormat"></select><span class="hint" id="chapterImportFormatHint"></span></div>
+              <div class="grow"><label for="chapterImportSource">Chapter file</label><textarea id="chapterImportSource" rows="4" spellcheck="false" placeholder="start,end,name&#10;0,600,Opening"></textarea></div>
+            </div>
+            <p class="hint" id="chapterImportClaim"></p>
+            <ul class="markers" id="chapterImportPreview"></ul>
+            <div class="row">
+              <button type="button" id="chapterImportBtn" disabled>Replace the list</button>
+              <span class="hint" id="chapterImportProblem"></span>
+            </div>
+          </fieldset>
         </div>
 
         <!-- Metadata -------------------------------------------------------- -->

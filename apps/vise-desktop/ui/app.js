@@ -4240,6 +4240,12 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     applyNumber(tab.frameRate, function (value) {
       sendTab("set_video", { frameRate: value }, "That frame rate could not be used.");
     });
+    applyChoice(tab.dolbyVision, function (value) {
+      sendTab("set_video", { dolbyVision: value }, "That Dolby Vision action could not be used.");
+    });
+    applyChoice(tab.hdr10Plus, function (value) {
+      sendTab("set_video", { hdr10Plus: value }, "That HDR10+ action could not be used.");
+    });
     setText(
       el("videoPlan"),
       tab.planLabel + (tab.notes.length ? " " + tab.notes.join(" ") : "")
@@ -4485,6 +4491,59 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     });
     setText(el("chaptersSummary"), tab.summary + (tab.available ? "" : " " + tab.reason));
     offer(el("addMarkerBtn"), tab.available);
+    paintChapterImport(tab.import);
+  }
+
+  // The import is shown before it is accepted: the claim says what replacing the
+  // list would do, the preview says what would be in it, and the button stays
+  // closed until there is something that actually parsed. A file that failed is
+  // reported in the same place as a failed number rather than silently ignored.
+  function paintChapterImport(model) {
+    if (!model) return;
+    applyChoice(model.format, function (value) {
+      sendTab("import_chapters", { format: value }, "That chapter file type could not be read.");
+    });
+    var source = el("chapterImportSource");
+    if (source && document.activeElement !== source) {
+      source.value = model.source.text;
+    }
+    if (source) {
+      source.setAttribute("aria-describedby", "chapterImportClaim");
+    }
+    setText(el("chapterImportClaim"), model.outcome.claim);
+    setText(el("chapterImportProblem"), model.outcome.reason);
+
+    var preview = el("chapterImportPreview");
+    clear(preview);
+    model.outcome.markers.forEach(function (marker) {
+      var item = document.createElement("li");
+      item.className = "marker";
+      item.textContent = marker.label;
+      preview.appendChild(item);
+    });
+
+    var button = el("chapterImportBtn");
+    button.disabled = !model.outcome.parsed;
+    button.setAttribute(
+      "aria-describedby",
+      model.outcome.parsed ? "chapterImportClaim" : "chapterImportProblem"
+    );
+    if (source) {
+      source.oninput = function () {
+        sendTab(
+          "import_chapters",
+          { text: source.value },
+          "That chapter file could not be read."
+        );
+      };
+    }
+    button.onclick = function () {
+      sendTab(
+        "import_chapters",
+        { accept: true },
+        "That chapter file could not be used."
+      );
+    };
   }
 
   function markerCard(marker) {

@@ -7,9 +7,11 @@
 //! consequence of a choice before the job is queued.
 
 use serde::{Deserialize, Serialize};
+use vise_core::{DolbyVisionAction, Hdr10PlusAction};
 
 use crate::tabs::common::{
-    number_in_range, ChoiceGroup, ChoiceGroupViewModel, NumField, NumberViewModel, ToggleViewModel,
+    number_in_range, ChoiceGroup, ChoiceGroupViewModel, ChoiceOption, NumField, NumberViewModel,
+    ToggleViewModel,
 };
 use crate::tabs::compatibility::{
     encoder_levels, encoder_presets, encoder_profiles, encoder_tunes, video_codec_options,
@@ -141,6 +143,10 @@ pub struct VideoSettings {
     pub frame_rate_mode: String,
     /// Frame rate used by the constant mode.
     pub frame_rate: NumField,
+    /// What to do with a Dolby Vision RPU.
+    pub dolby_vision: String,
+    /// What to do with HDR10+ dynamic metadata.
+    pub hdr10_plus: String,
 }
 
 impl Default for VideoSettings {
@@ -160,6 +166,11 @@ impl Default for VideoSettings {
             colour_range: "default".to_string(),
             frame_rate_mode: FrameRateMode::Source.as_str().to_string(),
             frame_rate: NumField::of("24"),
+            // HDR metadata is carried through unless the user asks otherwise:
+            // dropping a Dolby Vision RPU or HDR10+ dynamic metadata is a change
+            // to the picture, not a neutral default.
+            dolby_vision: DolbyVisionAction::PassThrough.as_str().to_string(),
+            hdr10_plus: Hdr10PlusAction::PassThrough.as_str().to_string(),
         }
     }
 }
@@ -239,6 +250,10 @@ pub struct VideoInput {
     pub frame_rate_mode: Option<String>,
     /// Frame rate used by the constant mode.
     pub frame_rate: Option<String>,
+    /// What to do with a Dolby Vision RPU.
+    pub dolby_vision: Option<String>,
+    /// What to do with HDR10+ dynamic metadata.
+    pub hdr10_plus: Option<String>,
 }
 
 impl VideoInput {
@@ -321,6 +336,31 @@ impl VideoInput {
                 .as_str()
                 .to_string();
         }
+        // The HDR rows refuse a name they do not offer, the same as every other
+        // picker: an unrecognised action must not be stored and then resolved
+        // into whatever the core's default happens to be.
+        if let Some(action) = self.dolby_vision {
+            settings.dolby_vision = DolbyVisionAction::parse(&action)
+                .ok_or_else(|| {
+                    format!(
+                        "'{}' is not a Dolby Vision action this build offers.",
+                        action.trim()
+                    )
+                })?
+                .as_str()
+                .to_string();
+        }
+        if let Some(action) = self.hdr10_plus {
+            settings.hdr10_plus = Hdr10PlusAction::parse(&action)
+                .ok_or_else(|| {
+                    format!(
+                        "'{}' is not an HDR10+ action this build offers.",
+                        action.trim()
+                    )
+                })?
+                .as_str()
+                .to_string();
+        }
         if let Some(value) = self.frame_rate {
             settings.frame_rate = NumField { text: value };
         }
@@ -370,6 +410,10 @@ pub struct VideoTabViewModel {
     pub frame_rate_mode: ChoiceGroupViewModel,
     /// Frame-rate field for the constant mode.
     pub frame_rate: NumberViewModel,
+    /// What happens to a Dolby Vision RPU the source carries.
+    pub dolby_vision: ChoiceGroupViewModel,
+    /// What happens to HDR10+ dynamic metadata the source carries.
+    pub hdr10_plus: ChoiceGroupViewModel,
     /// One line describing the rate control.
     pub plan_label: String,
     /// Worth knowing but not blocking.
@@ -408,6 +452,110 @@ fn read_number(
         }
     }
     value
+}
+
+/// The two HDR metadata rows, resolved against what the source carries and what
+/// this machine's encoder can do.
+///
+/// The rows are always present, because a user who cannot see what will happen
+/// to the RPU has no way to ask for it to be kept. What varies is whether the
+/// choice is open: a source with no Dolby Vision metadata, or an encoder without
+/// RPU coding, closes the row with the reason rather than hiding the question.
+fn hdr_rows(
+    settings: &VideoSettings,
+    facts: &TitleFacts,
+    notes: &mut Vec<String>,
+    problems: &mut Vec<String>,
+) -> (ChoiceGroupViewModel, ChoiceGroupViewModel) {
+    let caps = vise_core::HdrCapabilities::detect(
+        vise_core::FfprobeScanner::default()
+            .ffmpeg_path()
+            .map(std::path::PathBuf::from)
+            .as_deref(),
+    );
+    let has_dv = facts.dolby_vision_profile > 0 || facts.dolby_vision_rpu;
+    let has_hdr10_plus = facts.hdr10_plus;
+
+    let dv_options = vec![
+        ChoiceOption::new(
+            DolbyVisionAction::PassThrough.as_str(),
+            "Keep the metadata in the video",
+        ),
+        ChoiceOption::new(
+            DolbyVisionAction::ExtractRpu.as_str(),
+            "Save it beside the file instead",
+        ),
+        ChoiceOption::new(
+            DolbyVisionAction::Strip.as_str(),
+            "Remove it, leaving plain HDR10",
+        ),
+    ];
+    let hdr_options = vec![
+        ChoiceOption::new(
+            Hdr10PlusAction::PassThrough.as_str(),
+            "Keep the scene changes",
+        ),
+        ChoiceOption::new(
+            Hdr10PlusAction::Strip.as_str(),
+            "Remove them, leaving static HDR10",
+        ),
+    ];
+
+    let dv_available = has_dv;
+    let dv_reason = if has_dv {
+        String::new()
+    } else if facts.number == 0 {
+        "Choose a title to see whether it carries Dolby Vision metadata.".to_string()
+    } else {
+        "This title carries no Dolby Vision metadata, so there is nothing to keep or remove."
+            .to_string()
+    };
+    let dv = ChoiceGroupViewModel::build(
+        "videoDolbyVision",
+        "Dolby Vision metadata",
+        "What happens to the dynamic metadata the source carries.",
+        &settings.dolby_vision,
+        &dv_options,
+        dv_available,
+        &dv_reason,
+    );
+
+    let hdr_available = has_hdr10_plus;
+    let hdr_reason = if has_hdr10_plus {
+        String::new()
+    } else if facts.number == 0 {
+        "Choose a title to see whether it carries HDR10+ metadata.".to_string()
+    } else {
+        "This title carries no HDR10+ metadata, so there is nothing to keep or remove.".to_string()
+    };
+    let hdr10 = ChoiceGroupViewModel::build(
+        "videoHdr10Plus",
+        "HDR10+ metadata",
+        "What happens to the per-scene brightness data the source carries.",
+        &settings.hdr10_plus,
+        &hdr_options,
+        hdr_available,
+        &hdr_reason,
+    );
+
+    // A request the machine cannot carry is worth knowing about even when the
+    // source has nothing to carry: the row stays closed with its own reason, and
+    // the machine's limitation is stated once so it is not a surprise at encode
+    // time on a different machine.
+    if has_dv && !caps.dolby_vision_rpu {
+        notes.push(
+            "This machine's HEVC encoder cannot code Dolby Vision metadata, so the request will be reported rather than carried."
+                .to_string(),
+        );
+    }
+    if has_hdr10_plus && !caps.hdr10_plus_sei {
+        notes.push(
+            "This machine's HEVC encoder cannot forward HDR10+ metadata, so the request will be reported rather than carried."
+                .to_string(),
+        );
+    }
+    let _ = problems;
+    (dv, hdr10)
 }
 
 /// Build the video tab.
@@ -707,6 +855,12 @@ pub fn tab_view(settings: &VideoSettings, facts: &TitleFacts) -> VideoTabViewMod
         format!("{} · {passes}", settings.quality_label())
     };
 
+    // HDR metadata is a property of the source and a capability of the encoder,
+    // so both are resolved here rather than left to the job builder: a machine
+    // whose HEVC encoder was compiled without Dolby Vision RPU coding says so on
+    // the row, instead of the request being accepted and quietly ignored.
+    let (dv, hdr10) = hdr_rows(settings, facts, &mut notes, &mut problems);
+
     VideoTabViewModel {
         encoder,
         rate_control,
@@ -718,6 +872,8 @@ pub fn tab_view(settings: &VideoSettings, facts: &TitleFacts) -> VideoTabViewMod
         preset,
         profile,
         tune,
+        dolby_vision: dv,
+        hdr10_plus: hdr10,
         level,
         colour_range,
         frame_rate_mode,
@@ -742,6 +898,83 @@ mod tests {
             duration_seconds: 3600.0,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn an_hdr_row_is_closed_with_a_reason_when_the_source_has_nothing_to_carry() {
+        let plain = tab_view(&VideoSettings::default(), &facts());
+        assert!(!plain.dolby_vision.available);
+        assert!(
+            plain
+                .dolby_vision
+                .reason
+                .contains("no Dolby Vision metadata"),
+            "{}",
+            plain.dolby_vision.reason
+        );
+        assert!(!plain.hdr10_plus.available);
+        assert!(
+            plain.hdr10_plus.reason.contains("no HDR10+ metadata"),
+            "{}",
+            plain.hdr10_plus.reason
+        );
+    }
+
+    #[test]
+    fn a_source_with_hdr_metadata_opens_both_hdr_rows() {
+        let hdr = TitleFacts {
+            dolby_vision_profile: 8,
+            dolby_vision_rpu: true,
+            hdr10_plus: true,
+            ..facts()
+        };
+        let view = tab_view(&VideoSettings::default(), &hdr);
+        assert!(view.dolby_vision.available, "{}", view.dolby_vision.reason);
+        assert!(view.hdr10_plus.available, "{}", view.hdr10_plus.reason);
+        // Both keep the metadata unless the user says otherwise: dropping it is
+        // a change to the picture, so it is not the silent default.
+        assert_eq!(view.dolby_vision.selected, "pass_through");
+        assert_eq!(view.hdr10_plus.selected, "pass_through");
+        assert_eq!(view.dolby_vision.options.len(), 3);
+        assert_eq!(view.hdr10_plus.options.len(), 2);
+    }
+
+    #[test]
+    fn an_hdr_choice_reaches_the_job_and_an_unknown_one_is_refused() {
+        let hdr = TitleFacts {
+            dolby_vision_rpu: true,
+            hdr10_plus: true,
+            ..facts()
+        };
+        let tabs = crate::tabs::TabSettings {
+            video: VideoSettings {
+                dolby_vision: "strip".into(),
+                hdr10_plus: "strip".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let spec = tabs
+            .to_job_spec("/in.mkv", "/out.mkv", &hdr, &Default::default())
+            .expect("a job");
+        assert_eq!(
+            spec.dolby_vision.action,
+            Some(DolbyVisionAction::Strip),
+            "the choice has to reach the encoder"
+        );
+        assert_eq!(spec.hdr10_plus.action, Some(Hdr10PlusAction::Strip));
+        assert!(spec.dolby_vision.enabled, "the source carries it");
+        assert!(spec.hdr10_plus.enabled);
+
+        let refused = VideoInput {
+            dolby_vision: Some("melt-it-down".into()),
+            ..Default::default()
+        }
+        .apply(&mut VideoSettings::default());
+        assert!(
+            refused.is_err(),
+            "an unrecognised action must not be stored"
+        );
     }
 
     #[test]
