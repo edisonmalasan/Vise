@@ -1,0 +1,16 @@
+Vise Transcoder bundles third-party media tooling.
+
+The bundled ffmpeg and ffprobe binaries are built from FFmpeg and are licensed
+under the GNU General Public License, version 3 or later, because the builds
+that include the x264, x265, and SVT-AV1 encoders are GPL works. Corresponding
+source for those binaries is available from the FFmpeg project and from the
+upstream builds named in media-tools.lock.json.
+
+The FFmpeg libraries themselves are licensed under the LGPL 2.1 or later; it is
+the patent-encumbered and GPL-licensed codec implementations they link that make
+the combined binary a GPL work.
+
+By downloading and redistributing these binaries you accept those terms. The
+exact upstream source for each bundled binary, with its version and digest, is
+recorded in media-tools.lock.json and in the media-tools.manifest.json shipped
+alongside the binaries.

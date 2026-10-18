@@ -25,6 +25,7 @@ mod release;
 mod session;
 mod subtitle;
 pub mod sweep;
+pub mod tooling;
 pub use sweep::{
     SweepExecutor, SweepOutcome, SweepPlan, SweepProgress, SweepRange, SweepRequest,
     SweepResultRow, SweepResults, SweepRun, SweepState, CONFIRMED_SPAN, MAX_SWEEP_RUNS,
