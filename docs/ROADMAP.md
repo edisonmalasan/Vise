@@ -254,7 +254,7 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 *Outcome: Installable platform builds, release notes, and reproducible releases are available.*
 
-- [ ] Windows build and installer
+- [x] Windows build and installer
 - [ ] macOS build and app bundle
 - [ ] Linux build and package
 - [x] Bundle FFmpeg and ffprobe with release builds
@@ -262,7 +262,7 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [x] Versioned release notes
 - [x] Reproducible build process
 - [x] Update delivery mechanism \(optional)
-**Status:** In progress (5/8 verified; the three platform installers are pending.)
+**Status:** In progress (6/8 verified; the macOS and Linux packages are pending.)
 
 A shipped build carries its own encoder rather than relying on whatever the
 machine has, because the filters and encoders the application offers are only
@@ -283,13 +283,22 @@ binary altered by one byte. A real \uild-release.sh --bundled\ produced a
 staged package whose bundled \fmpeg\ runs (8.1.2) and which the tooling resolver
 reports as bundled while a different ffmpeg is on the \PATH\.
 
-Not claimed: the three platform installers. The Tauri bundle configuration is in
-place and the resource path resolves, but the \	auri\ CLI is not installed here,
-so no installer was produced and neither a macOS bundle nor a Linux package was
-built; only the Windows target was compiled. The pin file carries real archive
-digests for Windows and Linux and placeholders for macOS and for the Linux
-per-binary digests, which the fetch script refuses to leave unpinned without
-saying so.
+The Windows installer was produced and inspected rather than assumed. It was
+installed silently into a scratch directory and the installed tree checked: the
+application, the worker, and both tools are present, and the installed worker
+starts and answers its own authenticated API on the loopback port. Building it
+found a defect that would have shipped: the bundle carried the media tools but
+not the worker, so an installed application would have found no worker beside its
+executable and silently fallen back to running the pipeline in-process, which is
+the one thing process isolation exists to prevent. It also carried the 105 MB
+download archive, which is a build input rather than something to ship; the
+installer went from 159 MiB to 54 MiB once the tools were staged separately from
+the cache.
+
+Not claimed: the macOS bundle and the Linux package. Only the Windows target is
+installed on this machine, so those two were never compiled, let alone packaged;
+their pin entries carry placeholders that the fetch script refuses to leave
+unpinned without saying so.
 
 ## Group 13 — Worker process and JSON IPC
 
@@ -618,7 +627,7 @@ Required groups: 19
 | 9 | Chapters and metadata | Complete (6/6) |
 | 10 | Encoding control and job reliability | In progress (8/10) |
 | 11 | Hardware acceleration | Complete (7/7) |
-| 12 | Platform packaging and release | In progress (5/8; bundled tooling done, platform installers pending) |
+| 12 | Platform packaging and release | In progress (6/8; Windows installer and bundled tooling done) |
 | 13 | Worker process and JSON IPC | Complete (9/9) |
 | 14 | Desktop parity with reference product | Complete (18/18) |
 | 15 | Preferences surface | Complete (8/8) |
