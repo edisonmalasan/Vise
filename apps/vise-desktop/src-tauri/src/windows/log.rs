@@ -387,21 +387,6 @@ impl ActivityLog {
         self.cursor
     }
 
-    /// Which worker and buffer the last page came from.
-    pub fn session(&self) -> &str {
-        &self.session
-    }
-
-    /// How many times the worker was replaced or cleared.
-    pub fn resets(&self) -> usize {
-        self.resets
-    }
-
-    /// How many lines the window dropped to stay inside its bound.
-    pub fn dropped(&self) -> usize {
-        self.dropped
-    }
-
     /// Add one worker line.
     ///
     /// The worker numbers its own entries, and a page that repeats itself would
@@ -901,8 +886,8 @@ mod tests {
             vec![1, 2, 3],
             "and the window's own numbers never repeat"
         );
-        assert_eq!(log.resets(), 0);
-        assert_eq!(log.dropped(), 0);
+        assert_eq!(log.resets, 0);
+        assert_eq!(log.dropped, 0);
     }
 
     #[test]
@@ -929,8 +914,8 @@ mod tests {
         ));
         assert_eq!(taken, 2, "the new worker's lines are read, not dropped");
         assert_eq!(log.cursor(), 2);
-        assert_eq!(log.session(), "worker-2:0");
-        assert_eq!(log.resets(), 1);
+        assert_eq!(log.session, "worker-2:0");
+        assert_eq!(log.resets, 1);
 
         let view = log.view();
         let messages: Vec<&str> = view.lines.iter().map(|l| l.message.as_str()).collect();
@@ -973,7 +958,7 @@ mod tests {
         // session counter is what makes it visible, because the indices keep
         // counting and a page from here looks exactly like a quiet worker.
         log.take_page(page_from("worker-1:1", Vec::new(), 2));
-        assert_eq!(log.resets(), 1);
+        assert_eq!(log.resets, 1);
         assert_eq!(log.cursor(), 0, "reading starts again from the beginning");
 
         // The next line the worker writes is read rather than waited past.
@@ -1001,7 +986,7 @@ mod tests {
             vec![message(LogLevel::Info, "a", 0)],
             1,
         ));
-        assert_eq!(log.resets(), 0);
+        assert_eq!(log.resets, 0);
         assert!(log.view().total == 2, "and nothing extra was recorded");
     }
 
@@ -1016,7 +1001,7 @@ mod tests {
             truncated: false,
             session: String::new(),
         });
-        assert_eq!(log.resets(), 0);
+        assert_eq!(log.resets, 0);
         log.take_page(LogMessagesFromIndex {
             messages: vec![message(LogLevel::Info, "b", 1)],
             next_index: 2,
@@ -1029,8 +1014,10 @@ mod tests {
 
     #[test]
     fn a_window_that_cannot_keep_every_line_says_so_instead_of_growing() {
-        let mut log = ActivityLog::default();
-        log.limit = 3;
+        let mut log = ActivityLog {
+            limit: 3,
+            ..Default::default()
+        };
         for index in 0..6usize {
             log.take_page(page_from(
                 "worker-1:0",
@@ -1040,7 +1027,7 @@ mod tests {
         }
         let view = log.view();
         assert_eq!(view.total, 3, "the bound is the bound");
-        assert_eq!(view.over_capacity, true);
+        assert!(view.over_capacity);
         assert_eq!(view.dropped, 3);
         assert_eq!(view.limit, 3);
         assert!(
@@ -1057,8 +1044,10 @@ mod tests {
 
     #[test]
     fn the_indices_being_tracked_do_not_outlive_the_lines_they_describe() {
-        let mut log = ActivityLog::default();
-        log.limit = 2;
+        let mut log = ActivityLog {
+            limit: 2,
+            ..Default::default()
+        };
         for index in 0..5usize {
             log.take_page(page_from(
                 "worker-1:0",
@@ -1089,13 +1078,15 @@ mod tests {
             "the line is read rather than deduplicated away"
         );
         assert_eq!(view.total, 2, "and the cap is applied again afterwards");
-        assert_eq!(log.dropped(), 4);
+        assert_eq!(log.dropped, 4);
     }
 
     #[test]
     fn dropping_worker_lines_does_not_cost_the_window_its_own() {
-        let mut log = ActivityLog::default();
-        log.limit = 2;
+        let mut log = ActivityLog {
+            limit: 2,
+            ..Default::default()
+        };
         log.record("the user pressed something");
         log.take_page(page_from(
             "worker-1:0",
@@ -1114,15 +1105,17 @@ mod tests {
         ));
         let messages: Vec<String> = log.view().lines.iter().map(|l| l.message.clone()).collect();
         assert_eq!(messages, vec!["b".to_string(), "c".to_string()]);
-        assert_eq!(log.dropped(), 2);
+        assert_eq!(log.dropped, 2);
     }
 
     #[test]
     fn the_window_says_when_a_drop_happened_beside_the_workers_own_note() {
         // Both sources of a gap are reported, and neither is reported as the
         // other: a worker that dropped lines did not fill this window.
-        let mut log = ActivityLog::default();
-        log.limit = 1;
+        let mut log = ActivityLog {
+            limit: 1,
+            ..Default::default()
+        };
         log.take_page(page_from(
             "worker-1:0",
             vec![message(LogLevel::Info, "old", 0)],

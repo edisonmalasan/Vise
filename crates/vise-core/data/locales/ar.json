@@ -84,5 +84,22 @@
   "cli.transcodeFailed": "فشل التحويل: {problem}",
   "cli.removingOutput": "تعذّر حذف الإخراج السابق: {problem}",
   "cli.renamingOutput": "تعذّر نقل الإخراج إلى موضعه: {problem}",
-  "cli.batchFailures": "انتهت الدفعة مع وجود إخفاقات: {summary}"
+  "cli.batchFailures": "انتهت الدفعة مع وجود إخفاقات: {summary}",
+  "diagnostics.title": "التشخيص",
+  "diagnostics.sweep": "مسح الجودة",
+  "diagnostics.capabilities": "قدرات العتاد",
+  "diagnostics.encodeLogs": "سجلات الترميز",
+  "diagnostics.bundle": "حزمة التشخيص",
+  "diagnostics.startSweep": "بدء المسح",
+  "diagnostics.cancelSweep": "إلغاء المسح",
+  "diagnostics.exportResults": "تصدير النتائج",
+  "diagnostics.exportCapabilities": "تصدير القدرات",
+  "diagnostics.exportBundle": "إنشاء الحزمة",
+  "diagnostics.recheck": "فحص مرة أخرى",
+  "diagnostics.quality": "الجودة",
+  "diagnostics.size": "الحجم",
+  "diagnostics.relative": "نسبي",
+  "diagnostics.confirmSweep": "استخدام هذا النطاق الأوسع",
+  "diagnostics.exportResultsCsv": "تصدير CSV",
+  "diagnostics.exportResultsJson": "تصدير JSON"
 }

@@ -25,6 +25,11 @@ mod release;
 mod session;
 mod subtitle;
 pub mod sweep;
+pub use sweep::{
+    SweepExecutor, SweepOutcome, SweepPlan, SweepProgress, SweepRange, SweepRequest,
+    SweepResultRow, SweepResults, SweepRun, SweepState, CONFIRMED_SPAN, MAX_SWEEP_RUNS,
+    SWEEP_FOLDER,
+};
 mod video;
 pub use attachments::*;
 pub use audio::*;

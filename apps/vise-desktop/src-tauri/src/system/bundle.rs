@@ -446,19 +446,11 @@ impl DiagnosticBundle {
     /// One line describing the bundle.
     pub fn summary(&self) -> String {
         format!(
-            "{} file(s), {} byte(s), named for its own contents ({})",
+            "{} file(s) ({}) named for its own contents: {}",
             self.entries.len(),
             self.to_bytes().len(),
             self.file_name
         )
-    }
-
-    /// The bytes of one entry, for a caller that wants to look inside.
-    pub fn entry(&self, name: &str) -> Option<&[u8]> {
-        self.entries
-            .iter()
-            .find(|entry| entry.name == name)
-            .map(|entry| entry.bytes.as_slice())
     }
 }
 
@@ -617,6 +609,16 @@ mod tests {
     const TOKEN: &str = "s3cr3t-worker-token-value";
     const HOME: &str = "C:\\Users\\Edison";
 
+    /// One entry of a bundle, as text, for a test that checks its contents.
+    fn text_of(bundle: &DiagnosticBundle, name: &str) -> String {
+        let entry = bundle
+            .entries
+            .iter()
+            .find(|entry| entry.name == name)
+            .unwrap_or_else(|| panic!("{name} is not in the bundle"));
+        String::from_utf8(entry.bytes.clone()).expect("the entry is text")
+    }
+
     fn redactor() -> Redactor {
         Redactor::new(Some(PathBuf::from(HOME)), vec![TOKEN.to_string()])
     }
@@ -771,7 +773,7 @@ mod tests {
         expected.sort();
         assert_eq!(sorted, expected, "everything before the manifest is sorted");
 
-        let manifest = String::from_utf8_lossy(bundle.entry("manifest.json").expect("manifest"));
+        let manifest = text_of(&bundle, "manifest.json");
         for name in &sorted {
             assert!(manifest.contains(name), "{name} is not in the manifest");
         }
@@ -782,14 +784,14 @@ mod tests {
         for item in listed {
             let name = item["name"].as_str().expect("name");
             let digest = item["sha256"].as_str().expect("digest");
-            assert_eq!(digest, &sha256_hex(bundle.entry(name).expect("entry")));
+            assert_eq!(digest, &sha256_hex(text_of(&bundle, name).as_bytes()));
         }
     }
 
     #[test]
     fn the_bundle_says_what_it_is_and_what_to_do_with_it() {
         let bundle = DiagnosticBundle::build(&input(), &redactor());
-        let readme = String::from_utf8_lossy(bundle.entry("README.txt").expect("readme"));
+        let readme = text_of(&bundle, "README.txt");
         assert!(readme.contains("untrusted input"));
         assert!(readme.contains("removed"));
         assert!(readme.contains("reproducible"));
@@ -804,7 +806,7 @@ mod tests {
             .collect();
         let bundle = DiagnosticBundle::build(&long, &redactor());
         assert!(bundle.omitted > 0);
-        let log = String::from_utf8_lossy(bundle.entry("log.txt").expect("log"));
+        let log = text_of(&bundle, "log.txt");
         assert!(log.contains(" earlier byte(s) were left out"), "{log}");
         assert!(
             log.contains("line 19999 of the activity log"),
@@ -825,7 +827,7 @@ mod tests {
             serde_json::json!({ "path": "C:\\Users\\Edison\\Desktop\\x.json" }).to_string(),
         ));
         let bundle = DiagnosticBundle::build(&with_extra, &redactor());
-        let notes = String::from_utf8_lossy(bundle.entry("notes.json").expect("notes"));
+        let notes = text_of(&bundle, "notes.json");
         assert!(!notes.contains("Edison"), "{notes}");
         assert!(notes.contains("<user-home>/Desktop/x.json"), "{notes}");
     }
@@ -835,7 +837,7 @@ mod tests {
         let mut broken = input();
         broken.settings = "{ this is not the settings".to_string();
         let bundle = DiagnosticBundle::build(&broken, &redactor());
-        let settings = String::from_utf8_lossy(bundle.entry("settings.json").expect("settings"));
+        let settings = text_of(&bundle, "settings.json");
         assert!(settings.contains("this is not the settings"));
     }
 

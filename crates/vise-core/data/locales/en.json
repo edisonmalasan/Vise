@@ -84,5 +84,22 @@
   "cli.transcodeFailed": "The transcode failed: {problem}",
   "cli.removingOutput": "The old output could not be removed: {problem}",
   "cli.renamingOutput": "The output could not be moved into place: {problem}",
-  "cli.batchFailures": "The batch finished with failures: {summary}"
+  "cli.batchFailures": "The batch finished with failures: {summary}",
+  "diagnostics.title": "Diagnostics",
+  "diagnostics.sweep": "Quality sweep",
+  "diagnostics.capabilities": "Hardware capabilities",
+  "diagnostics.encodeLogs": "Encode logs",
+  "diagnostics.bundle": "Diagnostic bundle",
+  "diagnostics.startSweep": "Start sweep",
+  "diagnostics.cancelSweep": "Cancel sweep",
+  "diagnostics.exportResults": "Export results",
+  "diagnostics.exportCapabilities": "Export capabilities",
+  "diagnostics.exportBundle": "Build bundle",
+  "diagnostics.recheck": "Check again",
+  "diagnostics.quality": "Quality",
+  "diagnostics.size": "Size",
+  "diagnostics.relative": "Relative",
+  "diagnostics.confirmSweep": "Use this wider range",
+  "diagnostics.exportResultsCsv": "Export CSV",
+  "diagnostics.exportResultsJson": "Export JSON"
 }

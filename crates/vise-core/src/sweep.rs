@@ -128,6 +128,13 @@ pub struct SweepRequest {
     pub confirmed: bool,
 }
 
+// Not derived: a request with no range is a request nobody has made yet, and
+// the range it opens on is the one a first sweep usually wants rather than the
+// zeros a derive would give it.
+#[allow(
+    clippy::derivable_impls,
+    reason = "the default opens on a usable range, not on zeros"
+)]
 impl Default for SweepRequest {
     fn default() -> Self {
         SweepRequest {
@@ -770,10 +777,13 @@ mod tests {
     fn a_range_outside_the_scale_is_clamped_rather_than_refused() {
         let plan = plan(&request(SweepRange::new(0, 200, 100), true));
         assert!(plan.is_runnable(), "{}", plan.refusal);
-        assert!(plan.values.from >= MIN_QUALITY);
-        assert!(plan.values.to <= MAX_QUALITY);
+        assert_eq!(plan.values.to, MAX_QUALITY);
         for run in &plan.runs {
-            assert!((MIN_QUALITY..=MAX_QUALITY).contains(&run.quality));
+            assert!(
+                (MIN_QUALITY..=MAX_QUALITY).contains(&run.quality),
+                "{} is outside the scale",
+                run.quality
+            );
         }
     }
 

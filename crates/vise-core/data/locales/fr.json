@@ -84,5 +84,22 @@
   "cli.transcodeFailed": "La conversion a échoué : {problem}",
   "cli.removingOutput": "L'ancienne sortie n'a pas pu être supprimée : {problem}",
   "cli.renamingOutput": "La sortie n'a pas pu être mise en place : {problem}",
-  "cli.batchFailures": "Le lot s'est terminé avec des échecs : {summary}"
+  "cli.batchFailures": "Le lot s'est terminé avec des échecs : {summary}",
+  "diagnostics.title": "Diagnostic",
+  "diagnostics.sweep": "Balayage de qualité",
+  "diagnostics.capabilities": "Capacités de la machine",
+  "diagnostics.encodeLogs": "Journaux d'encodage",
+  "diagnostics.bundle": "Paquet de diagnostic",
+  "diagnostics.startSweep": "Démarrer le balayage",
+  "diagnostics.cancelSweep": "Annuler le balayage",
+  "diagnostics.exportResults": "Exporter les résultats",
+  "diagnostics.exportCapabilities": "Exporter les capacités",
+  "diagnostics.exportBundle": "Créer le paquet",
+  "diagnostics.recheck": "Vérifier à nouveau",
+  "diagnostics.quality": "Qualité",
+  "diagnostics.size": "Taille",
+  "diagnostics.relative": "Relatif",
+  "diagnostics.confirmSweep": "Utiliser cette plage plus large",
+  "diagnostics.exportResultsCsv": "Exporter en CSV",
+  "diagnostics.exportResultsJson": "Exporter en JSON"
 }

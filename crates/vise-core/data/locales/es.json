@@ -84,5 +84,22 @@
   "cli.transcodeFailed": "La transcodificación falló: {problem}",
   "cli.removingOutput": "No se pudo eliminar la salida anterior: {problem}",
   "cli.renamingOutput": "No se pudo mover la salida a su sitio: {problem}",
-  "cli.batchFailures": "El lote terminó con fallos: {summary}"
+  "cli.batchFailures": "El lote terminó con fallos: {summary}",
+  "diagnostics.title": "Diagnóstico",
+  "diagnostics.sweep": "Barrido de calidad",
+  "diagnostics.capabilities": "Capacidades del equipo",
+  "diagnostics.encodeLogs": "Registros de codificación",
+  "diagnostics.bundle": "Paquete de diagnóstico",
+  "diagnostics.startSweep": "Iniciar el barrido",
+  "diagnostics.cancelSweep": "Cancelar el barrido",
+  "diagnostics.exportResults": "Exportar los resultados",
+  "diagnostics.exportCapabilities": "Exportar las capacidades",
+  "diagnostics.exportBundle": "Crear el paquete",
+  "diagnostics.recheck": "Comprobar de nuevo",
+  "diagnostics.quality": "Calidad",
+  "diagnostics.size": "Tamaño",
+  "diagnostics.relative": "Relativo",
+  "diagnostics.confirmSweep": "Usar este rango más amplio",
+  "diagnostics.exportResultsCsv": "Exportar CSV",
+  "diagnostics.exportResultsJson": "Exportar JSON"
 }
