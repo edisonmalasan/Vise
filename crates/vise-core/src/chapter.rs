@@ -377,8 +377,8 @@ fn parse_csv(text: &str) -> Result<Vec<Chapter>, ChapterImportError> {
                 line,
             ));
         }
-        let start = parse_timecode(fields[0])
-            .map_err(|problem| ChapterImportError::at(problem, line))?;
+        let start =
+            parse_timecode(fields[0]).map_err(|problem| ChapterImportError::at(problem, line))?;
         let (end, name) = match fields.len() {
             1 => (None, None),
             2 => {
@@ -405,9 +405,7 @@ fn parse_csv(text: &str) -> Result<Vec<Chapter>, ChapterImportError> {
         });
     }
     if chapters.is_empty() {
-        return Err(ChapterImportError::new(
-            "the file holds no chapter markers",
-        ));
+        return Err(ChapterImportError::new("the file holds no chapter markers"));
     }
     Ok(chapters)
 }
@@ -485,9 +483,7 @@ fn parse_txt(text: &str) -> Result<Vec<Chapter>, ChapterImportError> {
     }
 
     if chapters.is_empty() {
-        return Err(ChapterImportError::new(
-            "the file holds no chapter markers",
-        ));
+        return Err(ChapterImportError::new("the file holds no chapter markers"));
     }
     Ok(chapters)
 }
@@ -563,9 +559,7 @@ fn parse_xml_chapters(text: &str) -> Result<Vec<Chapter>, ChapterImportError> {
             .children
             .iter()
             .find(|child| child.name.eq_ignore_ascii_case("ChapterTimeStart"))
-            .ok_or_else(|| {
-                ChapterImportError::new("a ChapterAtom has no ChapterTimeStart")
-            })?
+            .ok_or_else(|| ChapterImportError::new("a ChapterAtom has no ChapterTimeStart"))?
             .text
             .trim()
             .to_string();
@@ -617,10 +611,7 @@ fn collect_named<'a>(element: &'a XmlElement, name: &str) -> Vec<&'a XmlElement>
 
 /// Parse a small, well-formed XML document into a tree.
 fn parse_xml(text: &str) -> Result<XmlElement, String> {
-    let mut reader = XmlReader {
-        text,
-        pos: 0,
-    };
+    let mut reader = XmlReader { text, pos: 0 };
     reader.skip_prolog()?;
     let root = reader.parse_element()?;
     Ok(root)
@@ -700,9 +691,7 @@ impl<'a> XmlReader<'a> {
                     .ok_or_else(|| format!("</{name}> is never closed"))?;
                 let close_name = rest[2..close_end].trim();
                 if !close_name.eq_ignore_ascii_case(&name) {
-                    return Err(format!(
-                        "expected </{name}> but found </{close_name}>"
-                    ));
+                    return Err(format!("expected </{name}> but found </{close_name}>"));
                 }
                 self.pos += close_end + 1;
                 return Ok(element);
@@ -725,9 +714,7 @@ impl<'a> XmlReader<'a> {
         self.pos += rest.len() - trimmed.len();
     }
 
-    fn parse_tag(
-        &mut self,
-    ) -> Result<(String, BTreeMap<String, String>, bool), String> {
+    fn parse_tag(&mut self) -> Result<(String, BTreeMap<String, String>, bool), String> {
         // The caller has checked for '<'.
         self.pos += 1;
         let rest = self.rest();
@@ -813,10 +800,9 @@ fn decode_entities(text: &str) -> String {
                     .ok()
                     .and_then(char::from_u32)
             }
-            _ if entity.starts_with('#') => entity[1..]
-                .parse::<u32>()
-                .ok()
-                .and_then(char::from_u32),
+            _ if entity.starts_with('#') => {
+                entity[1..].parse::<u32>().ok().and_then(char::from_u32)
+            }
             _ => None,
         };
         match decoded {
@@ -868,8 +854,13 @@ mod import_tests {
         assert_eq!(error.line, Some(2));
         assert!(error.message.contains("soon"), "{}", error.display());
 
-        let error = parse_chapters(ChapterFormat::Csv, "# only a comment\n\n").expect_err("no rows");
-        assert!(error.message.contains("no chapter markers"), "{}", error.display());
+        let error =
+            parse_chapters(ChapterFormat::Csv, "# only a comment\n\n").expect_err("no rows");
+        assert!(
+            error.message.contains("no chapter markers"),
+            "{}",
+            error.display()
+        );
     }
 
     #[test]
@@ -891,8 +882,8 @@ mod import_tests {
 
     #[test]
     fn txt_refuses_a_time_that_is_not_a_time() {
-        let error = parse_chapters(ChapterFormat::Txt, "00:00:00 Good\nnoon Bad\n")
-            .expect_err("bad time");
+        let error =
+            parse_chapters(ChapterFormat::Txt, "00:00:00 Good\nnoon Bad\n").expect_err("bad time");
         assert_eq!(error.line, Some(2));
         assert!(error.message.contains("noon"), "{}", error.display());
     }
@@ -919,13 +910,20 @@ mod import_tests {
 
     #[test]
     fn xml_refuses_a_document_that_is_not_a_chapter_list() {
-        let error = parse_chapters(ChapterFormat::Xml, "<Playlist><chapter start=\"0\"/></Playlist>")
-            .expect_err("wrong root");
+        let error = parse_chapters(
+            ChapterFormat::Xml,
+            "<Playlist><chapter start=\"0\"/></Playlist>",
+        )
+        .expect_err("wrong root");
         assert!(error.message.contains("Playlist"), "{}", error.display());
 
         let error = parse_chapters(ChapterFormat::Xml, "<Chapters><ChapterAtom>broken")
             .expect_err("unclosed");
-        assert!(error.message.contains("never closed"), "{}", error.display());
+        assert!(
+            error.message.contains("never closed"),
+            "{}",
+            error.display()
+        );
     }
 
     #[test]
