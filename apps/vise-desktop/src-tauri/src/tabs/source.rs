@@ -32,6 +32,12 @@ pub struct AudioFacts {
     pub bit_rate: u64,
     /// Track number, language, and codec on one line.
     pub label: String,
+    /// Whether the track is in a language other than the source's primary one.
+    ///
+    /// A user choosing which audio to keep needs to know this while the track
+    /// list is still in front of them, so it is reported per track rather than
+    /// as a count on the tab.
+    pub foreign_language: bool,
 }
 
 /// One subtitle track of the chosen title.
@@ -102,6 +108,12 @@ pub struct TitleFacts {
     pub chapters: Vec<ChapterFacts>,
     /// Tags the source carried, sorted by name.
     pub metadata: Vec<MetadataFact>,
+    /// Dolby Vision profile reported in the stream side data; zero when none.
+    pub dolby_vision_profile: u32,
+    /// Whether the stream carries a Dolby Vision RPU.
+    pub dolby_vision_rpu: bool,
+    /// Whether the stream carries HDR10+ dynamic metadata.
+    pub hdr10_plus: bool,
 }
 
 impl TitleFacts {
@@ -137,6 +149,9 @@ impl TitleFacts {
                     value: value.clone(),
                 })
                 .collect(),
+            dolby_vision_profile: title.dolby_vision_profile,
+            dolby_vision_rpu: title.dolby_vision_rpu,
+            hdr10_plus: title.hdr10_plus,
         }
     }
 
@@ -218,6 +233,7 @@ fn audio_facts(track: &vise_ipc::contract::ScanAudioTrack) -> AudioFacts {
             track.track_number,
             format_channels(track.channel_count, &track.channel_layout)
         ),
+        foreign_language: track.foreign_language,
     }
 }
 
@@ -344,6 +360,7 @@ mod tests {
             language: "English".into(),
             language_code: "eng".into(),
             description: String::new(),
+            foreign_language: false,
         }
     }
 

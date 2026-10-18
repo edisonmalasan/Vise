@@ -99,6 +99,12 @@ pub struct StreamInfo {
     pub channel_layout: Option<String>,
     pub bit_rate: Option<u64>,
     pub duration_seconds: Option<f64>,
+    /// Dolby Vision profile reported in the stream's side data, when present.
+    pub dolby_vision_profile: Option<u8>,
+    /// Whether the stream carries a Dolby Vision RPU.
+    pub dolby_vision_rpu: bool,
+    /// Whether the stream carries HDR10+ dynamic metadata.
+    pub hdr10_plus: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -419,6 +425,19 @@ struct FfprobeStream {
     duration: Option<String>,
     #[serde(default)]
     tags: Option<BTreeMap<String, String>>,
+    /// Per-frame side data, which is where Dolby Vision and HDR10+ travel.
+    #[serde(default)]
+    side_data_list: Option<Vec<FfprobeSideData>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct FfprobeSideData {
+    #[serde(default)]
+    side_data_type: Option<String>,
+    #[serde(default)]
+    dv_profile: Option<u8>,
+    #[serde(default)]
+    rpu_present_flag: Option<u8>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -454,6 +473,8 @@ fn convert_stream(s: FfprobeStream) -> StreamInfo {
     } else {
         (None, None)
     };
+    let (dolby_vision_profile, dolby_vision_rpu, hdr10_plus) =
+        read_hdr_side_data(s.side_data_list.as_deref());
     StreamInfo {
         index: s.index,
         kind,
@@ -469,7 +490,32 @@ fn convert_stream(s: FfprobeStream) -> StreamInfo {
         channel_layout: s.channel_layout,
         bit_rate: s.bit_rate.as_deref().and_then(parse_u64),
         duration_seconds: s.duration.as_deref().and_then(parse_f64),
+        dolby_vision_profile,
+        dolby_vision_rpu,
+        hdr10_plus,
     }
+}
+
+/// Read the HDR side data ffprobe reports for a stream.
+///
+/// Dolby Vision announces itself as a `DOVI configuration record` with a
+/// profile and an RPU-present flag; HDR10+ announces itself as SMPTE 2094-40
+/// dynamic metadata. Both are side data rather than codec properties, which
+/// is why a stream can be plain HEVC and still carry a Dolby Vision RPU.
+fn read_hdr_side_data(side_data: Option<&[FfprobeSideData]>) -> (Option<u8>, bool, bool) {
+    let mut profile = None;
+    let mut rpu = false;
+    let mut hdr10_plus = false;
+    for entry in side_data.unwrap_or(&[]) {
+        let kind = entry.side_data_type.as_deref().unwrap_or("");
+        if kind.contains("DOVI") || kind.contains("Dolby Vision") {
+            profile = entry.dv_profile.or(profile);
+            rpu |= entry.rpu_present_flag.unwrap_or(0) != 0;
+        } else if kind.contains("2094-40") || kind.contains("HDR10+") {
+            hdr10_plus = true;
+        }
+    }
+    (profile, rpu, hdr10_plus)
 }
 
 fn convert_chapter(idx: usize, c: FfprobeChapter) -> ChapterInfo {
@@ -539,6 +585,109 @@ pub fn parse_ffprobe_output(bytes: &[u8], path: &Path) -> Result<ScanResult, cra
         chapters,
         titles: vec![title],
     })
+}
+
+/// An optical-disc source this build can recognise.
+///
+/// Optical media is not a file: a DVD is a `VIDEO_TS` folder or an ISO image,
+/// and a Blu-ray is a `BDMV` folder. Recognising which one a path names is the
+/// first half of supporting them; the encoder arguments the recognition
+/// produces are the second.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OpticalSourceKind {
+    /// A DVD-Video folder or ISO image.
+    Dvd,
+    /// A Blu-ray folder or ISO image.
+    BluRay,
+    /// An optical image whose format could not be told apart.
+    Iso,
+}
+
+impl OpticalSourceKind {
+    /// Stable identifier the interface layer sends back.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Dvd => "dvd",
+            Self::BluRay => "bluray",
+            Self::Iso => "iso",
+        }
+    }
+
+    /// Human-readable label.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Dvd => "DVD",
+            Self::BluRay => "Blu-ray",
+            Self::Iso => "Optical image",
+        }
+    }
+
+    /// The demuxer/protocol arguments this source needs.
+    ///
+    /// A DVD is read through the `dvdvideo` demuxer, whether the path is a
+    /// `VIDEO_TS` folder or an ISO image. A Blu-ray is read through ffmpeg's
+    /// `bluray` protocol, which takes the path as `bluray:<path>` rather than
+    /// as a demuxer name.
+    pub fn input_args(self, path: &Path) -> Vec<String> {
+        match self {
+            Self::Dvd | Self::Iso => vec!["-f".into(), "dvdvideo".into(), path_str(path)],
+            Self::BluRay => vec![format!("bluray:{}", path_str(path))],
+        }
+    }
+}
+
+fn path_str(path: &Path) -> String {
+    path.to_string_lossy().to_string()
+}
+
+/// Recognise an optical-disc source from its path.
+///
+/// A directory is named by the folder it holds (`VIDEO_TS` for DVD, `BDMV` for
+/// Blu-ray); an `.iso` file is reported as an optical image without guessing
+/// which of the two formats it holds, because that would need the disc's own
+/// table of contents. A plain file is not optical at all.
+pub fn optical_source_kind(path: &Path) -> Option<OpticalSourceKind> {
+    if path.is_dir() {
+        let dvd = path.join("VIDEO_TS").is_dir();
+        let bluray = path.join("BDMV").is_dir();
+        return match (dvd, bluray) {
+            (true, _) => Some(OpticalSourceKind::Dvd),
+            (_, true) => Some(OpticalSourceKind::BluRay),
+            _ => None,
+        };
+    }
+    if path.is_file() {
+        let is_iso = path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.eq_ignore_ascii_case("iso"))
+            .unwrap_or(false);
+        if is_iso {
+            return Some(OpticalSourceKind::Iso);
+        }
+    }
+    None
+}
+
+impl ScanResult {
+    /// The first video stream's Dolby Vision profile and RPU presence, when
+    /// the source carries them.
+    pub fn dolby_vision(&self) -> Option<(u8, bool)> {
+        self.streams
+            .iter()
+            .filter(|stream| stream.kind == TrackKind::Video)
+            .find_map(|stream| {
+                stream
+                    .dolby_vision_profile
+                    .map(|profile| (profile, stream.dolby_vision_rpu))
+            })
+    }
+
+    /// Whether any stream carries HDR10+ dynamic metadata.
+    pub fn has_hdr10_plus(&self) -> bool {
+        self.streams.iter().any(|stream| stream.hdr10_plus)
+    }
 }
 
 // ---------------------------------------------------------------------------

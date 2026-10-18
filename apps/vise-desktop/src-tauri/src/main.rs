@@ -42,9 +42,9 @@ use sources::{RecentSources, SourceDropReport, SourceViewModel};
 use system::tray::{TrayAction, TrayItemKind, TrayModel};
 use system::{Integration, SystemFacts};
 use tabs::{
-    AudioDefaultsInput, AudioTrackInput, ChaptersInput, DimensionsInput, FilterInput, MarkerInput,
-    MetadataInput, SubtitleTrackInput, SubtitlesInput, SummaryInput, TabSetViewModel, TabSettings,
-    TitleFacts, VideoInput,
+    AudioDefaultsInput, AudioTrackInput, ChapterImportInput, ChaptersInput, DimensionsInput,
+    FilterInput, MarkerInput, MetadataInput, SubtitleTrackInput, SubtitlesInput, SummaryInput,
+    TabSetViewModel, TabSettings, TitleFacts, VideoInput,
 };
 use viewmodel::{
     RangeSelection, ScanPhase, ScanProgressViewModel, SelectionViewModel, TrackSelectionInput,
@@ -1610,6 +1610,13 @@ tab_command!(set_chapters, ChaptersInput, |tabs, change| {
 });
 
 tab_command!(change_marker, MarkerInput, |tabs, change| {
+    change.apply(&mut tabs.chapters)
+});
+
+// Bringing markers in from a chapter file is a tab change like any other: the
+// refusal to accept a file that did not parse travels back as the same error the
+// user would see on a bad number, rather than as a silent no-op.
+tab_command!(import_chapters, ChapterImportInput, |tabs, change| {
     change.apply(&mut tabs.chapters)
 });
 
@@ -4057,6 +4064,7 @@ fn main() {
             set_subtitle_track,
             set_chapters,
             change_marker,
+            import_chapters,
             set_metadata,
             import_subtitles,
             preview_window,

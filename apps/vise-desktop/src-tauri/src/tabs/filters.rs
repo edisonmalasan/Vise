@@ -38,6 +38,8 @@ pub struct FilterSettings {
     pub telecine: bool,
     /// Smooth block edges.
     pub deblock: bool,
+    /// Block size the deblock filter smooths over, 4 to 31.
+    pub deblock_strength: NumField,
     /// Widen the frame with a border.
     pub pad: bool,
     /// Frame width to pad to.
@@ -65,6 +67,7 @@ impl Default for FilterSettings {
             sharpen_amount: NumField::blank(),
             telecine: false,
             deblock: false,
+            deblock_strength: NumField::blank(),
             pad: false,
             pad_width: NumField::blank(),
             pad_height: NumField::blank(),
@@ -105,6 +108,23 @@ impl FilterSettings {
     }
 
     /// The sharpen amount, whether it came from a name or from the user.
+    /// The deblock block size, when the user typed one that is in range.
+    ///
+    /// A block size outside 4 to 31 is not carried into the job: the tab reports
+    /// it as a problem, and inventing a value here would let the tab disagree
+    /// with what the encoder was actually told.
+    pub fn deblock_value(&self) -> Option<u8> {
+        if self.deblock_strength.is_blank() {
+            return None;
+        }
+        self.deblock_strength
+            .whole("Deblock block size")
+            .ok()
+            .flatten()
+            .and_then(|value| u8::try_from(value).ok())
+            .filter(|value| (4..=31).contains(value))
+    }
+
     pub fn sharpen_value(&self) -> Option<f32> {
         if !self.sharpen_amount.is_blank() {
             return self
@@ -161,7 +181,12 @@ impl FilterInput {
                 settings.chroma_smooth = self.enabled.unwrap_or(settings.chroma_smooth);
             }
             "grayscale" => settings.grayscale = self.enabled.unwrap_or(settings.grayscale),
-            "deblock" => settings.deblock = self.enabled.unwrap_or(settings.deblock),
+            "deblock" => {
+                settings.deblock = self.enabled.unwrap_or(settings.deblock);
+                if let Some(value) = self.value {
+                    settings.deblock_strength = NumField { text: value };
+                }
+            }
             "pad" => {
                 settings.pad = self.enabled.unwrap_or(settings.pad);
                 if let Some(value) = self.value {
@@ -251,10 +276,6 @@ pub fn colour_space_options() -> Vec<ChoiceOption> {
         ChoiceOption::new("fcc", "FCC (wide gamut)"),
     ]
 }
-
-/// Why the deblock row is not on offer.
-pub const DEBLOCK_REASON: &str =
-    "The worker contract has no deblock filter yet, so switching this on would do nothing.";
 
 /// One filter row as the page renders it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -476,21 +497,49 @@ pub fn tab_view(
         },
     });
 
-    rows.push(FilterRowViewModel {
-        id: "deblock".into(),
-        label: "Deblock".into(),
-        hint: "Smooths the edges between blocks in a compressed picture.".into(),
-        enabled: settings.deblock,
-        available: false,
-        reason: DEBLOCK_REASON.to_string(),
-        picks: Vec::new(),
-        fields: Vec::new(),
-        summary: if settings.deblock {
-            on("Asked for, but this build cannot apply it.")
+    {
+        // Deblocking is off by default: it is a judgement about how much of a
+        // source's blocking is worth smoothing away, and the right answer
+        // changes per source. It reaches ffmpeg as its own video filter, so it
+        // is available wherever the video pipeline is, with a block-size field
+        // beside the switch rather than hidden behind a mode picker.
+        let mut strength = NumberViewModel::new(
+            "deblockStrength",
+            "Block size",
+            settings.deblock_strength.text.trim(),
+            "",
+        )
+        .ranged(4.0, 31.0);
+        if !settings.deblock {
+            strength = strength.blocked("Turn deblocking on to choose the block size.");
         } else {
-            "Off, and not on offer in this build.".to_string()
-        },
-    });
+            check_value(
+                &settings.deblock_strength,
+                "Deblock block size",
+                true,
+                4.0,
+                31.0,
+                true,
+                &mut problems,
+                &mut strength,
+            );
+        }
+        rows.push(FilterRowViewModel {
+            id: "deblock".into(),
+            label: "Deblock".into(),
+            hint: "Smooths the edges between blocks in a compressed picture.".into(),
+            enabled: settings.deblock,
+            available: true,
+            reason: String::new(),
+            picks: Vec::new(),
+            fields: vec![strength],
+            summary: if settings.deblock {
+                on("Blocking is smoothed before the picture is scaled.")
+            } else {
+                off()
+            },
+        });
+    }
 
     // Padding: one row, two sizes.
     let mut pad_width =
@@ -798,6 +847,8 @@ pub fn to_job_options(
         sharpen_amount: settings.sharpen_value(),
         chroma_smooth: settings.chroma_smooth,
         chroma_smoothing: settings.chroma_smooth,
+        deblock: settings.deblock,
+        deblock_strength: settings.deblock_value(),
         grayscale: settings.grayscale,
         color_space: if settings.colour_space == "keep" {
             None
@@ -859,35 +910,57 @@ mod tests {
     }
 
     #[test]
-    fn deblock_is_shown_but_cannot_be_switched_on() {
-        let idle = tab_view(
+    fn deblock_reaches_the_filter_chain_with_the_block_size_it_was_given() {
+        let off = tab_view(
             &FilterSettings::default(),
             &DimensionsSettings::default(),
             &facts(),
         );
-        let deblock = filter_row(&idle, "deblock");
-        assert!(!deblock.available);
-        assert!(
-            deblock.reason.contains("no deblock filter"),
-            "{}",
-            deblock.reason
-        );
+        let row = filter_row(&off, "deblock");
+        assert!(row.available, "the core carries a deblock filter");
+        assert!(!row.enabled, "off by default");
+        assert!(row.reason.is_empty(), "{}", row.reason);
+        let chain = to_job_options(&FilterSettings::default(), &DimensionsSettings::default())
+            .build_filter_chain();
+        assert!(!chain.contains("deblock"), "{chain}");
 
         let asked_for = FilterSettings {
             deblock: true,
+            deblock_strength: NumField {
+                text: "8".to_string(),
+            },
             ..Default::default()
         };
         let asked = tab_view(&asked_for, &DimensionsSettings::default(), &facts());
-        let deblock = filter_row(&asked, "deblock");
-        assert!(deblock.enabled, "the request is never hidden");
-        assert!(
-            deblock.summary.contains("cannot apply"),
-            "{}",
-            deblock.summary
-        );
-        // The job model has nowhere to put it, so nothing is invented for it.
+        let row = filter_row(&asked, "deblock");
+        assert!(row.enabled, "the request is never hidden");
+        assert_eq!(row.fields.len(), 1, "the block size sits beside the switch");
         let chain = to_job_options(&asked_for, &DimensionsSettings::default()).build_filter_chain();
-        assert!(!chain.contains("deblock"), "{chain}");
+        assert!(
+            chain.contains("deblock=filter=strong:block=8"),
+            "the block size has to reach the filter: {chain}"
+        );
+    }
+
+    #[test]
+    fn a_deblock_block_size_outside_the_range_is_reported_not_accepted() {
+        let bad = tab_view(
+            &FilterSettings {
+                deblock: true,
+                deblock_strength: NumField {
+                    text: "99".to_string(),
+                },
+                ..Default::default()
+            },
+            &DimensionsSettings::default(),
+            &facts(),
+        );
+        assert!(!bad.ready, "{:?}", bad.problems);
+        assert!(
+            bad.problems.iter().any(|p| p.contains("4")),
+            "{:?}",
+            bad.problems
+        );
     }
 
     #[test]

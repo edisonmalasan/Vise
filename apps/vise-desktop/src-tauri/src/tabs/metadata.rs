@@ -16,7 +16,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use vise_core::{MetadataMode, MetadataProcessingOptions};
+use vise_core::{ContainerFormat, MetadataMode, MetadataProcessingOptions};
 
 use crate::tabs::common::{ChoiceGroup, ChoiceGroupViewModel, TextViewModel, ToggleViewModel};
 use crate::tabs::source::TitleFacts;
@@ -511,11 +511,25 @@ pub struct MetadataTabViewModel {
 }
 
 /// Build the metadata tab for the chosen title.
-pub fn tab_view(settings: &MetadataSettings, facts: &TitleFacts) -> MetadataTabViewModel {
+pub fn tab_view(
+    settings: &MetadataSettings,
+    facts: &TitleFacts,
+    container: ContainerFormat,
+) -> MetadataTabViewModel {
     let mode = settings.mode();
     let copies = settings.copies_source();
     let edits = settings.applies_edits();
     let chosen = facts.is_chosen();
+    // Which containers can carry a picture or a font is a property of the
+    // container, not of the tag mode, so the restriction is resolved here where
+    // the chosen container is known. A switch the muxer cannot honour says so
+    // instead of quietly dropping the picture on the floor.
+    let carrying =
+        vise_core::attachments::resolve(container, settings.cover_art, settings.attachments);
+    let cover_reason = carrying.cover_art_reason.clone();
+    let attachment_reason = carrying.attachments_reason.clone();
+    let cover_possible = carrying.cover_art_available;
+    let attachments_possible = carrying.attachments_available;
     let tags: Vec<TagViewModel> = settings
         .entries
         .iter()
@@ -625,8 +639,9 @@ pub fn tab_view(settings: &MetadataSettings, facts: &TitleFacts) -> MetadataTabV
                 "Written as a picture attached to the output.",
                 settings.cover_art,
             ),
-            chosen,
+            chosen && cover_possible,
             no_title,
+            cover_reason.as_str(),
         ),
         attachments: closed_toggle(
             ToggleViewModel::new(
@@ -635,8 +650,9 @@ pub fn tab_view(settings: &MetadataSettings, facts: &TitleFacts) -> MetadataTabV
                 "Written alongside the tags; fonts and subtitle pictures arrive this way.",
                 settings.attachments,
             ),
-            chosen,
+            chosen && attachments_possible,
             no_title,
+            attachment_reason.as_str(),
         ),
         clear: closed_toggle(
             ToggleViewModel::new(
@@ -647,6 +663,7 @@ pub fn tab_view(settings: &MetadataSettings, facts: &TitleFacts) -> MetadataTabV
             ),
             chosen,
             no_title,
+            "",
         ),
         has_source_tags: source_count > 0,
         summary: if !chosen {
@@ -694,11 +711,22 @@ fn invalid_text(field: TextViewModel, invalid: bool, problem: &str) -> TextViewM
 }
 
 /// A switch, closed with `reason` when `available` does not hold.
-fn closed_toggle(toggle: ToggleViewModel, available: bool, reason: &str) -> ToggleViewModel {
+fn closed_toggle(
+    toggle: ToggleViewModel,
+    available: bool,
+    reason: &str,
+    // The container's own reason, when the container is what closed it. Two
+    // switches can be closed for different reasons, so they are not folded into
+    // one argument: a caller that only knows "not now" passes an empty string and
+    // gets its own reason back.
+    container_reason: &str,
+) -> ToggleViewModel {
     if available {
         toggle
-    } else {
+    } else if container_reason.is_empty() {
         toggle.blocked(reason)
+    } else {
+        toggle.blocked(container_reason)
     }
 }
 
@@ -981,7 +1009,7 @@ mod tests {
     fn the_tab_lists_every_source_tag_with_its_origin() {
         let mut settings = edited();
         settings.set_value("artist", "Me").expect("edit");
-        let view = tab_view(&settings, &facts());
+        let view = tab_view(&settings, &facts(), ContainerFormat::Mkv);
         assert!(view.has_source_tags);
         assert_eq!(view.tags.len(), 2);
         let artist = view
@@ -1017,7 +1045,7 @@ mod tests {
     fn a_copied_value_cannot_be_changed_until_the_mode_says_so() {
         let mut settings = MetadataSettings::default();
         settings.sync_with_title(&facts());
-        let view = tab_view(&settings, &facts());
+        let view = tab_view(&settings, &facts(), ContainerFormat::Mkv);
         assert_eq!(view.mode.selected, "copy");
         assert!(view.tags.iter().all(|tag| !tag.editable));
         assert!(view
@@ -1034,7 +1062,7 @@ mod tests {
     fn a_removed_tag_is_shown_as_such_and_can_be_restored() {
         let mut settings = edited();
         settings.set_value("title", "").expect("blank");
-        let view = tab_view(&settings, &facts());
+        let view = tab_view(&settings, &facts(), ContainerFormat::Mkv);
         let title = view
             .tags
             .iter()
@@ -1055,7 +1083,7 @@ mod tests {
             name: "Bare".into(),
             ..Default::default()
         };
-        let view = tab_view(&settings, &bare);
+        let view = tab_view(&settings, &bare, ContainerFormat::Mkv);
         assert!(!view.has_source_tags);
         assert!(view.tags.is_empty());
         assert_eq!(view.source_note, "This title carries no tags.");
@@ -1065,13 +1093,42 @@ mod tests {
     #[test]
     fn without_a_title_the_tab_is_closed_with_the_reason() {
         let settings = MetadataSettings::default();
-        let view = tab_view(&settings, &TitleFacts::default());
+        let view = tab_view(&settings, &TitleFacts::default(), ContainerFormat::Mkv);
         assert!(!view.mode.available);
         assert!(view.mode.reason.contains("Choose a title"));
         assert!(!view.cover_art.available);
         assert!(!view.clear.available);
         assert_eq!(view.source_note, "No title is chosen.");
         assert!(view.summary.contains("Choose a title"));
+    }
+
+    #[test]
+    fn the_container_decides_whether_a_cover_or_a_font_can_be_written() {
+        let settings = MetadataSettings {
+            cover_art: true,
+            attachments: true,
+            ..Default::default()
+        };
+        // A container that carries pictures has both switches on offer.
+        let carried = tab_view(&settings, &facts(), ContainerFormat::Mkv);
+        assert!(carried.cover_art.available, "{}", carried.cover_art.reason);
+        assert!(
+            carried.attachments.available,
+            "{}",
+            carried.attachments.reason
+        );
+
+        // One that cannot says which container refused it, rather than accepting
+        // the request and dropping the picture on the floor.
+        let refused = tab_view(&settings, &facts(), ContainerFormat::Webm);
+        assert!(!refused.cover_art.available);
+        assert!(
+            refused.cover_art.reason.to_lowercase().contains("webm"),
+            "the reason has to name the container: {}",
+            refused.cover_art.reason
+        );
+        // The request is never hidden: it is still visibly on, and still reported.
+        assert!(refused.cover_art.checked, "the user's choice is not erased");
     }
 
     #[test]
@@ -1082,7 +1139,7 @@ mod tests {
             value: "orphan".into(),
             origin: Some(TagOrigin::Edited),
         });
-        let view = tab_view(&settings, &facts());
+        let view = tab_view(&settings, &facts(), ContainerFormat::Mkv);
         assert!(!view.ready);
         assert!(
             view.problems.iter().any(|p| p.contains("no name")),

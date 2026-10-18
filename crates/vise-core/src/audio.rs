@@ -301,3 +301,87 @@ pub struct AudioTrackConfig {
 pub type AudioTrack = AudioTrackConfig;
 pub type AudioTrackSpec = AudioTrackConfig;
 pub type AudioTrackConfiguration = AudioTrackConfig;
+
+/// The primary language of a set of tracks: the first language that is
+/// actually declared, ignoring the "undetermined" placeholder.
+///
+/// A track that carries no language is not a foreign-language track and not a
+/// primary one either, so it is skipped rather than treated as one or the
+/// other.
+pub fn primary_language_code<'a>(codes: &[&'a str]) -> Option<&'a str> {
+    codes.iter().copied().find(|code| {
+        let code = code.trim();
+        !code.is_empty() && !code.eq_ignore_ascii_case("und")
+    })
+}
+
+/// Which audio tracks are in a foreign language.
+///
+/// A foreign-language track is one whose declared language differs from the
+/// primary language the source reports. This is the answer the interface offers
+/// behind a "find the foreign-language dialogue" control: the short bursts of
+/// the original language in an otherwise dubbed film, which a viewer usually
+/// wants as forced subtitles rather than a full audio track.
+///
+/// Indices count from one, matching the track numbers the scan reports, and a
+/// track with no declared language is never foreign.
+pub fn foreign_audio_indices(codes: &[&str]) -> Vec<usize> {
+    let Some(primary) = primary_language_code(codes) else {
+        return Vec::new();
+    };
+    codes
+        .iter()
+        .enumerate()
+        .filter(|(index, code)| {
+            let code = code.trim();
+            !code.is_empty()
+                && !code.eq_ignore_ascii_case("und")
+                && !code.eq_ignore_ascii_case(primary)
+                && *index > 0
+        })
+        .map(|(index, _)| index + 1)
+        .collect()
+}
+
+/// Whether any audio track is in a foreign language.
+pub fn has_foreign_audio(codes: &[&str]) -> bool {
+    !foreign_audio_indices(codes).is_empty()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_primary_language_is_the_first_one_declared() {
+        assert_eq!(primary_language_code(&["und", "ger", "eng"]), Some("ger"));
+        assert_eq!(primary_language_code(&["eng", "ger"]), Some("eng"));
+        assert_eq!(primary_language_code(&["und", "und"]), None);
+        assert_eq!(primary_language_code(&[]), None);
+    }
+
+    #[test]
+    fn a_foreign_track_is_one_in_another_language_than_the_primary() {
+        // A dubbed film: German is primary, the short English bursts are foreign.
+        let codes = ["ger", "ger", "eng"];
+        assert_eq!(foreign_audio_indices(&codes), vec![3]);
+        assert!(has_foreign_audio(&codes));
+
+        // An undetermined track is not foreign.
+        let codes = ["eng", "und", "fre"];
+        assert_eq!(foreign_audio_indices(&codes), vec![3]);
+
+        // A single language has nothing foreign about it.
+        assert!(foreign_audio_indices(&["eng", "eng"]).is_empty());
+        assert!(!has_foreign_audio(&["und", "und"]));
+    }
+
+    #[test]
+    fn a_track_before_the_primary_is_not_treated_as_the_primary() {
+        // The first declared language wins even when it appears on a later
+        // track; the earlier undetermined track is simply skipped.
+        let codes = ["und", "spa", "ita"];
+        assert_eq!(primary_language_code(&codes), Some("spa"));
+        assert_eq!(foreign_audio_indices(&codes), vec![3]);
+    }
+}

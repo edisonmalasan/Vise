@@ -4,14 +4,17 @@
 //! packet types, progress/state model, and geometry helpers used by all
 //! frontends. It has no UI dependency.
 
+pub mod attachments;
 mod audio;
 mod catalog;
 mod chapter;
 mod error;
 mod geometry;
 mod hardware;
+pub mod hdr;
 pub mod i18n;
 mod job;
+mod lossless;
 mod media;
 mod metadata;
 mod pipeline;
@@ -21,19 +24,23 @@ mod release;
 mod session;
 mod subtitle;
 mod video;
+pub use attachments::*;
 pub use audio::*;
 pub use catalog::*;
 pub use chapter::*;
 pub use error::CoreError;
 pub use geometry::*;
 pub use hardware::*;
+pub use hdr::*;
 pub use i18n::*;
 pub use job::{
     AudioCodec, ContainerFormat, EncodingMode, JobSpec, OutputOptions, SubtitleMode, VideoCodec,
 };
+pub use lossless::*;
 pub use media::{
-    parse_ffprobe_output, ChapterInfo, CropDetection, FfprobeScanner, FormatInfo, MediaBuffer,
-    MediaScanner, Packet, ScanResult, StreamInfo, TitleInfo, TrackKind,
+    optical_source_kind, parse_ffprobe_output, ChapterInfo, CropDetection, FfprobeScanner,
+    FormatInfo, MediaBuffer, MediaScanner, OpticalSourceKind, Packet, ScanResult, StreamInfo,
+    TitleInfo, TrackKind,
 };
 pub use metadata::*;
 pub use pipeline::{transcode, transcode_file, TranscodePlan, TranscodeResult, Transcoder};

@@ -940,6 +940,7 @@ mod tests {
             sample_rate: 48_000,
             bit_rate: 640_000,
             label: format!("Audio {number} · English · eac3 · {layout}"),
+            foreign_language: false,
         }
     }
 
