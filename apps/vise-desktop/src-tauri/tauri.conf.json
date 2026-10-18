@@ -28,7 +28,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "vendor/ffmpeg/": "media/"
+      "vendor/ffmpeg/staged/": "media/",
+      "vendor/sidecar/vise-worker.exe": "vise-worker.exe"
     },
     "windows": {
       "nsis": {

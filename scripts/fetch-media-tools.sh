@@ -185,3 +185,19 @@ PY
 
 echo "fetch-media-tools: ready in $target"
 echo "  verify at any time with ./scripts/verify-media-tools.sh $platform"
+
+# The bundler is told about one directory that does not name a platform, so
+# tauri.conf.json stays the same on every machine. Only the tools, the manifest,
+# and the licence notice are copied into it: the archive that was downloaded is
+# a build input, not something to ship.
+staged="$vendor/staged"
+rm -rf "$staged"
+mkdir -p "$staged"
+for tool in $tools; do
+  cp "$target/$tool" "$staged/$tool"
+done
+cp "$target/media-tools.manifest.json" "$staged/media-tools.manifest.json"
+if [[ -f "$root/LICENSE-MEDIA-TOOLS" ]]; then
+  cp "$root/LICENSE-MEDIA-TOOLS" "$staged/LICENSE.txt"
+fi
+echo "fetch-media-tools: staged for bundling in $staged"
