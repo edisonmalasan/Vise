@@ -22,6 +22,7 @@ use vise_core::{Job, JobId, JobSpec, JobState, Progress, Session};
 use vise_ipc::contract::{CommandResult, EncodeCommand, InitCommand, ScanCommand, WorkState};
 use vise_ipc::portable::PortableSettings;
 use vise_ipc::timespan::TimeSpan;
+use vise_ipc::validation::ValidationReport;
 use vise_ipc::{WorkerClient, WorkerConfig, WorkerSupervisor};
 
 mod appearance;
@@ -1748,8 +1749,122 @@ fn subtitle_extension(name: &str) -> bool {
 // Queue
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Job validation
+// ---------------------------------------------------------------------------
+
+/// The facts this window holds about the source of `spec`, when it holds any.
+///
+/// Facts about a *different* file are worse than no facts, so the answer is
+/// only given when the job is against the source that was scanned.
+fn source_facts_for(guard: &DesktopState, spec: &JobSpec) -> Option<vise_core::ScanResult> {
+    let scanned = guard.flow.source()?.path.trim();
+    if scanned.is_empty() || !scanned.eq_ignore_ascii_case(spec.input_path.trim()) {
+        return None;
+    }
+    let facts = title_facts(guard);
+    facts.is_chosen().then(|| facts.to_scan_result())
+}
+
+/// Judge `spec` against this machine: every problem it has, each one naming the
+/// field that carries it.
+///
+/// The paths are looked up here and handed to the rules, which stay a pure
+/// function of the job and those answers. The same call runs in the worker
+/// before it commits to an encode, so a job that cannot work is refused here
+/// rather than half an hour into somebody else's machine time — and a job that
+/// arrives some other way is refused there instead.
+fn judge_job(spec: &JobSpec, scan: Option<vise_core::ScanResult>) -> ValidationReport {
+    let mut facts = vise_ipc::validation::probe_machine_facts(spec);
+    if let Some(scan) = scan {
+        facts = facts.and_scan(scan);
+    }
+    vise_ipc::validation::validate_job(spec, &facts)
+}
+
+/// Judge a job and write down what was wrong with it.
+fn check_job(state: &SharedState, spec: &JobSpec) -> ValidationReport {
+    let report = state
+        .lock()
+        .ok()
+        .map(|guard| judge_job(spec, source_facts_for(&guard, spec)))
+        .unwrap_or_default();
+    if !report.is_valid() {
+        let context = format!("queueing {}", windows::queue::file_name(&spec.output_path));
+        for line in report.lines() {
+            record_problem(state, "job", context.clone(), line);
+        }
+    }
+    report
+}
+
+/// The message a refused job carries.
+///
+/// Every problem is in it, one per line, because the whole point of reporting
+/// them together is that the user can fix them together.
+fn refusal(report: &ValidationReport) -> String {
+    format!(
+        "This job cannot run yet:\n{}\nNothing was queued.",
+        report.lines().join("\n")
+    )
+}
+
+/// Why a waiting job could not be handed to the encoder.
+#[derive(Debug)]
+enum ClaimStop {
+    /// Only this job is refused; the queue carries on with the next one.
+    Job { reason: String },
+    /// Something in the way stops the queue as well.
+    Queue { reason: String },
+}
+
+/// Check that a waiting job can run at all, then mark it as running.
+///
+/// Validation is the first thing that happens, before the job is claimed and
+/// before any room is asked for: a job that cannot encode is not a job that ran
+/// out of disk, and it fails on its own rather than pausing the queue behind it.
+fn prepare_job(state: &SharedState, id: JobId) -> Result<JobSpec, ClaimStop> {
+    let spec = state
+        .lock()
+        .map_err(|_| "desktop state is unavailable".to_string())
+        .map_err(|reason| ClaimStop::Queue { reason })?
+        .session
+        .job(id)
+        .map(|job| job.spec.clone())
+        .ok_or_else(|| ClaimStop::Queue {
+            reason: format!("job {id} not found"),
+        })?;
+
+    let report = check_job(state, &spec);
+    if !report.is_valid() {
+        let reason = report.summary();
+        push_log(
+            state,
+            format!("job {id} was refused before it started: {reason}"),
+        );
+        return Err(ClaimStop::Job { reason });
+    }
+
+    claim_job(state, id).map_err(|reason| ClaimStop::Queue { reason })
+}
+
+/// Judge a job without queueing it, for a page that wants to know before it
+/// offers the control.
+#[tauri::command]
+fn validate_job_spec(
+    state: State<'_, SharedState>,
+    spec: JobSpec,
+) -> Result<ValidationReport, String> {
+    let report = check_job(state.inner(), &spec);
+    Ok(report)
+}
+
 #[tauri::command]
 fn add_job(state: State<'_, SharedState>, spec: JobSpec) -> Result<JobId, String> {
+    let report = check_job(state.inner(), &spec);
+    if !report.is_valid() {
+        return Err(refusal(&report));
+    }
     let id = {
         let mut guard = state.lock().map_err(|e| e.to_string())?;
         let id = guard.session.add_job(spec);
@@ -1808,6 +1923,16 @@ fn queue_selection(state: State<'_, SharedState>, output_path: String) -> Result
         .tabs
         .to_job_spec(&source, output_path, &facts, &hardware)?;
     spec.title_index = Some(selection.selected_title_index);
+
+    let report = judge_job(&spec, source_facts_for(&guard, &spec));
+    if !report.is_valid() {
+        let context = format!("queueing title {title_index}");
+        for line in report.lines() {
+            guard.errors.record("job", &context, line);
+        }
+        drop(guard);
+        return Err(refusal(&report));
+    }
 
     let id = guard.session.add_job(spec);
     guard.queue.push(id);
@@ -2008,20 +2133,39 @@ fn queue_titles(state: State<'_, SharedState>) -> Result<Vec<JobId>, String> {
         output_file_exists,
     )?;
     let mut queued = Vec::new();
+    let mut refused: Vec<String> = Vec::new();
     for (index, output) in planned {
         let base = guard
             .tabs
             .to_job_spec(&source, &output, &facts, &hardware)?;
         let spec = windows::queue::titled_spec(&base, index, &output);
+        // Each title is judged on its own, so one unusable name does not cost
+        // the batch the titles that are fine.
+        let report = judge_job(&spec, source_facts_for(&guard, &spec));
+        if !report.is_valid() {
+            refused.push(format!("title {index}: {}", report.summary()));
+            continue;
+        }
         let id = guard.session.add_job(spec);
         guard.queue.push(id);
         queued.push(id);
+    }
+    if queued.is_empty() {
+        return Err(format!(
+            "Nothing from this batch can be queued yet:\n{}",
+            refused.join("\n")
+        ));
     }
     guard.activity.record(format!(
         "queued {} title(s) from the selection sheet ({})",
         queued.len(),
         windows::queue::collision_summary(policy)
     ));
+    for line in refused {
+        guard
+            .activity
+            .record(format!("left out of the batch: {line}"));
+    }
     Ok(queued)
 }
 
@@ -2138,7 +2282,20 @@ fn set_job_state(
 
 #[tauri::command]
 fn run_job(app: AppHandle, state: State<'_, SharedState>, id: JobId) -> Result<(), String> {
-    let spec = claim_job(&state, id)?;
+    let spec = match prepare_job(state.inner(), id) {
+        Ok(spec) => spec,
+        Err(ClaimStop::Job { reason }) => {
+            set_job_state(
+                state.inner(),
+                id,
+                JobState::Failed,
+                Progress::new(0.0),
+                Some(reason.clone()),
+            );
+            return Err(reason);
+        }
+        Err(ClaimStop::Queue { reason }) => return Err(reason),
+    };
     let shared: SharedState = state.inner().clone();
     let worker = worker_client(&state)?;
     thread::spawn(move || {
@@ -2353,12 +2510,26 @@ fn start_queue(
     }
     thread::spawn(move || {
         for id in waiting {
-            let spec = match claim_job(&shared, id) {
+            let spec = match prepare_job(&shared, id) {
                 Ok(spec) => spec,
-                Err(reason) => {
-                    // Something in the way — no room on the disk, or a pre-encode
-                    // action that refused — stops the queue rather than costing
-                    // every job behind this one the same refusal.
+                // A job that cannot encode fails on its own: the queue carries
+                // on with the next one rather than costing every job behind it
+                // the same refusal.
+                Err(ClaimStop::Job { reason }) => {
+                    set_job_state(
+                        &shared,
+                        id,
+                        JobState::Failed,
+                        Progress::new(0.0),
+                        Some(reason),
+                    );
+                    refresh_system(&shared);
+                    continue;
+                }
+                // Something in the way — no room on the disk, or a pre-encode
+                // action that refused — stops the queue rather than costing
+                // every job behind this one the same refusal.
+                Err(ClaimStop::Queue { reason }) => {
                     record_problem(&shared, "queue", format!("starting job {id}"), &reason);
                     refresh_system(&shared);
                     break;
@@ -4567,6 +4738,7 @@ fn main() {
             reset_preview_crop,
             apply_preview_crop,
             add_job,
+            validate_job_spec,
             queue_selection,
             queue_selection_window,
             set_queue_selection,
@@ -4762,6 +4934,125 @@ mod tests {
         let error = parse_duration(Some("99:99:99"), "shortest").expect_err("invalid");
         assert!(error.contains("shortest title duration"), "{error}");
         assert!(error.contains("99:99:99"), "{error}");
+    }
+
+    /// A job whose source and destination really exist, so a test about the rules
+    /// can leave the paths alone.
+    fn real_job_stub() -> (JobSpec, vise_core::ScanResult) {
+        let dir = std::env::temp_dir().join("vise-desktop-validation");
+        let _ = std::fs::create_dir_all(&dir);
+        let input = dir.join("in.mkv");
+        std::fs::write(&input, b"not real media").expect("write");
+        let spec = JobSpec {
+            container: vise_core::ContainerFormat::Mkv,
+            input_path: input.to_string_lossy().to_string(),
+            output_path: dir.join("out.mkv").to_string_lossy().to_string(),
+            quality: Some(22),
+            ..Default::default()
+        };
+        let facts = tabs::source::TitleFacts {
+            number: 1,
+            width: 640,
+            height: 480,
+            duration_seconds: 10.0,
+            audio: vec![tabs::source::AudioFacts {
+                number: 1,
+                channel_count: 2,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        (spec, facts.to_scan_result())
+    }
+
+    #[test]
+    fn a_job_is_judged_before_it_is_queued_and_every_problem_is_reported() {
+        let (mut job, scan) = real_job_stub();
+        assert!(
+            judge_job(&job, Some(scan.clone())).is_valid(),
+            "a plain job with real paths and matching facts passes"
+        );
+
+        // Three separate mistakes, all of them named against their field.
+        job.output_path = std::env::temp_dir()
+            .join("vise-desktop-validation")
+            .join("out.mp4")
+            .to_string_lossy()
+            .to_string();
+        job.video_codec = vise_core::VideoCodec::ProRes;
+        job.audio_processing.channels = Some(6);
+        let report = judge_job(&job, Some(scan.clone()));
+        let fields: Vec<&str> = report.issues.iter().map(|i| i.field.as_str()).collect();
+        assert!(fields.contains(&"OutputPath"), "{fields:?}");
+        assert!(fields.contains(&"Audio.Channels"), "{fields:?}");
+        let message = refusal(&report);
+        assert!(message.contains("Audio.Channels"), "{message}");
+        assert!(message.contains("Nothing was queued"), "{message}");
+        assert_eq!(
+            message.lines().count(),
+            report.issues.len() + 2,
+            "one line per problem, plus the two sentences around them"
+        );
+    }
+
+    #[test]
+    fn facts_are_only_offered_for_the_source_that_was_scanned() {
+        let (job, _) = real_job_stub();
+        let mut window = DesktopState::default();
+        // Nothing has been scanned, so there are no facts to offer.
+        assert!(source_facts_for(&window, &job).is_none());
+        window.flow.set_source(Some(sources::SourceViewModel {
+            path: job.input_path.clone(),
+            name: "in.mkv".to_string(),
+            location: String::new(),
+            kind: sources::SourceKind::File,
+            label: "in.mkv".to_string(),
+        }));
+        // The source is known but no title is chosen, so there is still nothing.
+        assert!(source_facts_for(&window, &job).is_none());
+
+        // A job against a different file is never judged with the facts of the
+        // scanned one: they are answers about the wrong media.
+        let mut other = job.clone();
+        other.input_path = "C:\\media\\somewhere-else.mkv".to_string();
+        assert!(source_facts_for(&window, &other).is_none());
+    }
+
+    #[test]
+    fn a_job_that_cannot_run_is_refused_by_the_queue_before_it_is_claimed() {
+        let (mut job, _) = real_job_stub();
+        // The source is deleted, so no encode can start.
+        job.input_path = std::env::temp_dir()
+            .join("vise-desktop-validation")
+            .join("not-there.mkv")
+            .to_string_lossy()
+            .to_string();
+        let state: SharedState = Arc::new(Mutex::new(window_with(&[job])));
+        let id = state.lock().expect("lock").session.jobs()[0].id;
+
+        // The refusal is about this job alone, so the queue behind it carries on.
+        match prepare_job(&state, id) {
+            Err(ClaimStop::Job { reason }) => assert!(reason.contains("InputPath"), "{reason}"),
+            Err(ClaimStop::Queue { reason }) => panic!("expected a job-level refusal: {reason}"),
+            Ok(_) => panic!("a job with no source must not be claimed"),
+        }
+        assert_eq!(
+            state.lock().expect("lock").session.jobs()[0].status.state,
+            JobState::Queued,
+            "a refused job was never claimed, so it is still waiting"
+        );
+    }
+
+    #[test]
+    fn a_job_the_tabs_would_queue_is_claimed_and_marked_running() {
+        let (job, _) = real_job_stub();
+        let state: SharedState = Arc::new(Mutex::new(window_with(&[job])));
+        let id = state.lock().expect("lock").session.jobs()[0].id;
+        prepare_job(&state, id).expect("a sound job is claimed");
+        assert_eq!(
+            state.lock().expect("lock").session.jobs()[0].status.state,
+            JobState::Running
+        );
     }
 
     #[test]

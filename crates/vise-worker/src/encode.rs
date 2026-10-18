@@ -250,7 +250,11 @@ impl EncodeService {
         }
 
         let cached = lock(&self.scanner).clone();
-        let report = vise_ipc::validation::validate_job(job, cached.as_ref());
+        let mut facts = vise_ipc::validation::probe_machine_facts(job);
+        if let Some(scan) = cached {
+            facts = facts.and_scan(scan);
+        }
+        let report = vise_ipc::validation::validate_job(job, &facts);
         if !report.is_valid() {
             self.logs.error(format!("encode rejected: {report}"));
             return Err(format!("invalid encode job: {report}"));
@@ -355,7 +359,14 @@ fn run_encode(
         }
     }
 
-    let report = vise_ipc::validation::validate_job(job, source_facts.as_ref());
+    // The paths are probed here, once, rather than inside the rules: what a job
+    // looks like on this machine and how that job should be judged are two
+    // different questions.
+    let mut facts = vise_ipc::validation::probe_machine_facts(job);
+    if let Some(scan) = source_facts.clone() {
+        facts = facts.and_scan(scan);
+    }
+    let report = vise_ipc::validation::validate_job(job, &facts);
     if !report.is_valid() {
         finish(
             inner,

@@ -1,20 +1,33 @@
 //! Pre-flight job validation.
 //!
-//! The worker validates a job completely before the pipeline starts. A
-//! partially specified job is the single most common way to turn a media
+//! A partially specified job is the single most common way to turn a media
 //! request into a hard failure deep inside a subprocess, so validation is
 //! deliberately exhaustive and reports every problem it finds at once instead
 //! of stopping at the first.
+//!
+//! The rules are a **pure function** of the job and the machine facts handed to
+//! them. Nothing in this module touches the filesystem, runs a subprocess, or
+//! asks what the machine can do: [`probe_machine_facts`] does that part, once,
+//! and its answer is injected. That split is what lets the window validate a
+//! job before it is queued — with facts it already has — and lets the worker
+//! validate the same job again as a defence in depth, with both sides running
+//! the identical rule set and therefore reaching the identical answer.
+//!
+//! A rule that needs a fact nobody supplied is skipped rather than guessed. An
+//! absent answer is not evidence of a problem, and a validator that invented
+//! one would refuse jobs it cannot actually judge.
 
 use std::fmt;
+use std::path::Path;
 
 use vise_core::{
-    AudioCodec, ContainerFormat, JobSpec, ScanResult, StreamInfo, SubtitleMode, TrackKind,
-    VideoCodec, VideoProcessingOptions,
+    AudioCodec, AudioMixdown, ContainerFormat, HardwareCapabilities, JobSpec, ScanResult,
+    StreamInfo, SubtitleMode, TrackKind, VideoCodec, VideoProcessingOptions,
 };
 
 /// One validation problem.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ValidationIssue {
     /// Dotted path of the offending field, e.g. `Video.Crop`.
     pub field: String,
@@ -39,7 +52,11 @@ impl fmt::Display for ValidationIssue {
 }
 
 /// A complete validation report.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+///
+/// Every problem is in here, not the first one, so the user can fix the whole
+/// job in one pass instead of discovering the next problem after each retry.
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ValidationReport {
     pub issues: Vec<ValidationIssue>,
 }
@@ -48,6 +65,14 @@ impl ValidationReport {
     /// Whether the job is safe to run.
     pub fn is_valid(&self) -> bool {
         self.issues.is_empty()
+    }
+
+    /// Every problem on its own line, as a window reports a refusal.
+    ///
+    /// The field travels with the message so the page can put each problem next
+    /// to the control it belongs to rather than in one paragraph.
+    pub fn lines(&self) -> Vec<String> {
+        self.issues.iter().map(|issue| issue.to_string()).collect()
     }
 
     /// Single-line summary suitable for an error reply or a log line.
@@ -67,6 +92,164 @@ impl fmt::Display for ValidationReport {
         } else {
             f.write_str(&self.summary())
         }
+    }
+}
+
+/// What is known about one path.
+///
+/// These are answers, not conclusions: a path that was never probed has no
+/// `PathFacts` at all, so the rules that would use them are skipped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PathFacts {
+    /// Something is there.
+    pub exists: bool,
+    /// What is there is a folder rather than a file.
+    pub is_dir: bool,
+    /// The file can be opened for reading.
+    pub readable: bool,
+    /// The destination can be written: the file itself when it is already
+    /// there, or the folder it will be created in when it is not.
+    pub writable: bool,
+}
+
+impl PathFacts {
+    /// A file that is there and can be read and written.
+    pub fn readable_file() -> Self {
+        PathFacts {
+            exists: true,
+            is_dir: false,
+            readable: true,
+            writable: true,
+        }
+    }
+
+    /// A file that is there and can be read but not written.
+    pub fn read_only_file() -> Self {
+        PathFacts {
+            writable: false,
+            ..PathFacts::readable_file()
+        }
+    }
+}
+
+/// The facts about the machine a job's validity depends on.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct MachineFacts {
+    /// What is known about the source path.
+    pub source: Option<PathFacts>,
+    /// What is known about the destination path.
+    pub destination: Option<PathFacts>,
+    /// What the scan found, when the source has been scanned.
+    pub scan: Option<ScanResult>,
+}
+
+impl MachineFacts {
+    /// No facts at all: every check that needs one is skipped.
+    pub fn unknown() -> Self {
+        MachineFacts::default()
+    }
+
+    /// Facts with a scan result and nothing known about the paths.
+    pub fn with_scan(scan: ScanResult) -> Self {
+        MachineFacts {
+            scan: Some(scan),
+            ..MachineFacts::default()
+        }
+    }
+
+    /// Attach a scan result to facts that already answer the path questions.
+    pub fn and_scan(mut self, scan: ScanResult) -> Self {
+        self.scan = Some(scan);
+        self
+    }
+
+    /// The scan result, when one was injected.
+    pub fn scan(&self) -> Option<&ScanResult> {
+        self.scan.as_ref()
+    }
+}
+
+/// Look the paths of `spec` up on this machine.
+///
+/// This is the only part of validation that touches the disk, and it is
+/// deliberately outside the rules: the rules stay a pure function so they can
+/// be exercised with facts a test chooses rather than files it has to create.
+pub fn probe_machine_facts(spec: &JobSpec) -> MachineFacts {
+    MachineFacts {
+        source: probe_source(spec.input_path.trim()),
+        destination: probe_destination(spec.output_path.trim()),
+        scan: None,
+    }
+}
+
+fn probe_source(path: &str) -> Option<PathFacts> {
+    let path = Path::new(path);
+    if path.as_os_str().is_empty() {
+        return None;
+    }
+    match std::fs::metadata(path) {
+        Err(_) => Some(PathFacts::default()),
+        Ok(meta) => {
+            let is_dir = meta.is_dir();
+            Some(PathFacts {
+                exists: true,
+                is_dir,
+                // A folder cannot be opened as media even when opening it as a
+                // path would succeed, so readability is only asked of a file.
+                readable: !is_dir && std::fs::File::open(path).is_ok(),
+                writable: false,
+            })
+        }
+    }
+}
+
+fn probe_destination(path: &str) -> Option<PathFacts> {
+    let path = Path::new(path);
+    if path.as_os_str().is_empty() {
+        return None;
+    }
+    match std::fs::metadata(path) {
+        Ok(meta) if meta.is_dir() => Some(PathFacts {
+            exists: true,
+            is_dir: true,
+            readable: false,
+            writable: false,
+        }),
+        Ok(_) => Some(PathFacts {
+            exists: true,
+            is_dir: false,
+            readable: std::fs::File::open(path).is_ok(),
+            writable: std::fs::OpenOptions::new().write(true).open(path).is_ok(),
+        }),
+        // The file is not there yet, which is the normal case. What decides
+        // whether it can be written is the folder it will be created in; a
+        // folder that is not there yet is created on the way, so it is not a
+        // problem yet either.
+        Err(_) => Some(PathFacts {
+            exists: false,
+            is_dir: false,
+            readable: false,
+            writable: match path.parent().filter(|p| !p.as_os_str().is_empty()) {
+                Some(parent) => match std::fs::metadata(parent) {
+                    Ok(meta) if meta.is_dir() => directory_accepts_files(parent),
+                    Ok(_) => false,
+                    Err(_) => true,
+                },
+                None => true,
+            },
+        }),
+    }
+}
+
+/// Whether a new file can be created in `dir`.
+fn directory_accepts_files(dir: &Path) -> bool {
+    let probe = dir.join(".vise-write-probe");
+    match std::fs::File::create(&probe) {
+        Ok(_) => {
+            let _ = std::fs::remove_file(&probe);
+            true
+        }
+        Err(_) => false,
     }
 }
 
@@ -139,24 +322,118 @@ fn extension_container(extension: &str) -> Option<ContainerFormat> {
     }
 }
 
-/// Validate a job. When `scan` is supplied, checks that also use source facts
-/// (geometry, available tracks, duration) are performed.
-pub fn validate_job(spec: &JobSpec, scan: Option<&ScanResult>) -> ValidationReport {
+/// The encoder whose filters a job's filter chain has to satisfy.
+///
+/// Resolved from the job alone: a named hardware encoder is what the job asked
+/// for, and everything else is the software encoder this build reaches for. What
+/// the machine would actually pick is a property of the machine, and asking the
+/// machine here would make this a subprocess again.
+fn filter_encoder(spec: &JobSpec) -> String {
+    let hardware = spec.hardware_acceleration_options();
+    if let Some(named) = hardware
+        .encode
+        .encoder
+        .as_ref()
+        .map(|name| name.trim())
+        .filter(|name| !name.is_empty())
+    {
+        return named.to_string();
+    }
+    // Everything else resolves to the software encoder: the pipeline reaches for
+    // it on its own whenever no hardware encoder is usable, and a rule that
+    // guessed a GPU encoder the machine may not have would refuse jobs that
+    // would have run.
+    HardwareCapabilities::default()
+        .software_encoder(spec.video_codec)
+        .to_string()
+}
+
+/// Whether an encoder codes every frame on its own.
+///
+/// This is what decides the filter rules below. Deblocking and telecine removal
+/// both act on artefacts that only inter prediction leaves behind: a blocked
+/// edge between two macroblocks in one picture, or a field-repeated cadence
+/// across pictures. An intra-only codec produces neither, so on FFV1, ProRes,
+/// and DNxHR those filters have nothing to work on — asking for them is not a
+/// slower encode, it is a filter whose output is discarded.
+fn encoder_is_intra_only(spec: &JobSpec) -> bool {
+    if spec.video_codec.is_intra_only() {
+        return true;
+    }
+    matches!(
+        filter_encoder(spec).as_str(),
+        "ffv1" | "prores_ks" | "dnxhd" | "prores" | "dnxhd_px"
+    )
+}
+
+/// How many channels a mixdown target produces. Zero means "whatever the source
+/// has", which is not a number to compare against.
+fn mixdown_channels(mixdown: AudioMixdown) -> u32 {
+    match mixdown {
+        AudioMixdown::Auto => 0,
+        AudioMixdown::Mono => 1,
+        AudioMixdown::Stereo | AudioMixdown::Dolby => 2,
+        AudioMixdown::Surround51 => 6,
+        AudioMixdown::Surround71 => 8,
+    }
+}
+
+/// The name a channel count is shown under.
+fn layout_label(channels: u32) -> String {
+    match channels {
+        1 => "mono".to_string(),
+        2 => "stereo".to_string(),
+        6 => "5.1".to_string(),
+        8 => "7.1".to_string(),
+        other => format!("{other} channels"),
+    }
+}
+
+/// The mixdown this job resolved to, as a channel count.
+fn requested_mixdown(options: &vise_core::AudioProcessingOptions) -> u32 {
+    if let Some(mixdown) = options.mixdown_enum {
+        let known = mixdown_channels(mixdown);
+        if known > 0 {
+            return known;
+        }
+    }
+    if let Some(named) = options.mixdown.as_ref() {
+        return match named
+            .trim()
+            .to_ascii_lowercase()
+            .replace([' ', '_'], "")
+            .as_str()
+        {
+            "mono" | "1.0" => 1,
+            "stereo" | "2.0" | "dolby" => 2,
+            "5.1" | "surround51" => 6,
+            "7.1" | "surround71" => 8,
+            _ => 0,
+        };
+    }
+    0
+}
+
+/// Validate a job against the facts supplied about the machine.
+///
+/// Checks that need a fact nobody supplied are skipped, so a caller with no
+/// facts still gets the rules that are about the job alone.
+pub fn validate_job(spec: &JobSpec, facts: &MachineFacts) -> ValidationReport {
     let mut issues = Vec::new();
 
-    validate_paths(spec, &mut issues);
+    validate_paths(spec, facts, &mut issues);
     validate_containers(spec, &mut issues);
-    validate_rate_control(spec, scan, &mut issues);
-    validate_video_filters(spec, scan, &mut issues);
-    validate_audio(spec, scan, &mut issues);
-    validate_subtitles(spec, scan, &mut issues);
+    validate_rate_control(spec, facts, &mut issues);
+    validate_video_filters(spec, facts, &mut issues);
+    validate_audio(spec, facts, &mut issues);
+    validate_subtitles(spec, facts, &mut issues);
 
     ValidationReport { issues }
 }
 
 /// Convenience wrapper for callers that only need the outcome.
-pub fn ensure_valid(spec: &JobSpec, scan: Option<&ScanResult>) -> Result<(), ValidationReport> {
-    let report = validate_job(spec, scan);
+pub fn ensure_valid(spec: &JobSpec, facts: &MachineFacts) -> Result<(), ValidationReport> {
+    let report = validate_job(spec, facts);
     if report.is_valid() {
         Ok(())
     } else {
@@ -164,27 +441,36 @@ pub fn ensure_valid(spec: &JobSpec, scan: Option<&ScanResult>) -> Result<(), Val
     }
 }
 
-fn validate_paths(spec: &JobSpec, issues: &mut Vec<ValidationIssue>) {
+fn validate_paths(spec: &JobSpec, facts: &MachineFacts, issues: &mut Vec<ValidationIssue>) {
     if spec.input_path.trim().is_empty() {
         issues.push(ValidationIssue::new(
             "InputPath",
             "an input source must be supplied",
         ));
     } else {
-        let input = std::path::Path::new(&spec.input_path);
-        if !input.exists() {
-            issues.push(ValidationIssue::new(
-                "InputPath",
-                format!("input source does not exist: {}", input.display()),
-            ));
-        } else if input.is_dir() {
-            issues.push(ValidationIssue::new(
-                "InputPath",
-                format!(
-                    "input source is a directory; scan it and submit a single title: {}",
-                    input.display()
-                ),
-            ));
+        match facts.source {
+            None => {}
+            Some(source) => {
+                if !source.exists {
+                    issues.push(ValidationIssue::new(
+                        "InputPath",
+                        format!("input source does not exist: {}", spec.input_path.trim()),
+                    ));
+                } else if source.is_dir {
+                    issues.push(ValidationIssue::new(
+                        "InputPath",
+                        format!(
+                            "input source is a folder; scan it and submit a single title: {}",
+                            spec.input_path.trim()
+                        ),
+                    ));
+                } else if !source.readable {
+                    issues.push(ValidationIssue::new(
+                        "InputPath",
+                        format!("input source cannot be read: {}", spec.input_path.trim()),
+                    ));
+                }
+            }
         }
     }
 
@@ -193,41 +479,61 @@ fn validate_paths(spec: &JobSpec, issues: &mut Vec<ValidationIssue>) {
             "OutputPath",
             "an output destination must be supplied",
         ));
-    } else {
-        let output = std::path::Path::new(&spec.output_path);
-        if spec.output_path.trim() == spec.input_path.trim() {
+        return;
+    }
+
+    if spec.output_path.trim() == spec.input_path.trim() {
+        issues.push(ValidationIssue::new(
+            "OutputPath",
+            "the output destination must differ from the input source",
+        ));
+    }
+
+    if let Some(destination) = facts.destination {
+        if destination.is_dir {
             issues.push(ValidationIssue::new(
                 "OutputPath",
-                "the output destination must differ from the input source",
+                format!(
+                    "the output destination is a folder, not a file: {}",
+                    spec.output_path.trim()
+                ),
+            ));
+        } else if !destination.writable {
+            issues.push(ValidationIssue::new(
+                "OutputPath",
+                format!(
+                    "the output destination cannot be written: {}",
+                    spec.output_path.trim()
+                ),
             ));
         }
-        match output
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.to_ascii_lowercase())
-        {
+    }
+
+    match spec
+        .output_path
+        .trim()
+        .rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase())
+    {
+        None => issues.push(ValidationIssue::new(
+            "OutputPath",
+            "the output destination needs a container file extension",
+        )),
+        Some(extension) => match extension_container(&extension) {
             None => issues.push(ValidationIssue::new(
                 "OutputPath",
-                "the output destination needs a container file extension",
+                format!("unknown output extension '{extension}'; use mp4, mkv, or webm"),
             )),
-            Some(extension) => match extension_container(&extension) {
-                None => issues.push(ValidationIssue::new(
-                    "OutputPath",
-                    format!("unknown output extension '{extension}'; use mp4, mkv, or webm"),
-                )),
-                Some(container) if container != spec.container => {
-                    issues.push(ValidationIssue::new(
-                        "OutputPath",
-                        format!(
-                        "output extension '{extension}' does not match the {} container; use '.{}'",
-                        container_name(spec.container),
-                        container_extension(spec.container)
-                    ),
-                    ))
-                }
-                Some(_) => {}
-            },
-        }
+            Some(container) if container != spec.container => issues.push(ValidationIssue::new(
+                "OutputPath",
+                format!(
+                    "output extension '{extension}' does not match the {} container; use '.{}'",
+                    container_name(spec.container),
+                    container_extension(spec.container)
+                ),
+            )),
+            Some(_) => {}
+        },
     }
 }
 
@@ -243,11 +549,11 @@ fn validate_containers(spec: &JobSpec, issues: &mut Vec<ValidationIssue>) {
             "AudioCodec",
             format!(
                 "{} audio cannot be stored in the {} container; use one of: {}",
-                audio_codec_name(audio),
+                audio.label(),
                 container_name(container),
                 container_audio_support(container)
                     .iter()
-                    .map(|c| audio_codec_name(*c))
+                    .map(|c| c.label())
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
@@ -258,11 +564,11 @@ fn validate_containers(spec: &JobSpec, issues: &mut Vec<ValidationIssue>) {
             "VideoCodec",
             format!(
                 "{} video cannot be stored in the {} container; use one of: {}",
-                video_codec_name(video),
+                video.label(),
                 container_name(container),
                 container_video_support(container)
                     .iter()
-                    .map(|c| video_codec_name(*c))
+                    .map(|c| c.label())
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
@@ -289,11 +595,29 @@ fn validate_containers(spec: &JobSpec, issues: &mut Vec<ValidationIssue>) {
     }
 }
 
-fn validate_rate_control(
-    spec: &JobSpec,
-    scan: Option<&ScanResult>,
-    issues: &mut Vec<ValidationIssue>,
-) {
+/// Whether a mode has anything for a second pass to work on.
+///
+/// A two-pass encode exists to spend a first pass measuring the material so the
+/// second pass can hit a rate or a size. A lossless write has no rate to hit and
+/// an intra-only codec has no pass-based mode at all, so in both cases the first
+/// pass produces a file nobody reads and the encoder runs once anyway.
+fn two_pass_is_pointless(spec: &JobSpec) -> Option<String> {
+    if spec.lossless_enabled() {
+        return Some(
+            "a lossless encode has nothing to gain from a second pass; switch two-pass off"
+                .to_string(),
+        );
+    }
+    if encoder_is_intra_only(spec) {
+        return Some(format!(
+            "{} codes every frame on its own and has no two-pass mode",
+            spec.video_codec.label()
+        ));
+    }
+    None
+}
+
+fn validate_rate_control(spec: &JobSpec, facts: &MachineFacts, issues: &mut Vec<ValidationIssue>) {
     let mode = spec.resolved_encoding_mode();
     if mode.is_constant_quality() {
         // Constant quality is the default mode, so an absent quality means
@@ -333,7 +657,7 @@ fn validate_rate_control(
             )),
             Some(_) => {}
         }
-        match known_duration(scan) {
+        match known_duration(facts.scan()) {
             None => issues.push(ValidationIssue::new(
                 "TargetSize",
                 "target-size encoding needs a known source duration; scan the source first",
@@ -345,6 +669,31 @@ fn validate_rate_control(
             Some(_) => {}
         }
     }
+
+    // A lossless write takes no rate at all: the lossless encoders have no
+    // quality or bitrate argument, so a value that came from a saved preset is
+    // carried in the request and then refused by the encoder rather than
+    // honoured. Refusing it here says so against the field that carries it.
+    if spec.lossless_enabled() {
+        if spec.effective_quality().is_some() {
+            issues.push(ValidationIssue::new(
+                "Quality",
+                "a lossless encode has no quality value; clear the quality field",
+            ));
+        }
+        if spec.effective_bitrate_kbps().is_some() {
+            issues.push(ValidationIssue::new(
+                "Bitrate",
+                "a lossless encode has no bitrate; clear the bitrate field",
+            ));
+        }
+    }
+
+    if spec.two_pass_enabled() {
+        if let Some(reason) = two_pass_is_pointless(spec) {
+            issues.push(ValidationIssue::new("TwoPass", reason));
+        }
+    }
 }
 
 fn known_duration(scan: Option<&ScanResult>) -> Option<f64> {
@@ -354,11 +703,7 @@ fn known_duration(scan: Option<&ScanResult>) -> Option<f64> {
         .or_else(|| scan.titles.iter().find_map(|t| t.duration_seconds))
 }
 
-fn validate_video_filters(
-    spec: &JobSpec,
-    scan: Option<&ScanResult>,
-    issues: &mut Vec<ValidationIssue>,
-) {
+fn validate_video_filters(spec: &JobSpec, facts: &MachineFacts, issues: &mut Vec<ValidationIssue>) {
     let options = spec.video_processing_options();
 
     if let Some((x, y, w, h)) = options.crop {
@@ -368,7 +713,7 @@ fn validate_video_filters(
                 "crop width and height must be greater than zero",
             ));
         }
-        if let Some((source_w, source_h)) = source_geometry(scan) {
+        if let Some((source_w, source_h)) = source_geometry(facts.scan()) {
             if w > source_w || h > source_h {
                 issues.push(ValidationIssue::new(
                     "Video.Crop",
@@ -400,6 +745,42 @@ fn validate_video_filters(
                 ));
             }
         }
+    }
+
+    // Filters that act on artefacts left behind by inter prediction have
+    // nothing to act on when the encoder is intra-only.
+    let intra_only = encoder_is_intra_only(spec);
+    if options.deblock && intra_only {
+        issues.push(ValidationIssue::new(
+            "Video.Deblock",
+            format!(
+                "{} codes every frame on its own, so it produces no blocking artefacts for deblocking to remove",
+                spec.video_codec.label()
+            ),
+        ));
+    }
+    if options.detelecine && intra_only {
+        issues.push(ValidationIssue::new(
+            "Video.Detelecine",
+            format!(
+                "{} codes every frame on its own, so telecine cadence does not survive into the output",
+                spec.video_codec.label()
+            ),
+        ));
+    }
+    // An absent block size is the filter's own default, which is a complete
+    // request; a present one has to be inside the range the filter accepts, and
+    // has to be wanted at all.
+    match options.deblock_strength {
+        Some(strength) if !(4..=31).contains(&strength) => issues.push(ValidationIssue::new(
+            "Video.Deblock",
+            format!("deblock block size {strength} is outside the supported range 4-31"),
+        )),
+        Some(_) if !options.deblock => issues.push(ValidationIssue::new(
+            "Video.Deblock",
+            "a deblock block size was set but deblocking is off, so the value is ignored",
+        )),
+        _ => {}
     }
 
     if let Some(fps) = options.constant_frame_rate {
@@ -440,9 +821,10 @@ fn source_geometry(scan: Option<&ScanResult>) -> Option<(u32, u32)> {
         .map(|s| (s.width.unwrap_or(0), s.height.unwrap_or(0)))
 }
 
-fn validate_audio(spec: &JobSpec, scan: Option<&ScanResult>, issues: &mut Vec<ValidationIssue>) {
+fn validate_audio(spec: &JobSpec, facts: &MachineFacts, issues: &mut Vec<ValidationIssue>) {
     let options = spec.audio_processing_options();
     let passthrough = options.passthrough || options.copy;
+    let source_channels = source_audio_channels(facts.scan());
 
     if let Some(channels) = options.channels {
         if channels == 0 || channels > 8 {
@@ -450,7 +832,7 @@ fn validate_audio(spec: &JobSpec, scan: Option<&ScanResult>, issues: &mut Vec<Va
                 "Audio.Channels",
                 format!("channel count {channels} must be between 1 and 8"),
             ));
-        } else if let Some(source_channels) = source_audio_channels(scan) {
+        } else if let Some(source_channels) = source_channels {
             if passthrough && channels != source_channels {
                 issues.push(ValidationIssue::new(
                     "Audio.Channels",
@@ -458,20 +840,57 @@ fn validate_audio(spec: &JobSpec, scan: Option<&ScanResult>, issues: &mut Vec<Va
                         "audio passthrough cannot change the layout from {source_channels} to {channels} channels"
                     ),
                 ));
+            } else if !passthrough && channels > source_channels {
+                // Widening would have to invent speakers the recording does not
+                // contain, so what comes out would not be the layout that was
+                // asked for.
+                issues.push(ValidationIssue::new(
+                    "Audio.Channels",
+                    format!(
+                        "the source has {} channel(s), so {} output would have to invent speakers that are not in the recording",
+                        source_channels,
+                        layout_label(channels)
+                    ),
+                ));
             }
         }
     }
 
-    if let (Some(channels), Some(mixdown)) = (options.channels, options.mixdown_enum) {
-        let expected = mixdown_channels(mixdown);
-        if expected != 0 && expected != channels {
-            issues.push(ValidationIssue::new(
-                "Audio.Mixdown",
-                format!(
-                    "mixdown '{}' implies {expected} channels but {channels} were requested",
-                    mixdown.as_str()
-                ),
-            ));
+    let mixdown = requested_mixdown(&options);
+    if mixdown > 0 {
+        if let Some(channels) = options.channels {
+            if channels != mixdown {
+                issues.push(ValidationIssue::new(
+                    "Audio.Mixdown",
+                    format!(
+                        "mixdown to {} implies {mixdown} channels but {channels} were requested",
+                        layout_label(mixdown)
+                    ),
+                ));
+            }
+        }
+        if let Some(source_channels) = source_channels {
+            if mixdown > source_channels {
+                issues.push(ValidationIssue::new(
+                    "Audio.Mixdown",
+                    format!(
+                        "the source has {} channel(s), so a {} mixdown cannot be made from it",
+                        source_channels,
+                        layout_label(mixdown)
+                    ),
+                ));
+            } else if mixdown == source_channels {
+                // Mixing to the layout the track already has is not a mixdown:
+                // the filter would be a copy of the input, and offering it as a
+                // choice suggests it did something.
+                issues.push(ValidationIssue::new(
+                    "Audio.Mixdown",
+                    format!(
+                        "the source is already {}; there is nothing to mix down to that layout",
+                        layout_label(mixdown)
+                    ),
+                ));
+            }
         }
     }
 
@@ -488,7 +907,8 @@ fn validate_audio(spec: &JobSpec, scan: Option<&ScanResult>, issues: &mut Vec<Va
     }
 
     if passthrough {
-        let needs_filter = options.mixdown.is_some()
+        let needs_filter = mixdown > 0
+            || options.mixdown.is_some()
             || options.mixdown_enum.is_some()
             || options.dither
             || options.gain.is_some()
@@ -518,21 +938,7 @@ fn source_audio_channels(scan: Option<&ScanResult>) -> Option<u32> {
         .and_then(|s: &StreamInfo| s.channels)
 }
 
-fn mixdown_channels(mixdown: vise_core::AudioMixdown) -> u32 {
-    match mixdown {
-        vise_core::AudioMixdown::Auto => 0,
-        vise_core::AudioMixdown::Mono => 1,
-        vise_core::AudioMixdown::Stereo | vise_core::AudioMixdown::Dolby => 2,
-        vise_core::AudioMixdown::Surround51 => 6,
-        vise_core::AudioMixdown::Surround71 => 8,
-    }
-}
-
-fn validate_subtitles(
-    spec: &JobSpec,
-    scan: Option<&ScanResult>,
-    issues: &mut Vec<ValidationIssue>,
-) {
+fn validate_subtitles(spec: &JobSpec, facts: &MachineFacts, issues: &mut Vec<ValidationIssue>) {
     let options = spec.subtitle_processing_options();
     let burn_in = options.effective_burn_in() || spec.subtitle_mode == SubtitleMode::BurnIn;
 
@@ -552,21 +958,23 @@ fn validate_subtitles(
                 .as_ref()
                 .map(|p| !p.trim().is_empty())
                 .unwrap_or(false);
-        if let Some(scan) = scan {
-            let has_embedded = scan.streams.iter().any(|s| s.kind == TrackKind::Subtitle);
-            if !has_external && !has_embedded {
-                issues.push(ValidationIssue::new(
-                    "Subtitle",
-                    "subtitle burn-in requested but the source has no subtitle tracks and no subtitle file was supplied",
-                ));
+        match facts.scan() {
+            Some(scan) => {
+                let has_embedded = scan.streams.iter().any(|s| s.kind == TrackKind::Subtitle);
+                if !has_external && !has_embedded {
+                    issues.push(ValidationIssue::new(
+                        "Subtitle",
+                        "subtitle burn-in requested but the source has no subtitle tracks and no subtitle file was supplied",
+                    ));
+                }
             }
-        } else if !has_external {
             // Without scan facts the worker cannot confirm a subtitle source
             // exists; requiring the explicit path keeps the behaviour honest.
-            issues.push(ValidationIssue::new(
+            None if !has_external => issues.push(ValidationIssue::new(
                 "Subtitle",
                 "subtitle burn-in requires either an embedded subtitle track or an explicit subtitle file",
-            ));
+            )),
+            None => {}
         }
     }
 
@@ -587,14 +995,6 @@ fn container_name(container: ContainerFormat) -> &'static str {
         ContainerFormat::Mkv => "Matroska",
         ContainerFormat::Webm => "WebM",
     }
-}
-
-fn audio_codec_name(codec: AudioCodec) -> &'static str {
-    codec.label()
-}
-
-fn video_codec_name(codec: VideoCodec) -> &'static str {
-    codec.label()
 }
 
 /// Build a synthetic scan result, useful for validation tests and for callers
@@ -656,30 +1056,233 @@ mod tests {
         minimal_job(input, output)
     }
 
+    /// A Matroska job, for the rules that are about the container.
+    fn mkv(input: &str, output: &str) -> JobSpec {
+        JobSpec {
+            container: ContainerFormat::Mkv,
+            ..minimal_job(input, output)
+        }
+    }
+
+    /// Facts for a source and a destination that are both fine, so a test can
+    /// state the one thing it is about.
+    fn usable() -> MachineFacts {
+        MachineFacts {
+            source: Some(PathFacts::readable_file()),
+            destination: Some(PathFacts {
+                exists: false,
+                is_dir: false,
+                readable: false,
+                writable: true,
+            }),
+            scan: None,
+        }
+    }
+
+    fn with_scan(channels: Option<u32>) -> MachineFacts {
+        usable().and_scan(synthetic_scan(10.0, 640, 480, channels))
+    }
+
+    /// Assert a job is refused, and that the refusal names `field`.
+    fn refused_for(job: &JobSpec, facts: &MachineFacts, field: &str) -> String {
+        let report = validate_job(job, facts);
+        assert!(
+            report.issues.iter().any(|issue| issue.field == field),
+            "expected a problem on {field}, got: {}",
+            report.summary()
+        );
+        assert!(!report.is_valid());
+        report.summary()
+    }
+
+    /// Assert a job is accepted.
+    fn accepted(job: &JobSpec, facts: &MachineFacts) {
+        let report = validate_job(job, facts);
+        assert!(
+            report.is_valid(),
+            "unexpected problems: {}",
+            report.summary()
+        );
+        assert!(ensure_valid(job, facts).is_ok());
+    }
+
     #[test]
     fn reports_missing_paths() {
-        let report = validate_job(&JobSpec::default(), None);
+        let report = validate_job(&JobSpec::default(), &MachineFacts::unknown());
         assert!(!report.is_valid());
         let fields: Vec<&str> = report.issues.iter().map(|i| i.field.as_str()).collect();
         assert!(fields.contains(&"InputPath"));
         assert!(fields.contains(&"OutputPath"));
         assert!(report.summary().contains("InputPath"));
+        assert_eq!(report.lines().len(), report.issues.len());
     }
 
     #[test]
-    fn reports_missing_input_file_and_bad_extension() {
-        let report = validate_job(&spec("no-such-file.mkv", "out.txt"), None);
+    fn reports_every_problem_at_once() {
+        // Six separate mistakes, all reported: a validator that stopped at the first
+        // would cost the user six round trips instead of one.
+        let mut job = JobSpec {
+            input_path: "in.mkv".to_string(),
+            container: ContainerFormat::Webm,
+            video_codec: VideoCodec::H264,
+            audio_codec: AudioCodec::Pcm,
+            quality: Some(99),
+            ..JobSpec::default()
+        };
+        job.audio_processing.channels = Some(6);
+        let facts = MachineFacts {
+            source: Some(PathFacts::default()),
+            destination: Some(PathFacts {
+                writable: false,
+                ..PathFacts::default()
+            }),
+            scan: Some(synthetic_scan(10.0, 640, 480, Some(2))),
+        };
+        let report = validate_job(&job, &facts);
+        let fields: Vec<&str> = report.issues.iter().map(|i| i.field.as_str()).collect();
+        for expected in [
+            "InputPath",
+            "OutputPath",
+            "VideoCodec",
+            "AudioCodec",
+            "Audio.Channels",
+        ] {
+            assert!(
+                fields.contains(&expected),
+                "{expected} missing from {fields:?}"
+            );
+        }
+        assert!(
+            report.issues.len() >= 6,
+            "expected the whole list, got {}",
+            report.summary()
+        );
+    }
+
+    #[test]
+    fn reports_a_missing_input_file_and_a_bad_extension() {
+        let facts = MachineFacts {
+            source: Some(PathFacts::default()),
+            ..usable()
+        };
+        let report = validate_job(&spec("no-such-file.mkv", "out.txt"), &facts);
         let fields: Vec<&str> = report.issues.iter().map(|i| i.field.as_str()).collect();
         assert!(fields.contains(&"InputPath"));
         assert!(fields.contains(&"OutputPath"));
     }
 
     #[test]
+    fn a_source_that_is_a_folder_is_not_a_source() {
+        let facts = MachineFacts {
+            source: Some(PathFacts {
+                exists: true,
+                is_dir: true,
+                ..PathFacts::default()
+            }),
+            ..usable()
+        };
+        refused_for(&spec("C:\\media\\folder", "out.mp4"), &facts, "InputPath");
+        // The same path read as a file is fine.
+        let file = MachineFacts {
+            source: Some(PathFacts::readable_file()),
+            ..usable()
+        };
+        accepted(&spec("C:\\media\\movie.mp4", "out.mp4"), &file);
+    }
+
+    #[test]
+    fn a_source_that_cannot_be_read_is_refused() {
+        let facts = MachineFacts {
+            source: Some(PathFacts {
+                exists: true,
+                is_dir: false,
+                readable: false,
+                writable: false,
+            }),
+            ..usable()
+        };
+        let summary = refused_for(&spec("locked.mp4", "out.mp4"), &facts, "InputPath");
+        assert!(summary.contains("cannot be read"), "{summary}");
+        accepted(&spec("locked.mp4", "out.mp4"), &usable());
+    }
+
+    #[test]
+    fn a_destination_that_cannot_be_written_is_refused() {
+        let facts = MachineFacts {
+            destination: Some(PathFacts {
+                exists: false,
+                is_dir: false,
+                readable: false,
+                writable: false,
+            }),
+            ..usable()
+        };
+        let summary = refused_for(&spec("in.mp4", "C:\\out\\movie.mp4"), &facts, "OutputPath");
+        assert!(summary.contains("cannot be written"), "{summary}");
+        accepted(&spec("in.mp4", "C:\\out\\movie.mp4"), &usable());
+    }
+
+    #[test]
+    fn a_destination_that_is_a_folder_is_refused() {
+        let facts = MachineFacts {
+            destination: Some(PathFacts {
+                exists: true,
+                is_dir: true,
+                ..PathFacts::default()
+            }),
+            ..usable()
+        };
+        let summary = refused_for(&spec("in.mp4", "C:\\out\\movie.mp4"), &facts, "OutputPath");
+        assert!(summary.contains("folder"), "{summary}");
+    }
+
+    #[test]
+    fn the_probe_reports_what_is_really_on_disk() {
+        let dir = std::env::temp_dir().join("vise-ipc-probe-facts");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let source = dir.join("in.mkv");
+        std::fs::write(&source, b"not real media").expect("write");
+        let destination = dir.join("out.mkv");
+
+        let facts = probe_machine_facts(&mkv(
+            source.to_str().unwrap(),
+            destination.to_str().unwrap(),
+        ));
+        let probed_source = facts.source.expect("source probed");
+        assert!(probed_source.exists && probed_source.readable && !probed_source.is_dir);
+        let probed_destination = facts.destination.expect("destination probed");
+        assert!(!probed_destination.exists);
+        assert!(
+            probed_destination.writable,
+            "a new file beside one that exists can be written"
+        );
+
+        // A file that is not there, in a folder that is not either, is not a
+        // problem yet: the folder is created on the way to the file.
+        let nested = dir.join("made-on-demand").join("out.mkv");
+        let facts = probe_machine_facts(&mkv(source.to_str().unwrap(), nested.to_str().unwrap()));
+        assert!(facts.destination.expect("destination probed").writable);
+
+        // A destination that is really a folder is refused rather than offered.
+        let facts = probe_machine_facts(&mkv(source.to_str().unwrap(), dir.to_str().unwrap()));
+        assert!(facts.destination.expect("probed").is_dir);
+        let summary = refused_for(
+            &mkv(
+                source.to_str().unwrap(),
+                dir.join("out.mkv").to_str().unwrap(),
+            ),
+            &facts,
+            "OutputPath",
+        );
+        assert!(summary.contains("folder"), "{summary}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn reports_container_extension_mismatch() {
-        let mut job = spec("in.mkv", "out.mp4");
-        job.container = ContainerFormat::Mkv;
-        let report = validate_job(&job, None);
-        assert!(report.summary().contains("does not match"));
+        let summary = refused_for(&mkv("in.mkv", "out.mp4"), &usable(), "OutputPath");
+        assert!(summary.contains("does not match"), "{summary}");
     }
 
     #[test]
@@ -688,118 +1291,292 @@ mod tests {
         job.container = ContainerFormat::Webm;
         job.video_codec = VideoCodec::H264;
         job.audio_codec = AudioCodec::Aac;
-        let report = validate_job(&job, None);
-        let summary = report.summary();
-        assert!(summary.contains("H.264"));
-        assert!(summary.contains("AAC"));
+        let summary = refused_for(&job, &usable(), "VideoCodec");
+        assert!(summary.contains("H.264"), "{summary}");
+        let summary = refused_for(&job, &usable(), "AudioCodec");
+        assert!(summary.contains("AAC"), "{summary}");
+    }
+
+    #[test]
+    fn a_container_that_can_carry_the_chosen_codecs_is_accepted() {
+        let mut job = mkv("in.mkv", "out.mkv");
+        job.video_codec = VideoCodec::H265;
+        job.audio_codec = AudioCodec::Opus;
+        accepted(&job, &usable());
     }
 
     #[test]
     fn reports_lossless_container_constraint() {
         let mut job = spec("in.mp4", "out.mp4");
         job.lossless = true;
-        let report = validate_job(&job, None);
-        assert!(report.summary().contains("lossless"));
+        let summary = refused_for(&job, &usable(), "Container");
+        assert!(summary.contains("lossless"), "{summary}");
+    }
+
+    #[test]
+    fn a_lossless_job_that_carries_no_rate_is_accepted() {
+        let mut job = mkv("in.mkv", "out.mkv");
+        job.video_codec = VideoCodec::Ffv1;
+        job.audio_codec = AudioCodec::Flac;
+        job.lossless = true;
+        accepted(&job, &usable());
     }
 
     #[test]
     fn reports_rate_control_problems() {
         let mut job = spec("in.mp4", "out.mp4");
         job.quality = Some(99);
-        assert!(validate_job(&job, None)
+        assert!(validate_job(&job, &usable())
             .summary()
             .contains("outside the supported range"));
 
         // Constant quality is the default mode: an absent quality is valid.
         let job = spec("in.mp4", "out.mp4");
-        assert!(!validate_job(&job, None).summary().contains("quality"));
+        accepted(&job, &usable());
 
         let mut job = spec("in.mp4", "out.mp4");
         job.encoding_mode = Some(vise_core::EncodingMode::AverageBitrate);
-        assert!(validate_job(&job, None).summary().contains("bitrate"));
+        refused_for(&job, &usable(), "Bitrate");
+
+        let mut job = spec("in.mp4", "out.mp4");
+        job.encoding_mode = Some(vise_core::EncodingMode::AverageBitrate);
+        job.bitrate = Some(0);
+        refused_for(&job, &usable(), "Bitrate");
 
         let mut job = spec("in.mp4", "out.mp4");
         job.encoding_mode = Some(vise_core::EncodingMode::TargetSize);
         job.target_size = Some(1024);
-        let report = validate_job(&job, None);
-        assert!(report.summary().contains("known source duration"));
-        let scan = synthetic_scan(10.0, 640, 480, Some(2));
-        assert!(!validate_job(&job, Some(&scan))
-            .summary()
-            .contains("known source duration"));
+        refused_for(&job, &usable(), "TargetSize");
+        let facts = usable().and_scan(synthetic_scan(10.0, 640, 480, Some(2)));
+        accepted(&job, &facts);
+    }
+
+    #[test]
+    fn a_lossless_request_may_not_carry_a_rate() {
+        let mut job = mkv("in.mkv", "out.mkv");
+        job.video_codec = VideoCodec::Ffv1;
+        job.audio_codec = AudioCodec::Flac;
+        job.lossless = true;
+        job.quality = Some(20);
+        let summary = refused_for(&job, &usable(), "Quality");
+        assert!(
+            summary.contains("lossless encode has no quality"),
+            "{summary}"
+        );
+
+        job.quality = None;
+        job.bitrate = Some(4000);
+        refused_for(&job, &usable(), "Bitrate");
+
+        // Without either, the same job is a complete lossless request.
+        job.bitrate = None;
+        accepted(&job, &usable());
+    }
+
+    #[test]
+    fn a_two_pass_job_that_gains_nothing_from_it_is_refused() {
+        let mut job = mkv("in.mkv", "out.mkv");
+        job.two_pass = true;
+        // A constant-quality second pass is a real thing and is left alone.
+        job.quality = Some(22);
+        accepted(&job, &usable());
+
+        // A lossless write has no rate for the first pass to measure.
+        job.lossless = true;
+        let summary = refused_for(&job, &usable(), "TwoPass");
+        assert!(summary.contains("lossless"), "{summary}");
+
+        // An intra-only codec has no pass-based mode at all.
+        job.lossless = false;
+        job.quality = None;
+        job.video_codec = VideoCodec::Ffv1;
+        let summary = refused_for(&job, &usable(), "TwoPass");
+        assert!(summary.contains("every frame on its own"), "{summary}");
+
+        // An average-bitrate second pass is exactly what two passes are for.
+        job.video_codec = VideoCodec::H264;
+        job.encoding_mode = Some(vise_core::EncodingMode::AverageBitrate);
+        job.bitrate = Some(2500);
+        accepted(&job, &usable());
     }
 
     #[test]
     fn reports_crop_problems_against_source_geometry() {
-        let scan = synthetic_scan(10.0, 640, 480, Some(2));
+        let facts = with_scan(Some(2));
         let mut job = spec("in.mp4", "out.mp4");
         job.crop = Some((600, 400, 320, 240));
-        let report = validate_job(&job, Some(&scan));
-        assert!(report.summary().contains("extends past"));
+        let summary = refused_for(&job, &facts, "Video.Crop");
+        assert!(summary.contains("extends past"), "{summary}");
 
         job.crop = Some((0, 0, 0, 100));
-        assert!(validate_job(&job, None)
-            .summary()
-            .contains("greater than zero"));
+        refused_for(&job, &usable(), "Video.Crop");
+
+        job.crop = Some((0, 0, 320, 240));
+        accepted(&job, &facts);
+    }
+
+    #[test]
+    fn a_filter_the_encoder_cannot_apply_is_refused() {
+        // Deblocking and telecine removal act on artefacts that only inter
+        // prediction leaves behind, so an intra-only codec cannot be asked for
+        // either of them.
+        let mut job = mkv("in.mkv", "out.mkv");
+        job.video_codec = VideoCodec::Ffv1;
+        job.audio_codec = AudioCodec::Flac;
+        job.video_processing.deblock = true;
+        let summary = refused_for(&job, &usable(), "Video.Deblock");
+        assert!(summary.contains("every frame on its own"), "{summary}");
+
+        job.video_processing.deblock = false;
+        accepted(&job, &usable());
+
+        job.video_processing.detelecine = true;
+        let summary = refused_for(&job, &usable(), "Video.Detelecine");
+        assert!(summary.contains("telecine"), "{summary}");
+
+        job.video_processing.detelecine = false;
+        accepted(&job, &usable());
+
+        // The same filters on a codec that does predict between frames are the
+        // ordinary case and are left alone.
+        job.video_codec = VideoCodec::H264;
+        job.video_processing.deblock = true;
+        job.video_processing.detelecine = true;
+        accepted(&job, &usable());
+    }
+
+    #[test]
+    fn a_deblock_strength_outside_the_filters_range_is_refused() {
+        let mut job = spec("in.mp4", "out.mp4");
+        job.video_processing.deblock = true;
+        job.video_processing.deblock_strength = Some(64);
+        let summary = refused_for(&job, &usable(), "Video.Deblock");
+        assert!(
+            summary.contains("between") || summary.contains("4-31"),
+            "{summary}"
+        );
+
+        job.video_processing.deblock_strength = Some(4);
+        accepted(&job, &usable());
+
+        // A block size with deblocking off is a value nothing will read.
+        job.video_processing.deblock = false;
+        job.video_processing.deblock_strength = Some(8);
+        refused_for(&job, &usable(), "Video.Deblock");
     }
 
     #[test]
     fn reports_audio_layout_conflicts() {
-        let scan = synthetic_scan(10.0, 640, 480, Some(2));
-        let mut job = spec("in.mp4", "out.mp4");
+        let facts = with_scan(Some(2));
+        let mut job = mkv("in.mkv", "out.mkv");
         job.audio_processing = AudioProcessingOptions {
             channels: Some(6),
             passthrough: true,
             ..Default::default()
         };
-        assert!(validate_job(&job, Some(&scan))
-            .summary()
-            .contains("cannot change the layout"));
+        let summary = refused_for(&job, &facts, "Audio.Channels");
+        assert!(summary.contains("cannot change the layout"), "{summary}");
 
-        let mut job = spec("in.mkv", "out.mkv");
-        job.container = ContainerFormat::Mkv;
+        let mut job = mkv("in.mkv", "out.mkv");
         job.audio_processing = AudioProcessingOptions {
             channels: Some(2),
             mixdown_enum: Some(vise_core::AudioMixdown::Surround51),
             ..Default::default()
         };
-        assert!(validate_job(&job, None)
-            .summary()
-            .contains("implies 6 channels"));
+        let summary = refused_for(&job, &facts, "Audio.Mixdown");
+        assert!(summary.contains("implies 6 channels"), "{summary}");
 
-        let mut job = spec("in.mkv", "out.mkv");
-        job.container = ContainerFormat::Mkv;
+        let mut job = mkv("in.mkv", "out.mkv");
         job.audio_processing = AudioProcessingOptions {
             channels: Some(12),
             ..Default::default()
         };
-        assert!(validate_job(&job, None)
-            .summary()
-            .contains("between 1 and 8"));
+        refused_for(&job, &facts, "Audio.Channels");
+    }
+
+    #[test]
+    fn a_layout_the_source_cannot_produce_is_refused() {
+        let stereo = with_scan(Some(2));
+        let mut job = mkv("in.mkv", "out.mkv");
+
+        // Asking for a surround track from a stereo recording would have to
+        // invent the speakers that are not in it.
+        job.audio_processing = AudioProcessingOptions {
+            channels: Some(6),
+            ..Default::default()
+        };
+        let summary = refused_for(&job, &stereo, "Audio.Channels");
+        assert!(summary.contains("invent speakers"), "{summary}");
+
+        // The same request as a named mixdown is refused the same way.
+        job.audio_processing = AudioProcessingOptions {
+            mixdown_enum: Some(vise_core::AudioMixdown::Surround51),
+            ..Default::default()
+        };
+        let summary = refused_for(&job, &stereo, "Audio.Mixdown");
+        assert!(summary.contains("cannot be made from it"), "{summary}");
+
+        // Mixing a stereo source to mono is a real mixdown and is allowed.
+        job.audio_processing = AudioProcessingOptions {
+            mixdown_enum: Some(vise_core::AudioMixdown::Mono),
+            ..Default::default()
+        };
+        accepted(&job, &stereo);
+    }
+
+    #[test]
+    fn a_mixdown_to_the_layout_the_source_already_has_is_refused() {
+        let mono = with_scan(Some(1));
+        let mut job = mkv("in.mkv", "out.mkv");
+        job.audio_processing = AudioProcessingOptions {
+            mixdown_enum: Some(vise_core::AudioMixdown::Mono),
+            ..Default::default()
+        };
+        let summary = refused_for(&job, &mono, "Audio.Mixdown");
+        assert!(summary.contains("nothing to mix down"), "{summary}");
+
+        // A surround source mixing down to stereo has something to do.
+        let surround = with_scan(Some(6));
+        job.audio_processing = AudioProcessingOptions {
+            mixdown_enum: Some(vise_core::AudioMixdown::Stereo),
+            ..Default::default()
+        };
+        accepted(&job, &surround);
+
+        // Leaving the layout alone is always allowed.
+        job.audio_processing = AudioProcessingOptions {
+            mixdown_enum: Some(vise_core::AudioMixdown::Auto),
+            ..Default::default()
+        };
+        accepted(&job, &surround);
     }
 
     #[test]
     fn reports_passthrough_conflicts() {
-        let mut job = spec("in.mkv", "out.mkv");
-        job.container = ContainerFormat::Mkv;
+        let mut job = mkv("in.mkv", "out.mkv");
         job.audio_processing = AudioProcessingOptions {
             passthrough: true,
             gain: Some(2.0),
             ..Default::default()
         };
-        assert!(validate_job(&job, None).summary().contains("passthrough"));
+        refused_for(&job, &usable(), "Audio");
     }
 
     #[test]
     fn reports_subtitle_burn_in_without_a_source() {
         let mut job = spec("in.mp4", "out.mp4");
         job.subtitle_mode = SubtitleMode::BurnIn;
-        assert!(validate_job(&job, None).summary().contains("burn-in"));
+        refused_for(&job, &usable(), "Subtitle");
+        refused_for(&job, &with_scan(Some(2)), "Subtitle");
 
-        let scan = synthetic_scan(10.0, 640, 480, Some(2));
-        assert!(validate_job(&job, Some(&scan))
-            .summary()
-            .contains("no subtitle"));
+        // A source that carries subtitles has something to burn in.
+        let mut scan = synthetic_scan(10.0, 640, 480, Some(2));
+        scan.streams.push(StreamInfo {
+            index: 2,
+            kind: TrackKind::Subtitle,
+            ..Default::default()
+        });
+        accepted(&job, &MachineFacts::unknown().and_scan(scan));
     }
 
     #[test]
@@ -810,11 +1587,10 @@ mod tests {
         let output = dir.join("output.mp4");
         std::fs::write(&input, b"not real media").expect("write input");
 
-        let scan = synthetic_scan(10.0, 640, 480, Some(2));
+        let facts = probe_machine_facts(&spec(input.to_str().unwrap(), output.to_str().unwrap()))
+            .and_scan(synthetic_scan(10.0, 640, 480, Some(2)));
         let mut job = spec(input.to_str().unwrap(), output.to_str().unwrap());
         job.quality = Some(22);
-        let report = validate_job(&job, Some(&scan));
-        assert!(report.is_valid(), "unexpected issues: {}", report.summary());
-        assert!(ensure_valid(&job, Some(&scan)).is_ok());
+        accepted(&job, &facts);
     }
 }
