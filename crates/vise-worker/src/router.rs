@@ -216,9 +216,13 @@ fn handle_start_encode(runtime: &Arc<WorkerRuntime>, request: &HttpRequest) -> H
     runtime.apply_init(&command.initialise_command);
 
     // Validation against the cached scan result gives an immediate, precise
-    // answer for most bad jobs.
-    let cached = runtime.scan().cached_result(&command.encode_job.input_path);
-    let report = vise_ipc::validation::validate_job(&command.encode_job, cached.as_ref());
+    // answer for most bad jobs. The paths are looked up here rather than inside
+    // the rules, which stay a pure function of the job and these facts.
+    let mut facts = vise_ipc::validation::probe_machine_facts(&command.encode_job);
+    if let Some(cached) = runtime.scan().cached_result(&command.encode_job.input_path) {
+        facts = facts.and_scan(cached);
+    }
+    let report = vise_ipc::validation::validate_job(&command.encode_job, &facts);
     if !report.is_valid() {
         runtime.logs().error(format!("encode rejected: {report}"));
         return HttpResponse::json(

@@ -210,6 +210,58 @@ impl TitleFacts {
         languages.sort_by(|a, b| a.0.cmp(&b.0));
         languages
     }
+
+    /// These facts as a source scan, for the shared job validator.
+    ///
+    /// The window keeps a scan as title facts so the tabs can read it, and the
+    /// worker keeps it as a probe result so the pipeline can read it. The job
+    /// validator is shared, so the window's facts are put into the shape it
+    /// reads here rather than the rules being written twice: one rule set, two
+    /// callers, and a job that passes in the window is the same job the worker
+    /// will accept.
+    ///
+    /// Only what a title scan reported is carried across. A field the window
+    /// has no answer for is left at its default rather than filled in with a
+    /// guess, so a rule that needs it is skipped rather than decided wrongly.
+    pub fn to_scan_result(&self) -> vise_core::ScanResult {
+        let mut streams = vec![vise_core::StreamInfo {
+            index: 0,
+            kind: vise_core::TrackKind::Video,
+            width: self.has_frame_size().then_some(self.width),
+            height: self.has_frame_size().then_some(self.height),
+            ..Default::default()
+        }];
+        for track in &self.audio {
+            streams.push(vise_core::StreamInfo {
+                index: streams.len(),
+                kind: vise_core::TrackKind::Audio,
+                channels: (track.channel_count > 0).then_some(track.channel_count),
+                ..Default::default()
+            });
+        }
+        for _ in &self.subtitles {
+            streams.push(vise_core::StreamInfo {
+                index: streams.len(),
+                kind: vise_core::TrackKind::Subtitle,
+                ..Default::default()
+            });
+        }
+        let stream_indices: Vec<usize> = (0..streams.len()).collect();
+        vise_core::ScanResult {
+            format: vise_core::FormatInfo {
+                duration_seconds: self.has_duration().then_some(self.duration_seconds),
+                ..Default::default()
+            },
+            streams,
+            titles: vec![vise_core::TitleInfo {
+                index: 0,
+                duration_seconds: self.has_duration().then_some(self.duration_seconds),
+                stream_indices,
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+    }
 }
 
 fn audio_facts(track: &vise_ipc::contract::ScanAudioTrack) -> AudioFacts {

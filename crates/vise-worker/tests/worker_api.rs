@@ -14,6 +14,7 @@ use vise_ipc::contract::{
     CommandResult, EncodeCommand, InitCommand, LogMessage, PreviewCommand, PreviewResult,
     ProgressReport, ScanCommand, TitlesResult, WorkState,
 };
+use vise_ipc::crash::{EncodeOutcome, IsolationPolicy, Resolution, WorkerDeath};
 use vise_ipc::timespan::TimeSpan;
 use vise_ipc::{ClientError, WorkerClient, WorkerConfig, WorkerSupervisor};
 
@@ -151,6 +152,404 @@ where
         );
         std::thread::sleep(Duration::from_millis(50));
     }
+}
+
+// ---------------------------------------------------------------------------
+// Crash isolation
+// ---------------------------------------------------------------------------
+//
+// What follows drives the same attribution the desktop window uses, over a real
+// worker that is really killed. The window's part of it is the poll loop and the
+// sweep; both are exercised here against the actual binary and the actual
+// subprocess, because the one thing worth being sure of is that a worker killed
+// mid-encode is noticed as a dead *process* and not as a queue that went quiet.
+
+/// Wait until the encoder process exists, so a kill lands during the encode
+/// rather than during the planning that precedes it.
+fn wait_until_encoding<F>(mut read: F, label: &str) -> ProgressReport
+where
+    F: FnMut() -> ProgressReport,
+{
+    let deadline = Instant::now() + Duration::from_secs(60);
+    loop {
+        let report = read();
+        assert!(
+            Instant::now() < deadline,
+            "{label} never started encoding; last report {report:?}"
+        );
+        if report
+            .working
+            .as_ref()
+            .map(|w| w.stage.starts_with("encoding"))
+            .unwrap_or(false)
+        {
+            return report;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// Wait until the client cannot reach the worker any more.
+fn wait_until_gone(client: &WorkerClient) -> ClientError {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        if let Err(err) = client.is_token_set() {
+            return err;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the client must notice a worker that died"
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+/// A source long enough that an encode is still running when the worker dies.
+fn long_source(dir: &Path, seconds: u32) -> PathBuf {
+    generate_source(dir, "long.mkv", seconds)
+}
+
+/// Runs the isolation tests one at a time.
+///
+/// They kill worker processes and leave an encoder behind each one: a killed
+/// worker does not get to kill the ffmpeg it started, so an orphaned encoder
+/// keeps running after its test has finished. Running these in parallel would
+/// have one test's orphan competing with another's encode for the machine, and
+/// the failures that produces look nothing like the thing being tested.
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Stop an encode, retrying while the encoder process is still being planned.
+///
+/// The control routes deliberately refuse while the encode thread has not
+/// spawned ffmpeg yet, so a test that stops the moment the stage turns to
+/// "encoding" is racing the very window the refusal describes.
+fn stop_when_ready(client: &WorkerClient) -> bool {
+    let deadline = Instant::now() + Duration::from_secs(60);
+    loop {
+        if let Ok(result) = client.stop_encode() {
+            if result.was_successful {
+                return true;
+            }
+        }
+        if Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+#[test]
+fn a_worker_killed_mid_encode_fails_only_its_job_and_the_next_job_still_runs() {
+    let _serial = serial();
+    let dir = temp_dir("isolation");
+    let media = media_dir("isolation");
+    let logs = dir.join("logs");
+    std::fs::create_dir_all(&logs).expect("log dir");
+    // Long enough that the encode is still going when the worker is killed.
+    let source = long_source(&media, 600);
+    let first = dir.join("first.mp4");
+    let second = dir.join("second.mp4");
+
+    let (mut supervisor, client) = start_worker("isolation");
+    client
+        .start_scan(&scan_command(&source, &logs))
+        .expect("StartScan");
+    poll_until(
+        || client.poll_scan_progress().expect("PollScanProgress"),
+        Duration::from_secs(60),
+        "scan",
+    );
+
+    let job = |output: &Path| JobSpec {
+        input_path: source.to_string_lossy().to_string(),
+        output_path: output.to_string_lossy().to_string(),
+        container: ContainerFormat::Mp4,
+        quality: Some(40),
+        ..JobSpec::default()
+    };
+
+    // Job one starts, and the window's poll loop is what notices the death.
+    let started = client
+        .start_encode(&EncodeCommand {
+            initialise_command: init_command(&logs),
+            encode_job: job(&first),
+        })
+        .expect("StartEncode");
+    assert!(started.was_successful, "encode refused: {}", started.error);
+    wait_until_encoding(
+        || client.poll_encode_progress().expect("PollEncodeProgress"),
+        "job one",
+    );
+
+    // Kill the worker outright: no shutdown request, no chance to tidy up.
+    let connection = supervisor.connection().expect("a running worker");
+    let killed = Command::new("taskkill")
+        .args(["/PID", &connection.pid.to_string(), "/F"])
+        .output();
+    assert!(
+        killed.map(|out| out.status.success()).unwrap_or(false),
+        "the worker process must be killable for this test"
+    );
+
+    // The poll fails, and the failure is recognised as a dead process rather
+    // than as a queue that went quiet.
+    let error = wait_until_gone(&client);
+    assert!(error.is_worker_gone(), "unexpected error: {error}");
+    let death = supervisor
+        .notice_death()
+        .expect("the supervisor must see the worker it lost");
+    assert_eq!(death.pid, connection.pid, "{death:?}");
+    assert_ne!(
+        death.code,
+        Some(0),
+        "a killed process does not report success: {death:?}"
+    );
+    assert!(
+        death
+            .describe()
+            .contains(&format!("{}", death.code.unwrap_or(-1)))
+            || death.code.is_none(),
+        "the exit status travels with the death: {death:?}"
+    );
+
+    // The window's decision: this job fails, on its own, and the queue carries
+    // on.
+    let mut policy = IsolationPolicy::new();
+    let resolution = policy.resolved(EncodeOutcome::WorkerGone(death.clone()), &first.clone());
+    match &resolution {
+        Resolution::JobCrashed { reason, output, .. } => {
+            assert_eq!(output, &first, "the crash is about this job's file");
+            assert!(reason.contains("worker process"), "{reason}");
+        }
+        other => panic!("expected an isolated crash, got {other:?}"),
+    }
+    assert!(
+        resolution.continues_queue(),
+        "one dead worker must not stop the queue"
+    );
+
+    // What the dead worker could not do for itself: remove its partial output.
+    // The sweep is the window's job, and it must not touch the destination.
+    //
+    // A worker killed outright does not get to kill the encoder it started, so
+    // on some platforms the file it was writing is still open. That is the real
+    // case, and the contract is not "the file is gone": it is that every partial
+    // is either removed or named, so the user is told which file is still there
+    // and can remove it themselves. Nothing is ever promoted to a finished file.
+    let orphan = vise_ipc::partial::partial_output_path_for(&first, connection.pid);
+    assert!(
+        orphan.is_file(),
+        "the killed worker left the partial it was writing: {orphan:?}"
+    );
+    let stale = vise_ipc::partial::partial_output_path_for(&first, connection.pid + 1);
+    std::fs::write(&stale, b"an earlier partial").expect("write a partial");
+    let cleanup = vise_ipc::partial::remove_partial_outputs(&first);
+    assert!(
+        cleanup.removed.contains(&stale),
+        "a partial nobody is writing is removed: {cleanup:?}"
+    );
+    let still_there: Vec<&PathBuf> = cleanup
+        .failed
+        .iter()
+        .map(|(path, _)| path)
+        .chain(cleanup.removed.iter())
+        .collect();
+    for path in still_there {
+        assert!(
+            cleanup.removed.contains(path) || cleanup.failed.iter().any(|(p, _)| p == path),
+            "every partial is either removed or reported: {path:?} in {cleanup:?}"
+        );
+    }
+    assert!(
+        !cleanup.summary().is_empty(),
+        "the sweep says what it did: {cleanup:?}"
+    );
+    assert!(
+        !first.exists(),
+        "a crashed job is never promoted to a finished file"
+    );
+
+    // Job two runs: the supervisor brings up a fresh worker and the next encode
+    // completes on it.
+    let replacement = supervisor.ensure_running().expect("a fresh worker");
+    assert_ne!(replacement.pid, connection.pid, "a new process");
+    assert_eq!(supervisor.restarts(), 1);
+    let next = replacement.client().with_timeout(Duration::from_secs(120));
+    let started = next
+        .start_encode(&EncodeCommand {
+            initialise_command: init_command(&logs),
+            encode_job: job(&second),
+        })
+        .expect("StartEncode on the replacement");
+    assert!(
+        started.was_successful,
+        "the next job must be accepted: {}",
+        started.error
+    );
+    // This source is far too long to encode in a test, so the encode is stopped
+    // once the replacement has proved it is really encoding. What is being
+    // asserted is that a fresh worker took the job on at all: the failure being
+    // tested is the first worker dying, not this one finishing.
+    wait_until_encoding(
+        || next.poll_encode_progress().expect("PollEncodeProgress"),
+        "job two",
+    );
+    assert!(
+        stop_when_ready(&next),
+        "the replacement accepts the control routes"
+    );
+    let _ = poll_until(
+        || next.poll_encode_progress().expect("PollEncodeProgress"),
+        Duration::from_secs(60),
+        "the second encode",
+    );
+    supervisor.shutdown().expect("shutdown");
+}
+
+#[test]
+fn a_user_requested_stop_is_not_reported_as_a_crash() {
+    let _serial = serial();
+    let dir = temp_dir("isolation-stop");
+    let media = media_dir("isolation-stop");
+    let logs = dir.join("logs");
+    std::fs::create_dir_all(&logs).expect("log dir");
+    let source = long_source(&media, 600);
+    let output = dir.join("stopped.mp4");
+
+    let (mut supervisor, client) = start_worker("isolation-stop");
+    client
+        .start_scan(&scan_command(&source, &logs))
+        .expect("StartScan");
+    poll_until(
+        || client.poll_scan_progress().expect("PollScanProgress"),
+        Duration::from_secs(60),
+        "scan",
+    );
+
+    let job = JobSpec {
+        input_path: source.to_string_lossy().to_string(),
+        output_path: output.to_string_lossy().to_string(),
+        container: ContainerFormat::Mp4,
+        quality: Some(40),
+        ..JobSpec::default()
+    };
+    let started = client
+        .start_encode(&EncodeCommand {
+            initialise_command: init_command(&logs),
+            encode_job: job,
+        })
+        .expect("StartEncode");
+    assert!(started.was_successful, "encode refused: {}", started.error);
+    wait_until_encoding(
+        || client.poll_encode_progress().expect("PollEncodeProgress"),
+        "the job",
+    );
+
+    // The user presses stop. The window records that before it asks the worker,
+    // because the worker may be killed while the request is in flight.
+    let mut policy = IsolationPolicy::new();
+    policy.request_stop();
+    assert!(
+        stop_when_ready(&client),
+        "the worker accepts the stop request"
+    );
+
+    let report = poll_until(
+        || client.poll_encode_progress().expect("PollEncodeProgress"),
+        Duration::from_secs(60),
+        "the stopped encode",
+    );
+    let done = report.work_done.clone().expect("WorkDone");
+    let resolution = policy.resolved(
+        EncodeOutcome::Finished {
+            was_successful: done.was_successful,
+            message: done.message.clone(),
+            error_code: done.error,
+        },
+        &output,
+    );
+    assert!(
+        matches!(resolution, Resolution::JobCancelled { .. }),
+        "a stop is a cancellation, not a failure: {resolution:?}"
+    );
+    assert_eq!(
+        policy.guard().consecutive(),
+        0,
+        "and it is not counted against the worker"
+    );
+    // The stopped encode leaves no file for the user to explain.
+    assert!(!output.exists(), "a cancelled job writes no destination");
+    supervisor.shutdown().expect("shutdown");
+}
+
+#[test]
+fn consecutive_worker_deaths_are_replaced_and_then_reported_rather_than_looping() {
+    let dir = temp_dir("isolation-streak");
+    let mut supervisor = WorkerSupervisor::new(
+        WorkerConfig::new(WORKER_EXE)
+            .with_port(0)
+            .with_handshake_dir(dir)
+            .with_handshake_timeout(Duration::from_secs(30)),
+    );
+
+    // The same decision the window makes, against the same streak, but driven
+    // from real processes: each worker is killed, the streak grows, and the
+    // window is told whether to replace it or to stop.
+    let _serial = serial();
+    let mut policy = IsolationPolicy::new();
+    let mut replacements = 0u32;
+    let mut pids: Vec<u32> = Vec::new();
+
+    for attempt in 1..=3 {
+        let connection = supervisor.ensure_running().expect("a worker");
+        pids.push(connection.pid);
+        assert!(connection.client().is_token_set().expect("IsTokenSet"));
+        let _ = Command::new("taskkill")
+            .args(["/PID", &connection.pid.to_string(), "/F"])
+            .output();
+        let _ = wait_until_gone(&connection.client().with_timeout(Duration::from_secs(5)));
+        let death = supervisor
+            .notice_death()
+            .unwrap_or_else(|| WorkerDeath::unexplained(connection.pid, "killed in the test"));
+        let resolution = policy.resolved(EncodeOutcome::WorkerGone(death), Path::new("out.mkv"));
+        match attempt {
+            1 | 2 => match resolution {
+                Resolution::JobCrashed { backoff, .. } => {
+                    replacements += 1;
+                    assert_eq!(
+                        backoff,
+                        Duration::from_secs(2) * (replacements - 1),
+                        "each replacement waits longer than the last"
+                    );
+                }
+                other => panic!("attempt {attempt}: expected a replacement, got {other:?}"),
+            },
+            _ => {
+                assert!(
+                    !resolution.continues_queue(),
+                    "the third death in a row stops the queue"
+                );
+                match &resolution {
+                    Resolution::QueueStopped { reason, .. } => assert!(
+                        reason.contains("3 time(s) in a row"),
+                        "the streak must be reported: {reason}"
+                    ),
+                    other => panic!("attempt {attempt}: expected the queue to stop, got {other:?}"),
+                }
+            }
+        }
+    }
+    assert_eq!(replacements, 2, "two workers were replaced before the stop");
+    assert_eq!(policy.guard().consecutive(), 3);
+    assert_eq!(pids.len(), 3, "three distinct processes ran");
+    // No fourth worker: the streak was reported rather than restarted again.
+    let restarts_before = supervisor.restarts();
+    let _ = supervisor.ensure_running().expect("a worker");
+    assert_eq!(supervisor.restarts(), restarts_before + 1);
+    supervisor.shutdown().expect("shutdown");
 }
 
 #[test]

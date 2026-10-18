@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::api;
 use crate::client::{ClientError, WorkerClient};
+use crate::crash::WorkerDeath;
 use crate::portable::PortableSettings;
 use crate::token::generate_token;
 
@@ -195,6 +196,7 @@ pub struct WorkerSupervisor {
     worker: Option<RunningWorker>,
     restarts: u32,
     last_failure: Option<String>,
+    last_death: Option<WorkerDeath>,
 }
 
 impl std::fmt::Debug for WorkerSupervisor {
@@ -216,6 +218,7 @@ impl WorkerSupervisor {
             worker: None,
             restarts: 0,
             last_failure: None,
+            last_death: None,
         }
     }
 
@@ -227,6 +230,52 @@ impl WorkerSupervisor {
     /// Reason the previous worker stopped, when it did.
     pub fn last_failure(&self) -> Option<&str> {
         self.last_failure.as_deref()
+    }
+
+    /// What the last worker that died looked like, while it is unclaimed.
+    ///
+    /// The exit status is the part a queue row needs: "the worker process
+    /// stopped answering" is a symptom, "exited with code 3" is a fact somebody
+    /// can act on.
+    pub fn last_death(&self) -> Option<&WorkerDeath> {
+        self.last_death.as_ref()
+    }
+
+    /// Hand over the last death, so it is attributed to one job exactly once.
+    pub fn take_death(&mut self) -> Option<WorkerDeath> {
+        self.last_death.take()
+    }
+
+    /// Look at the running worker and record its death if it has died.
+    ///
+    /// This does not start a replacement: it is what the window calls the moment
+    /// a request fails, so the queue can be told the exit status straight away
+    /// rather than after a replacement has been spawned and a handshake waited
+    /// out. [`WorkerSupervisor::ensure_running`] does the replacement.
+    pub fn notice_death(&mut self) -> Option<WorkerDeath> {
+        let worker = self.worker.as_mut()?;
+        let pid = worker.connection.pid;
+        let death = match worker.child.try_wait() {
+            Ok(Some(status)) => WorkerDeath {
+                pid,
+                code: status.code(),
+                signal: signal_of(&status),
+                reason: "the process ended while an encode was running".to_string(),
+            },
+            // Alive but not answering is a death as far as the queue is
+            // concerned; there is simply no exit status to report.
+            Ok(None) => WorkerDeath::unexplained(pid, "the worker stopped answering requests"),
+            Err(e) => {
+                WorkerDeath::unexplained(pid, format!("the worker status is unavailable: {e}"))
+            }
+        };
+        self.record_death(death.clone());
+        Some(death)
+    }
+
+    fn record_death(&mut self, death: WorkerDeath) {
+        self.last_failure = Some(death.describe());
+        self.last_death = Some(death);
     }
 
     /// Connection details for the running worker, if any.
@@ -265,11 +314,16 @@ impl WorkerSupervisor {
     /// This is the crash-recovery entry point: call it before any operation
     /// that must not fail because the worker died underneath the UI.
     pub fn ensure_running(&mut self) -> Result<WorkerConnection, SupervisorError> {
+        let mut death: Option<WorkerDeath> = None;
         if let Some(worker) = self.worker.as_mut() {
             match worker.child.try_wait() {
                 Ok(Some(status)) => {
-                    let code = status.code();
-                    self.last_failure = Some(format!("worker exited with code {code:?}"));
+                    death = Some(WorkerDeath {
+                        pid: worker.connection.pid,
+                        code: status.code(),
+                        signal: signal_of(&status),
+                        reason: "the process ended while an encode was running".to_string(),
+                    });
                 }
                 Ok(None) => {
                     // Process is alive; confirm it still answers requests.
@@ -279,12 +333,21 @@ impl WorkerSupervisor {
                     ) {
                         return Ok(worker.connection.clone());
                     }
-                    self.last_failure = Some("worker stopped answering requests".to_string());
+                    death = Some(WorkerDeath::unexplained(
+                        worker.connection.pid,
+                        "the worker stopped answering requests",
+                    ));
                 }
                 Err(e) => {
-                    self.last_failure = Some(format!("worker status unavailable: {e}"));
+                    death = Some(WorkerDeath::unexplained(
+                        worker.connection.pid,
+                        format!("the worker status is unavailable: {e}"),
+                    ));
                 }
             }
+        }
+        if let Some(death) = death {
+            self.record_death(death);
             self.worker = None;
             self.restarts += 1;
         }
@@ -418,6 +481,9 @@ impl WorkerSupervisor {
 
         if is_restart {
             self.last_failure = None;
+            // The replacement is up, so the death that brought us here has been
+            // dealt with; a fresh death is recorded against the new process.
+            self.last_death = None;
         }
         self.worker = Some(RunningWorker {
             child,
@@ -494,6 +560,22 @@ impl Drop for WorkerSupervisor {
             let _ = std::fs::remove_file(&worker.handshake_file);
         }
     }
+}
+
+/// The signal that ended a process, where the platform has signals.
+///
+/// `std::process::ExitStatus::signal` is behind an extension trait, so this is
+/// the unix reading of the raw status and the answer is simply "no signal" on
+/// Windows, where a killed process reports an exit code instead.
+#[cfg(unix)]
+fn signal_of(status: &std::process::ExitStatus) -> Option<i32> {
+    use std::os::unix::process::ExitStatusExt;
+    status.signal()
+}
+
+#[cfg(not(unix))]
+fn signal_of(_status: &std::process::ExitStatus) -> Option<i32> {
+    None
 }
 
 /// Read a handshake file, for callers that start the worker themselves.

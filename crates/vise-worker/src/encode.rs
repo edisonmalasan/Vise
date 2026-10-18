@@ -250,7 +250,11 @@ impl EncodeService {
         }
 
         let cached = lock(&self.scanner).clone();
-        let report = vise_ipc::validation::validate_job(job, cached.as_ref());
+        let mut facts = vise_ipc::validation::probe_machine_facts(job);
+        if let Some(scan) = cached {
+            facts = facts.and_scan(scan);
+        }
+        let report = vise_ipc::validation::validate_job(job, &facts);
         if !report.is_valid() {
             self.logs.error(format!("encode rejected: {report}"));
             return Err(format!("invalid encode job: {report}"));
@@ -355,7 +359,14 @@ fn run_encode(
         }
     }
 
-    let report = vise_ipc::validation::validate_job(job, source_facts.as_ref());
+    // The paths are probed here, once, rather than inside the rules: what a job
+    // looks like on this machine and how that job should be judged are two
+    // different questions.
+    let mut facts = vise_ipc::validation::probe_machine_facts(job);
+    if let Some(scan) = source_facts.clone() {
+        facts = facts.and_scan(scan);
+    }
+    let report = vise_ipc::validation::validate_job(job, &facts);
     if !report.is_valid() {
         finish(
             inner,
@@ -672,17 +683,11 @@ pub fn encode_log_label(job: &JobSpec) -> String {
 }
 
 /// Temporary output path used while an encode runs.
+///
+/// The naming is shared with the window, which has to be able to find and sweep
+/// these files when a worker dies before it can tidy up after itself.
 pub fn partial_output_path(output: &Path) -> PathBuf {
-    let parent = output.parent().unwrap_or_else(|| Path::new("."));
-    let stem = output
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("output");
-    let extension = output.extension().and_then(|e| e.to_str()).unwrap_or("mkv");
-    parent.join(format!(
-        "{stem}.vise-part-{}.{extension}",
-        std::process::id()
-    ))
+    vise_ipc::partial::partial_output_path(output)
 }
 
 /// Replace the destination argument in a resolved command line.
