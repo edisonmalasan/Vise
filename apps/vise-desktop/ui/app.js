@@ -4106,6 +4106,19 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         ? tabs.source.name + " · " + tabs.source.summary
         : tabs.source.summary
     );
+    // A disc is read differently from a file, so the user is told which they
+    // picked rather than being left to work it out from a failure.
+    var sourceNote = el("tabSourceNote");
+    if (sourceNote) {
+      setText(sourceNote, tabs.source.sourceNote || "");
+      show(sourceNote, !!(tabs.source.sourceNote));
+    }
+    // A disc is read differently from a file, so the page says which it is.
+    var sourceNote = el("tabSourceNote");
+    if (sourceNote) {
+      setText(sourceNote, tabs.source.sourceNote || "");
+      show(sourceNote, !!(tabs.source.sourceNote && tabs.source.sourceNote.length));
+    }
 
     var problems = el("tabProblems");
     if (tabs.problems && tabs.problems.length) {

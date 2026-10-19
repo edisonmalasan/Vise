@@ -2,12 +2,12 @@
   "comment": "Pinned media tooling. Bump deliberately: a new ffmpeg means new encoder availability and therefore new test expectations. 'sha256' on an archive is the digest of the archive as published; a per-binary digest is only needed when the archive itself is not pinned, because a pinned archive already determines what is inside it. A build must not be published while an archive digest still reads REPLACE_WITH_SHA256.",
   "platforms": {
     "windows-x86_64": {
-      "version": "8.1.2",
+      "version": "9.0.2",
       "archives": [
         {
-          "name": "ffmpeg-8.1.2-essentials_build.zip",
-          "url": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip",
-          "sha256": "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec"
+          "name": "ffmpeg-n9.0.2-28-g669f5ab083-win64-gpl-9.0.zip",
+          "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-18-13-01/ffmpeg-n9.0.2-28-g669f5ab083-win64-gpl-9.0.zip",
+          "sha256": "a38198cc130ed3fa02097d0baebcea9c1b8a9d9d3d1d8161d691d1f03709158b"
         }
       ],
       "license": "GPL-3.0-or-later",
@@ -16,8 +16,8 @@
         "ffprobe.exe"
       ],
       "digests": {
-        "ffmpeg.exe": "1326dde4c84ff1f96fe6b8916c5bed29e163e9b5dccf995f6f3db069d143ec5e",
-        "ffprobe.exe": "b49ccc7c6547b141ad5a2f6ec69cc04323d7133d7704d70b331b904c63eecb07"
+        "ffmpeg.exe": "f9c4d64e3012fa2740efaabe260b64149f3e4c25a63c4fa39e8091e4a19f686f",
+        "ffprobe.exe": "04bde2c18043338085b73d2aaaefc86b865820ccd90144d8578231e6bf229c35"
       }
     },
     "linux-x86_64": {

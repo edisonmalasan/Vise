@@ -272,8 +272,11 @@ impl Transcoder {
             }
         }
         args.push("-y".into());
-        args.push("-i".into());
-        args.push(input.to_string_lossy().to_string());
+        // An optical disc is not a file, so the demuxer that reads it is named
+        // before the input rather than the path alone.
+        for argument in crate::media::encoder_input_arguments(Path::new(&input)) {
+            args.push(argument);
+        }
         if let Some(path) = &chapter_metadata_path {
             args.push("-i".into());
             args.push(path.to_string_lossy().to_string());

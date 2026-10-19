@@ -18,6 +18,7 @@ mod job;
 mod lossless;
 mod media;
 mod metadata;
+pub mod optical;
 mod pipeline;
 mod preset;
 mod progress;
