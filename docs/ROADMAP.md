@@ -266,10 +266,10 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 A shipped build carries its own encoder rather than relying on whatever the
 machine has, because the filters and encoders the application offers are only
-present in some builds. \crates/vise-core/src/tooling.rs\ owns the order and it
+present in some builds. `crates/vise-core/src/tooling.rs` owns the order and it
 is fixed: the application's own copy under any of the packaged layouts, then the
-machine's \PATH\, then a per-user install. A file only counts when it exists, is
-a file, and is executable, so a directory called \fmpeg.exe\ is not mistaken for
+machine's `PATH`, then a per-user install. A file only counts when it exists, is
+a file, and is executable, so a directory called `ffmpeg.exe` is not mistaken for
 a binary and found at the first spawn instead. When nothing is bundled the build
 says so rather than behaving quietly differently from a shipped one, and that
 reaches the Group 20 diagnostics bundle.
@@ -277,11 +277,11 @@ reaches the Group 20 diagnostics bundle.
 Verified end to end on this machine rather than by inspection. The tools are
 fetched into a pin file, the archive digest was compared against the digest the
 publisher publishes, and the extracted binaries' digests were then pinned, so a
-release job can re-check the claim with \erify-media-tools.sh\ before it
+release job can re-check the claim with `verify-media-tools.sh` before it
 publishes. That script was confirmed to pass on the fetched tools and to fail on a
-binary altered by one byte. A real \uild-release.sh --bundled\ produced a
-staged package whose bundled \fmpeg\ runs (8.1.2) and which the tooling resolver
-reports as bundled while a different ffmpeg is on the \PATH\.
+binary altered by one byte. A real `build-release.sh --bundled` produced a
+staged package whose bundled `ffmpeg` runs (8.1.2) and which the tooling resolver
+reports as bundled while a different ffmpeg is on the `PATH`.
 
 The Windows installer was produced and inspected rather than assumed. It was
 installed silently into a scratch directory and the installed tree checked: the
@@ -295,16 +295,26 @@ download archive, which is a build input rather than something to ship; the
 installer went from 159 MiB to 54 MiB once the tools were staged separately from
 the cache.
 
-Not claimed: the macOS bundle and the Linux package. Building them needs a
-sysroot and a linker for the target, and neither platform's toolchain is
-available on a Windows machine, so no bundle was produced for either. What was
-checked is the part that can be: \ise-core\, \ise-ipc\, and \ise-worker\ all
-type-check for both _64-unknown-linux-gnu\ and _64-apple-darwin\, so the
-portable half of the workspace is known to build off this platform. Only the
-desktop crate is untested there, because it needs the platform's own GUI
-libraries. Their pin entries still carry placeholders, which the fetch script
-refuses to leave unpinned without saying so, so an unpinned entry cannot be
-published by accident.
+The macOS bundle is built by the release workflow on a macOS machine, which is
+the only place it can be: it links against the frameworks of the platform it
+runs on. The bundle and the disk image were produced there, and the workflow
+that produced them runs the same checks as the other two platforms.
+
+All three platforms now build and package on every push, and each is checked
+rather than assumed: the Linux package is unpacked and its parts run, and the
+Windows installer is installed into a scratch directory and its tree inspected.
+The media tools are pinned per platform with their archive and binary digests,
+and every build checks those digests before it trusts what it downloaded.
+
+Building for the other platforms found several things that would have shipped.
+The window asked for a Windows window handle unconditionally and so did not
+compile off Windows. The application looked for the worker only beside its own
+binary, and a Linux package installs the binary under /usr/bin and its
+resources under /usr/lib, so an installed application would have found no
+worker and quietly fallen back to running the pipeline inside the window. The
+capabilities offered a hardware encoder because ffmpeg listed it, whatever
+hardware was present. And the bundle carried the media tools but not the worker,
+so the installed application had no worker to start.
 
 ## Group 13 — Worker process and JSON IPC
 
