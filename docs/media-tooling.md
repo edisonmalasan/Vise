@@ -46,7 +46,7 @@ checked against what it claims to contain. **`scripts/verify-media-tools.sh`
 re-checks that claim on a machine that already has the tools**, which is what a
 release job should run before it publishes anything.
 
-The version, URL, and expected digests live in `media-tools.lock.json` at the
+The version, URL, and expected digests live in `media-tools.json` at the
 repository root. Change it deliberately: a new ffmpeg means new encoder
 availability and therefore new test expectations.
 
@@ -57,6 +57,14 @@ availability and therefore new test expectations.
 | Windows | beside the executable | The worker is launched from the same directory, so it resolves the same copy. |
 | macOS | `Contents/Resources/media` | Inside the `.app`, where the signature covers them. |
 | Linux | beside the executable | `libexec` is also searched for distributions that split binaries out. |
+
+A platform key in the pin file names the **tools**, not the machine they run
+on. macOS publishes one encoder build, for Intel, and Apple silicon runs it
+through Rosetta 2, so both architectures resolve to `darwin-x86_64` rather
+than to a `darwin-aarch64` that nothing is pinned under. The three scripts
+that name a platform agree on this, and a key the pin file does not hold
+stops the fetch with the reason rather than producing a build with no
+encoder.
 
 ## Why not let `PATH` win
 

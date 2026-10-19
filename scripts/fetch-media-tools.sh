@@ -32,7 +32,14 @@ fi
 host_platform() {
   local os arch
   case "$(uname -s)" in
-    Darwin) os=darwin ;;
+    Darwin)
+      # macOS has one pinned encoder build, and it is the x86_64 one. Apple
+      # silicon runs it through Rosetta 2, so the key names the tools rather
+      # than the machine: both architectures resolve to the same build, and
+      # naming the machine would ask the pin file for a build nobody publishes.
+      echo "darwin-x86_64"
+      return
+      ;;
     Linux) os=linux ;;
     MINGW*|MSYS*|CYGWIN*) os=windows ;;
     *) echo "unsupported operating system: $(uname -s)" >&2; exit 1 ;;

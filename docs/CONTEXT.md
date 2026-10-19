@@ -15,7 +15,10 @@
 |---|---|
 | Goals, features, and progress | `docs/ROADMAP.md` |
 | Current application behavior | `crates/vise-core` (media, pipeline), `crates/vise-worker` (worker JSON API), `apps/vise-desktop` (shell); `crates/vise-ipc` (client, supervisor, contract) |
+| Product truth and the interface's design system | `PRODUCT.md` and `DESIGN.md` at the repository root |
 | Technical design and key boundaries | `re` reverse-engineering notes (behavioral/structural reference only); `docs/ROADMAP.md` architecture decisions |
+| Bundled media tooling | `docs/media-tooling.md`, `media-tools.json` (the pin file) |
+| Release notes and the changelog | `release-notes/<version>.md` and `CHANGELOG.md` |
 | Build and test commands | Root `AGENTS.md` |
 | Agent skills and lock | `.agents/skills/` and `skills-lock.json` (vendored skill definitions) |
 | Important existing dependencies | serde/serde_json for the worker contract and for the embedded translation resources; no HTTP framework; ffmpeg/ffprobe subprocesses; `graphify-out/` is derived analysis |

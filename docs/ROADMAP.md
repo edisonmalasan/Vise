@@ -320,13 +320,32 @@ the cache.
 The macOS bundle is built by the release workflow on a macOS machine, which is
 the only place it can be: it links against the frameworks of the platform it
 runs on. The bundle and the disk image were produced there, and the workflow
-that produced them runs the same checks as the other two platforms.
+that produced them runs the same checks as the other two platforms. The build
+runs on an Apple silicon machine, so the application is aarch64 and there is
+no Intel build of it.
 
 All three platforms now build and package on every push, and each is checked
 rather than assumed: the Linux package is unpacked and its parts run, and the
 Windows installer is installed into a scratch directory and its tree inspected.
 The media tools are pinned per platform with their archive and binary digests,
 and every build checks those digests before it trusts what it downloaded.
+
+The release itself is cut from the artifacts those three builds produced, so
+what is published is exactly what was built and checked rather than a second
+build that might differ. The job runs only for a tag: a plain run builds and
+stops there, and nothing reaches a user until the tag is pushed. The notes
+come from `release-notes/<version>.md` through `scripts/release-notes.sh`, and
+a version with no notes is refused rather than published empty.
+
+Two defects were found by reading what the build actually produces rather than
+what it was meant to. The macOS bundle is aarch64, but the only published
+macOS encoder is the x86_64 one, so the application ships an encoder that
+macOS runs through Rosetta 2, and the readme now says so rather than
+promising an Intel build that does not exist. And the scripts that fetch the
+media tools asked the pin file for a build under the name of the machine
+rather than the name of the tool, so an Apple silicon Mac looked for
+`darwin-aarch64`, which nothing is pinned under, and the fetch failed. All
+three scripts now resolve macOS to the one build that exists.
 
 Building for the other platforms found several things that would have shipped.
 The window asked for a Windows window handle unconditionally and so did not

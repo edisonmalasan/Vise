@@ -143,3 +143,48 @@ jobs:
           path: |
             target/release/bundle/macos/*.app
             target/release/bundle/dmg/*.dmg
+
+  # The release is cut from the artifacts the three builds produced, so what
+  # is published is exactly what was built and checked rather than a second
+  # build that might differ. The job runs only for a tag: a plain run builds
+  # and stops there, and nothing reaches a user until the tag is pushed.
+  publish:
+    name: publish the release
+    needs: [linux, windows, macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: the release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          ./scripts/release-notes.sh "$version" > "notes-$version.md"
+          echo "publish: the notes for $version"
+          head -20 "notes-$version.md"
+      - name: the files to publish
+        run: |
+          mkdir -p publish
+          find artifacts -type f \( -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' \) \
+            -exec cp {} publish/ \;
+          echo "publish: the files that will be published"
+          ls -la publish
+      - name: the checksums
+        run: |
+          cd publish
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+      - name: cut the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Vise Transcoder $version" \
+            --notes-file "notes-$version.md" \
+            publish/*
+          echo "publish: https://github.com/${{ github.repository }}/releases/tag/$GITHUB_REF_NAME"

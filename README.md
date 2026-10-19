@@ -43,7 +43,7 @@ Grab a build for your platform from the
 | **Windows** | `Vise Transcoder_<version>_x64-setup.exe` | NSIS installer, per-user by default |
 | **Linux** | `Vise Transcoder_<version>_amd64.deb` | Debian, Ubuntu, and derivatives |
 | **Linux** | `Vise Transcoder_<version>_amd64.AppImage` | Runs anywhere, no install |
-| **macOS** | `Vise Transcoder_<version>_<arch>.dmg` | Apple silicon and Intel |
+| **macOS** | `Vise Transcoder_<version>_aarch64.dmg` | Apple silicon; the bundled encoder is the x86_64 build, which macOS runs through Rosetta 2 |
 
 Every build carries the media tooling it was tested with. Nothing else needs to
 be installed.
@@ -106,6 +106,22 @@ cross-compiled:
 ```bash
 ./scripts/build-linux.sh --bundled
 ```
+
+### Cutting a release
+
+The release workflow builds all three platforms, checks each one, and — for a
+tag — cuts the release from the artifacts those builds produced:
+
+```bash
+# Write the notes for the version first; a tag without notes is refused.
+# The notes live in release-notes/<version>.md.
+
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The published files are the ones the three builds produced, with a
+`SHA256SUMS` alongside them. Nothing reaches a user until the tag is pushed.
 
 ## How it is put together
 
