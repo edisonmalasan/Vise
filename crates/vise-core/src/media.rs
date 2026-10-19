@@ -270,6 +270,17 @@ pub trait MediaScanner {
 impl MediaScanner for FfprobeScanner {
     fn scan(&self, path: &Path) -> Result<ScanResult, crate::CoreError> {
         let ffprobe = self.ffprobe_bin()?;
+        // An optical disc is read through a demuxer or a protocol that only
+        // some builds have. When the build does not have it, the tool would
+        // say that the format is unknown, which reads like a damaged disc; the
+        // answer is checked here so the refusal can name what is missing.
+        if let Some(kind) = optical_source_kind(path) {
+            let ffmpeg = self.ffmpeg_path().map(Path::to_path_buf);
+            let capabilities = crate::optical::OpticalCapabilities::detect(ffmpeg.as_deref());
+            if let Some(refusal) = capabilities.refusal(kind) {
+                return Err(crate::CoreError::InvalidMedia(refusal));
+            }
+        }
         let output = Command::new(&ffprobe)
             .arg("-v")
             .arg("error")
@@ -278,7 +289,7 @@ impl MediaScanner for FfprobeScanner {
             .arg("-show_format")
             .arg("-show_streams")
             .arg("-show_chapters")
-            .arg(path)
+            .args(input_arguments(path))
             .output()
             .map_err(|e| crate::CoreError::CommandFailed(e.to_string()))?;
 
@@ -295,6 +306,41 @@ impl MediaScanner for FfprobeScanner {
 
         parse_ffprobe_output(&output.stdout, path)
     }
+}
+
+/// The arguments that say where the input is, for a tool that takes the input
+/// as a positional argument.
+///
+/// ffprobe names the file directly, so an optical disc only needs the demuxer
+/// or the protocol in front of it.
+pub fn input_arguments(path: &Path) -> Vec<String> {
+    match optical_source_kind(path) {
+        Some(kind) => kind.input_args(path),
+        None => vec![path_str(path)],
+    }
+}
+
+/// The arguments that say where the input is, for a tool that takes the input
+/// after `-i`.
+///
+/// An optical disc is not a file, so a plain path is not enough: a DVD is read
+/// through the `dvdvideo` demuxer and a Blu-ray through the `bluray` protocol.
+/// The demuxer has to be named before the input, and the input itself still
+/// has to be marked as an input, or the tool would try to write to it.
+pub fn encoder_input_arguments(path: &Path) -> Vec<String> {
+    let mut arguments = vec!["-i".to_string()];
+    match optical_source_kind(path) {
+        Some(kind) => {
+            // The demuxer or protocol goes before the input, and the input
+            // keeps its own marker.
+            let mut demuxer = kind.input_args(path);
+            let input = demuxer.pop().unwrap_or_default();
+            arguments.splice(0..0, demuxer);
+            arguments.push(input);
+        }
+        None => arguments.push(path_str(path)),
+    }
+    arguments
 }
 
 // Free functions for convenience / alternate expected call styles.
@@ -334,8 +380,7 @@ fn extract_preview_with(
         .arg("-y")
         .arg("-ss")
         .arg(format!("{:.3}", time_seconds.max(0.0)))
-        .arg("-i")
-        .arg(input)
+        .args(encoder_input_arguments(input))
         .arg("-frames:v")
         .arg("1")
         .arg("-q:v")

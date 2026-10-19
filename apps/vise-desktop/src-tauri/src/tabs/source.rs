@@ -110,6 +110,8 @@ pub struct TitleFacts {
     pub metadata: Vec<MetadataFact>,
     /// Dolby Vision profile reported in the stream side data; zero when none.
     pub dolby_vision_profile: u32,
+    /// What the source is: a file, a DVD, a Blu-ray, or an optical image.
+    pub source_kind: String,
     /// Whether the stream carries a Dolby Vision RPU.
     pub dolby_vision_rpu: bool,
     /// Whether the stream carries HDR10+ dynamic metadata.
@@ -152,6 +154,7 @@ impl TitleFacts {
             dolby_vision_profile: title.dolby_vision_profile,
             dolby_vision_rpu: title.dolby_vision_rpu,
             hdr10_plus: title.hdr10_plus,
+            source_kind: title.source_kind.clone(),
         }
     }
 
@@ -352,6 +355,11 @@ pub struct TitleFactsViewModel {
     pub chapter_count: usize,
     /// One line describing what the tabs are working on.
     pub summary: String,
+    /// What the source is, when it is not an ordinary file.
+    ///
+    /// A disc is read differently from a file, and a user who has just pointed
+    /// the window at a DVD should be told that is what happened.
+    pub source_note: String,
 }
 
 impl TitleFactsViewModel {
@@ -388,7 +396,25 @@ impl TitleFactsViewModel {
             audio_count: facts.audio.len(),
             subtitle_count: facts.subtitles.len(),
             chapter_count: facts.chapters.len(),
+            source_note: note_for_source(&facts.source_kind),
         }
+    }
+}
+
+/// What to say about the source, when there is something to say.
+///
+/// A disc is read differently from a file, so a user who has just pointed the
+/// window at a DVD should be told that is what happened. An ordinary file has
+/// nothing to say.
+fn note_for_source(kind: &str) -> String {
+    match kind.trim().to_ascii_lowercase().as_str() {
+        "dvd" => "Reading a DVD. The chapters and titles come from the disc itself.".to_string(),
+        "bluray" => {
+            "Reading a Blu-ray. The chapters and titles come from the disc itself.".to_string()
+        }
+        "iso" => "Reading an optical image. The chapters and titles come from the disc itself."
+            .to_string(),
+        _ => String::new(),
     }
 }
 
@@ -524,5 +550,37 @@ mod tests {
         assert!(!none.chosen);
         assert_eq!(none.name, "No title chosen");
         assert!(none.summary.contains("Choose a title"));
+    }
+
+    #[test]
+    fn a_disc_says_so_and_a_file_says_nothing() {
+        let mut facts = TitleFacts {
+            number: 1,
+            name: "A title".to_string(),
+            ..Default::default()
+        };
+        facts.source_kind = "dvd".to_string();
+        let dvd = TitleFactsViewModel::of(&facts);
+        assert!(
+            dvd.source_note.contains("DVD"),
+            "the user is told what is being read: {}",
+            dvd.source_note
+        );
+
+        facts.source_kind = "bluray".to_string();
+        let bluray = TitleFactsViewModel::of(&facts);
+        assert!(
+            bluray.source_note.contains("Blu-ray"),
+            "{}",
+            bluray.source_note
+        );
+
+        facts.source_kind = String::new();
+        let file = TitleFactsViewModel::of(&facts);
+        assert!(
+            file.source_note.is_empty(),
+            "an ordinary file has nothing to say: {}",
+            file.source_note
+        );
     }
 }
