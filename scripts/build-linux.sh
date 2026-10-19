@@ -70,16 +70,21 @@ docker run --rm \
   -w /src \
   -e VISE_BUNDLED="$bundled" \
   "$image" \
-  bash -lc "
+  bash -c "
     set -euo pipefail
+    export PATH=\"/root/.cargo/bin:\$PATH\"
     mkdir -p /build/target
     echo 'build-linux: installing pinned media tools'
     ./scripts/fetch-media-tools.sh linux-x86_64
     ./scripts/verify-media-tools.sh linux-x86_64
     echo 'build-linux: building the release'
     cargo build --workspace --release
+    echo 'build-linux: staging the worker beside the application'
+    rm -rf apps/vise-desktop/src-tauri/vendor/sidecar
+    mkdir -p apps/vise-desktop/src-tauri/vendor/sidecar
+    cp target/release/vise-worker apps/vise-desktop/src-tauri/vendor/sidecar/vise-worker
     echo 'build-linux: bundling'
-    cd apps/vise-desktop/src-tauri && tauri bundle --bundles deb,appimage
+    cd apps/vise-desktop/src-tauri && cargo tauri bundle --bundles deb,appimage
   "
 
 echo "build-linux: artifacts are in target/release/bundle/"

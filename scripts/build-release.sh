@@ -66,7 +66,7 @@ cargo build --workspace --release
 worker="$root/target/release/vise-worker"
 desktop="$root/target/release/vise-desktop"
 for binary in "$worker" "$desktop"; do
-  if [[ ! -x "$binary" ]]; then
+  if [[ ! -f "$binary" ]]; then
     echo "build-release: expected $binary to have been built" >&2
     exit 1
   fi
@@ -106,9 +106,21 @@ echo "  contents:"
 # would fall back to running the pipeline in-process, which is exactly what
 # process isolation exists to avoid.
 sidecar="$root/apps/vise-desktop/src-tauri/vendor/sidecar"
+# The directory is emptied first, because the bundle copies it whole: a worker
+# left there by a build for another platform would be shipped alongside this
+# one, and would never run.
 rm -rf "$sidecar"
 mkdir -p "$sidecar"
 worker_name="vise-worker"
-[[ "$(uname -s)" == "MINGW"* || "$(uname -s)" == "CYGWIN"* ]] && worker_name="vise-worker.exe"
+# The application asks for the name the platform gives an executable, so the
+# staged copy is named for the platform that will run it.
+if [[ "$(uname -s)" == "MINGW"* || "$(uname -s)" == "CYGWIN"* ]]; then
+  worker_name="vise-worker.exe"
+  [[ -f "$worker.exe" ]] && worker="$worker.exe"
+fi
 cp "$worker" "$sidecar/$worker_name"
 echo "build-release: worker staged for bundling in $sidecar"
+
+# The bundle configuration names a directory rather than the file, so whichever
+# platform staged its own worker name is the one that gets shipped.
+echo "build-release: the bundle takes the whole sidecar directory, so the worker is named for the platform that staged it"

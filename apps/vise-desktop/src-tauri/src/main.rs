@@ -919,6 +919,21 @@ pub struct TrayRequest {
     /// The surface to open.
     pub surface: String,
 }
+/// Where the packaged application keeps its resources.
+///
+/// A macOS bundle puts them in `Contents/Resources`, beside the `MacOS`
+/// directory the executable lives in. A build run from the source tree has no
+/// such place, and that is not an error: the tools and the worker are found
+/// next to the executable then.
+fn resource_dir() -> Option<PathBuf> {
+    let executable_dir = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(PathBuf::from))?;
+    executable_dir
+        .parent()
+        .map(|contents| contents.join("Resources"))
+}
+
 /// Build the backend the application will use.
 ///
 /// Isolation is on unless a portable settings file switches it off, or the
@@ -956,11 +971,25 @@ fn build_backend(isolate: bool) -> Backend {
     } else {
         "vise-worker"
     };
-    let candidates = [
-        executable_dir.join(name),
-        PathBuf::from("target/debug").join(name),
-        PathBuf::from("target/release").join(name),
-    ];
+    // A packaged build does not always put the worker beside the application:
+    // the Linux package installs the binary under /usr/bin and its resources
+    // under /usr/lib, and the macOS bundle puts them inside the application
+    // itself. Each of those layouts is tried, so a packaged build finds its own
+    // worker rather than quietly falling back to running the pipeline in the
+    // window.
+    let mut candidates = vec![executable_dir.join(name)];
+    if let Some(resources) = resource_dir() {
+        candidates.push(resources.join(name));
+    }
+    if let Some(parent) = executable_dir.parent() {
+        // The Linux package installs the binary under /usr/bin and its resources
+        // under /usr/lib, so the worker is a sibling of the bin directory rather
+        // than of the binary.
+        candidates.push(parent.join("lib").join("Vise Transcoder").join(name));
+        candidates.push(parent.join("lib").join("vise-transcoder").join(name));
+    }
+    candidates.push(PathBuf::from("target/debug").join(name));
+    candidates.push(PathBuf::from("target/release").join(name));
     let Some(executable) = candidates.into_iter().find(|path| path.is_file()) else {
         eprintln!(
             "the worker executable '{name}' was not found next to the application; \
@@ -4832,6 +4861,10 @@ fn main() {
                 }
                 // The notification area needs the window to show against, so the
                 // notifier is built here rather than before the window existed.
+                // A window handle is a Windows concept; on the other platforms the
+                // notifier falls back to the activity log, which every build
+                // already has, rather than the window failing to start.
+                #[cfg(windows)]
                 if let Ok(handle) = window.hwnd() {
                     if let Ok(mut guard) = start_up.lock() {
                         guard.integration.use_notifier(std::sync::Arc::new(
