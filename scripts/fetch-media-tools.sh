@@ -95,6 +95,12 @@ print(json.dumps(lock["platforms"][sys.argv[2]]["digests"]))
 PY
 )"
 target="$vendor/$platform"
+archive_digest="$($PYTHON - "$lock" "$platform" <<'PY'
+import json, sys
+lock = json.load(open(sys.argv[1], encoding="utf-8"))
+print(lock["platforms"][sys.argv[2]].get("archive_sha256", ""))
+PY
+)"
 
 echo "fetch-media-tools: ffmpeg $version for $platform"
 echo "  from $url"
@@ -114,6 +120,28 @@ if [[ ! -f "$archive_path" ]]; then
   fi
 else
   echo "  archive already cached"
+fi
+
+# The archive is checked against the pin before anything is unpacked from it, so
+# a tampered download is refused at the point it arrives rather than after its
+# contents have been trusted once.
+if [[ -n "$archive_digest" && "$archive_digest" != REPLACE_WITH_SHA256 ]]; then
+  actual="$($PYTHON - "$archive_path" <<'PY'
+import hashlib, sys
+with open(sys.argv[1], "rb") as handle:
+    print(hashlib.sha256(handle.read()).hexdigest())
+PY
+)"
+  if [[ "$actual" != "$archive_digest" ]]; then
+    echo "fetch-media-tools: the downloaded archive is not the pinned one:" >&2
+    echo "  expected $archive_digest" >&2
+    echo "  found    $actual" >&2
+    echo "  Nothing was unpacked from it." >&2
+    exit 1
+  fi
+  echo "  archive matches the pin"
+else
+  echo "  warning: the pin file records no archive digest for this platform"
 fi
 
 work="$(mktemp -d)"
@@ -191,6 +219,8 @@ echo "  verify at any time with ./scripts/verify-media-tools.sh $platform"
 # and the licence notice are copied into it: the archive that was downloaded is
 # a build input, not something to ship.
 staged="$vendor/staged"
+# The directory is emptied first: the bundle copies it whole, so tools left
+# there by a build for another platform would be shipped alongside this one.
 rm -rf "$staged"
 mkdir -p "$staged"
 for tool in $tools; do

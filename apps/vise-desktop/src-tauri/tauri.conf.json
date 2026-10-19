@@ -22,20 +22,43 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis"
+      "nsis",
+      "deb",
+      "appimage",
+      "dmg",
+      "app"
     ],
     "icon": [
+      "icons/32x32.png",
+      "icons/64x64.png",
+      "icons/128x128.png",
+      "icons/256x256.png",
+      "icons/512x512.png",
       "icons/icon.ico"
     ],
     "resources": {
       "vendor/ffmpeg/staged/": "media/",
-      "vendor/sidecar/vise-worker.exe": "vise-worker.exe"
+      "vendor/sidecar/": ""
     },
     "windows": {
       "nsis": {
         "installMode": "currentUser"
       }
     },
-    "externalBin": []
+    "externalBin": [],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0"
+        ]
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "category": "Video",
+    "shortDescription": "Transcode video and audio",
+    "longDescription": "Vise Transcoder converts video and audio between formats."
   }
 }
