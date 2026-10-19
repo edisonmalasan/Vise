@@ -355,7 +355,21 @@ mod platform {
         // call this crate does not have; rather than report a number it cannot
         // justify, it reports that it does not know, which the gate treats as
         // "do not refuse".
-        let _ = path;
+        //
+        // A folder that is not there is a different matter: there is nothing to
+        // measure and nothing to write, so the answer is that the question was
+        // refused rather than a number nobody can act on.
+        let folder = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty());
+        if let Some(folder) = folder {
+            if !folder.exists() {
+                return Err(SpaceError::Refused(format!(
+                    "{} does not exist yet",
+                    folder.display()
+                )));
+            }
+        }
         Ok(SpaceReading::unknown())
     }
 }
@@ -520,6 +534,10 @@ mod tests {
         ));
     }
 
+    // This test is about Windows path shapes: a drive letter and a backslash
+    // name one file on Windows and one odd filename on Linux, so the
+    // behaviour it checks only has one answer on one platform.
+    #[cfg(windows)]
     #[test]
     fn the_platform_answers_for_a_path_or_says_why_not() {
         // Whether this machine answers is not the point; that it comes back as an

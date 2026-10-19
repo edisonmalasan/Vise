@@ -202,6 +202,13 @@ pub struct HardwareCapabilities {
     pub hwaccels: Vec<String>,
     pub decoders: Vec<String>,
     pub encoders: Vec<String>,
+    /// The accelerator devices this machine actually has.
+    ///
+    /// An encoder being compiled into ffmpeg says nothing about whether it can
+    /// run: a build made for NVIDIA lists the NVIDIA encoders on a machine with
+    /// no NVIDIA card. The device list is what tells the two apart.
+    #[serde(default)]
+    pub devices: Vec<String>,
 }
 
 impl HardwareCapabilities {
@@ -226,6 +233,7 @@ impl HardwareCapabilities {
             hwaccels,
             decoders,
             encoders,
+            devices: detect_devices(),
         }
     }
 
@@ -240,11 +248,30 @@ impl HardwareCapabilities {
                 .any(|h| h.to_lowercase().contains(&needle))
     }
 
+    /// Whether an encoder can actually be used on this machine.
+    ///
+    /// A hardware encoder also needs the device it drives. The list ffmpeg
+    /// prints includes the encoders it was built with, whatever hardware is
+    /// plugged in, so a machine with no NVIDIA card but a build that mentions
+    /// NVIDIA would otherwise be offered a codec that cannot run.
     pub fn supports_encoder(&self, name: &str) -> bool {
         let needle = name.to_lowercase();
-        self.encoders
+        let listed = self
+            .encoders
             .iter()
-            .any(|e| e.to_lowercase().contains(&needle))
+            .any(|e| e.to_lowercase().contains(&needle));
+        if !listed {
+            return false;
+        }
+        match device_for_encoder(&needle) {
+            Some(device) => self.has_device(device),
+            None => true,
+        }
+    }
+
+    /// Whether this machine has a given accelerator device.
+    pub fn has_device(&self, device: &str) -> bool {
+        self.devices.iter().any(|d| d.eq_ignore_ascii_case(device))
     }
 
     pub fn supports_decode(&self, codec: &str) -> bool {
@@ -363,6 +390,80 @@ fn run_lines(ffmpeg: &Path, args: &[&str]) -> Vec<String> {
         .collect()
 }
 
+/// The accelerator device an encoder drives, when it needs one.
+///
+/// The software encoders drive nothing, so they are not in this table and are
+/// always available.
+pub fn device_for_encoder(encoder: &str) -> Option<&'static str> {
+    let name = encoder.to_lowercase();
+    if name.contains("nvenc") || name.contains("cuvid") {
+        Some("cuda")
+    } else if name.contains("qsv") {
+        Some("qsv")
+    } else if name.contains("vaapi") {
+        Some("vaapi")
+    } else if name.contains("amf") {
+        Some("amf")
+    } else if name.contains("videotoolbox") {
+        Some("videotoolbox")
+    } else {
+        None
+    }
+}
+
+/// The accelerator devices this machine actually has.
+///
+/// The check is deliberately about the device rather than about the driver: a
+/// machine with no NVIDIA card has no device node and no driver library, so
+/// either answers the question, and the device node is the one that is present
+/// on every platform the same way.
+pub fn detect_devices() -> Vec<String> {
+    let mut devices: Vec<String> = Vec::new();
+
+    // The NVIDIA device node is the one thing that is unambiguously the card.
+    if std::path::Path::new("/dev/nvidiactl").exists() {
+        devices.push("cuda".to_string());
+    }
+
+    // A render node is what the DRM-based encoders drive. Which vendor it is
+    // cannot be told from the node alone, so the encoders that use it are
+    // offered when one is there, and the vendor-specific ones are not.
+    if std::path::Path::new("/dev/dri").is_dir() {
+        if let Ok(entries) = std::fs::read_dir("/dev/dri") {
+            for entry in entries.flatten() {
+                if entry.file_name().to_string_lossy().starts_with("renderD") {
+                    devices.push("vaapi".to_string());
+                    break;
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows the driver's own library is the marker: it is installed
+        // with the card and is absent without it.
+        let system = std::env::var_os("SystemRoot")
+            .map(|root| PathBuf::from(root).join("System32"))
+            .unwrap_or_else(|| PathBuf::from("C:/Windows/System32"));
+        if system.join("nvcuda.dll").is_file() {
+            devices.push("cuda".to_string());
+        }
+        if system.join("amf.dll").is_file() {
+            devices.push("amf".to_string());
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // Every Mac has the hardware encoder, and ffmpeg on the platform is
+        // built against it.
+        devices.push("videotoolbox".to_string());
+    }
+
+    devices
+}
+
 // Convenience aliases used by callers/tests.
 pub type HardwareCapability = HardwareCapabilities;
 pub type HardwareCaps = HardwareCapabilities;
@@ -430,5 +531,92 @@ impl HardwareManager {
     }
     pub fn capabilities(&self) -> &HardwareCapabilities {
         &self.capabilities
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn with_encoders(encoders: &[&str], devices: &[&str]) -> HardwareCapabilities {
+        HardwareCapabilities {
+            ffmpeg_path: None,
+            hwaccels: Vec::new(),
+            decoders: Vec::new(),
+            encoders: encoders.iter().map(|e| e.to_string()).collect(),
+            devices: devices.iter().map(|d| d.to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn a_software_encoder_needs_no_device() {
+        let caps = with_encoders(&["libx264", "libx265"], &[]);
+        assert!(caps.supports_encoder("libx264"));
+        assert!(caps.supports_encoder("libx265"));
+    }
+
+    #[test]
+    fn a_hardware_encoder_without_its_device_is_not_offered() {
+        // ffmpeg lists the NVIDIA encoders whether or not there is a card.
+        let caps = with_encoders(&["h264_nvenc", "hevc_nvenc"], &[]);
+        assert!(
+            !caps.supports_encoder("h264_nvenc"),
+            "a machine with no card must not be offered the card encoder"
+        );
+    }
+
+    #[test]
+    fn a_hardware_encoder_with_its_device_is_offered() {
+        let caps = with_encoders(&["h264_nvenc", "hevc_nvenc"], &["cuda"]);
+        assert!(caps.supports_encoder("h264_nvenc"));
+        assert!(caps.supports_encoder("hevc_nvenc"));
+    }
+
+    #[test]
+    fn a_device_for_one_vendor_does_not_unlock_another() {
+        let caps = with_encoders(&["h264_nvenc", "h264_qsv", "h264_vaapi"], &["cuda"]);
+        assert!(caps.supports_encoder("h264_nvenc"));
+        assert!(!caps.supports_encoder("h264_qsv"));
+        assert!(!caps.supports_encoder("h264_vaapi"));
+    }
+
+    #[test]
+    fn an_encoder_that_is_not_listed_is_not_offered_whatever_the_device() {
+        let caps = with_encoders(&["libx264"], &["cuda"]);
+        assert!(!caps.supports_encoder("h264_nvenc"));
+    }
+
+    #[test]
+    fn each_vendor_encoder_names_the_device_it_needs() {
+        assert_eq!(device_for_encoder("h264_nvenc"), Some("cuda"));
+        assert_eq!(device_for_encoder("hevc_nvenc"), Some("cuda"));
+        assert_eq!(device_for_encoder("h264_qsv"), Some("qsv"));
+        assert_eq!(device_for_encoder("h264_vaapi"), Some("vaapi"));
+        assert_eq!(device_for_encoder("h264_amf"), Some("amf"));
+        assert_eq!(
+            device_for_encoder("h264_videotoolbox"),
+            Some("videotoolbox")
+        );
+        assert_eq!(device_for_encoder("libx264"), None);
+        assert_eq!(device_for_encoder("aac"), None);
+    }
+
+    #[test]
+    fn a_machine_with_no_card_offers_the_software_encoder() {
+        let caps = with_encoders(&["h264_nvenc", "libx264"], &[]);
+        assert_eq!(
+            caps.preferred_encoder(VideoCodec::H264, &HardwareAcceleration::default()),
+            "libx264",
+            "the software encoder is what a machine with no card must fall back to"
+        );
+    }
+
+    #[test]
+    fn a_machine_with_a_card_offers_it() {
+        let caps = with_encoders(&["h264_nvenc", "libx264"], &["cuda"]);
+        assert_eq!(
+            caps.preferred_encoder(VideoCodec::H264, &HardwareAcceleration::default()),
+            "h264_nvenc"
+        );
     }
 }

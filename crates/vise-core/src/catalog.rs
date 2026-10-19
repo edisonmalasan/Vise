@@ -41,7 +41,7 @@ use std::sync::OnceLock;
 /// editing formats that no GPU in this list encodes.
 ///
 /// It is written and read as the encoder's own identifier rather than as a
-/// variant name, so a preset file says `hevc_nvenc` — the same word the media
+/// variant name, so a preset file says `hevc_nvenc` â€” the same word the media
 /// tools, the logs, and an operator's command line all use. An identifier this
 /// build does not know is refused rather than kept as text nobody will read
 /// again.
@@ -90,8 +90,8 @@ pub enum EncoderId {
 /// A list rather than a match because the point of parsing is to be
 /// exhaustive: an identifier that is not in here is not an encoder this build
 /// knows how to check for. It is public so a caller that has to know what a
-/// machine *could* offer — a test building a machine that has everything, or a
-/// report listing the encoders this build knows — reads one list rather than
+/// machine *could* offer â€” a test building a machine that has everything, or a
+/// report listing the encoders this build knows â€” reads one list rather than
 /// keeping its own.
 pub const EVERY_ENCODER: [EncoderId; 18] = [
     EncoderId::X264,
@@ -1065,7 +1065,7 @@ impl PresetMigration {
 /// A document that is not an object is refused: there is nothing in it to read,
 /// and guessing would mean writing a file over somebody else's. A document whose
 /// version this build cannot read is refused by name, with the number it
-/// declared, rather than half-read — a partial read of a newer document is how a
+/// declared, rather than half-read â€” a partial read of a newer document is how a
 /// member somebody depended on gets dropped on the next save.
 pub fn read_preset_document(value: &serde_json::Value) -> Result<PresetDocument, CoreError> {
     let Some(members) = value.as_object() else {
@@ -1344,8 +1344,14 @@ pub fn writes_the_same_file(first: &PresetEntry, second: &PresetEntry) -> bool {
 mod tests {
     use super::*;
 
+    /// A machine with no graphics card.
+    ///
+    /// Its ffmpeg still lists the NVIDIA encoders, because a build made for
+    /// NVIDIA lists them whatever is plugged in, so the list alone says nothing
+    /// about the hardware.
     fn software() -> HardwareCapabilities {
         HardwareCapabilities {
+            devices: Vec::new(),
             ffmpeg_path: Some(std::path::PathBuf::from("ffmpeg")),
             hwaccels: vec!["d3d11va".to_string()],
             decoders: vec!["h264".to_string()],
@@ -1354,6 +1360,14 @@ mod tests {
                 "libx265  HEVC".to_string(),
                 "h264_nvenc NVIDIA".to_string(),
             ],
+        }
+    }
+
+    /// The same machine, with a card in it.
+    fn with_card() -> HardwareCapabilities {
+        HardwareCapabilities {
+            devices: vec!["cuda".to_string()],
+            ..software()
         }
     }
 
@@ -1396,7 +1410,7 @@ mod tests {
     fn a_hardware_encoder_this_machine_has_is_used_as_written() {
         let resolution = resolve_availability(
             &entry("a", Some(EncoderId::NvencH264), Some(HardwareFamily::Nvenc)),
-            &software(),
+            &with_card(),
             &HardwareAcceleration::auto(),
         );
         assert!(resolution.available);

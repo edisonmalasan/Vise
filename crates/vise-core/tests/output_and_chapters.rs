@@ -341,6 +341,10 @@ fn edited_markers_become_a_second_input_that_is_cleaned_up() {
         input_path: source.to_string_lossy().to_string(),
         output_path: out.to_string_lossy().to_string(),
         container: ContainerFormat::Mp4,
+        // The encoder is pinned to the software one. This test is about the
+        // chapter sidecar, and a machine with a graphics card would otherwise
+        // run it through a codec the machine running the test may not have.
+        hardware_acceleration: vise_core::HardwareAcceleration::disabled(),
         chapter_processing: ChapterProcessingOptions {
             mode: Some(ChapterMode::Edit),
             edit: true,

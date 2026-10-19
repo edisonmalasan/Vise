@@ -4861,21 +4861,25 @@ fn main() {
                 }
                 // The notification area needs the window to show against, so the
                 // notifier is built here rather than before the window existed.
-                // A window handle is a Windows concept; on the other platforms the
-                // notifier falls back to the activity log, which every build
-                // already has, rather than the window failing to start.
-                #[cfg(windows)]
-                if let Ok(handle) = window.hwnd() {
-                    if let Ok(mut guard) = start_up.lock() {
-                        guard.integration.use_notifier(std::sync::Arc::new(
-                            system::notify::BalloonNotifier::new(
-                                handle.0 as isize,
-                                "Vise Transcoder",
-                            ),
-                        ));
-                        let described = guard.integration.notifier_description();
-                        guard.activity.record(described);
+                // Only Windows has a window handle to show a balloon against;
+                // elsewhere the notifier reports itself unavailable and the
+                // message goes to the activity log, which every build has.
+                let balloon_window = {
+                    #[cfg(windows)]
+                    {
+                        window.hwnd().ok().map(|handle| handle.0 as isize)
                     }
+                    #[cfg(not(windows))]
+                    {
+                        None
+                    }
+                };
+                if let Ok(mut guard) = start_up.lock() {
+                    guard.integration.use_notifier(std::sync::Arc::new(
+                        system::notify::BalloonNotifier::new(balloon_window, "Vise Transcoder"),
+                    ));
+                    let described = guard.integration.notifier_description();
+                    guard.activity.record(described);
                 }
             }
             build_tray(app);

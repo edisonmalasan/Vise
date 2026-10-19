@@ -30,9 +30,16 @@ fn temp_dir(name: &str) -> PathBuf {
     dir
 }
 
-/// A machine with every encoder the catalog asks for.
+/// A machine with every encoder the catalog asks for, and the hardware to run
+/// them: the encoders are listed by ffmpeg, but the card has to be there too.
 fn everything() -> HardwareCapabilities {
     HardwareCapabilities {
+        devices: vec![
+            "cuda".to_string(),
+            "qsv".to_string(),
+            "amf".to_string(),
+            "videotoolbox".to_string(),
+        ],
         ffmpeg_path: Some(PathBuf::from("ffmpeg")),
         hwaccels: vec![
             "cuda".to_string(),
@@ -69,6 +76,7 @@ fn everything() -> HardwareCapabilities {
 fn software_only() -> HardwareCapabilities {
     let mut caps = everything();
     caps.hwaccels.clear();
+    caps.devices.clear();
     caps.encoders
         .retain(|name| name.starts_with("lib") || name == "ffv1");
     caps

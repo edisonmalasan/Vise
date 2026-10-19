@@ -787,6 +787,10 @@ mod tests {
         assert_eq!(rewritten[3], "out.part.mp4");
     }
 
+    // This test is about Windows path shapes: a drive letter and a backslash
+    // name one file on Windows and one odd filename on Linux, so the
+    // behaviour it checks only has one answer on one platform.
+    #[cfg(windows)]
     #[test]
     fn an_encode_log_is_named_after_the_output_the_user_recognises() {
         let job = JobSpec {

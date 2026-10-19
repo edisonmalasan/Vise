@@ -74,6 +74,7 @@ fn the_bounds_are_reachable_as_constants_and_are_enforced() {
 #[test]
 fn a_capability_report_can_be_built_from_a_detection_the_caller_owns() {
     let detection = HardwareCapabilities {
+        devices: Vec::new(),
         ffmpeg_path: Some(std::path::PathBuf::from("/opt/ffmpeg")),
         hwaccels: vec!["vaapi".into(), "d3d11va".into()],
         decoders: vec!["h264".into(), "hevc".into(), "av1".into()],

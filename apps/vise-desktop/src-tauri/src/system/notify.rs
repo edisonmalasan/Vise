@@ -449,15 +449,20 @@ impl Notifier for LogNotifier {
 /// The icon is a private one owned by this module and removed as soon as the
 /// balloon has been up long enough to be read, so the notification area keeps one
 /// icon rather than accumulating them.
+///
+/// The window handle is optional because only Windows has one. On the other
+/// platforms the notifier reports that it is unavailable and the message goes
+/// to the activity log instead, which is the same path a balloon takes when the
+/// system refuses to show one.
 pub struct BalloonNotifier {
     /// Windows user-interface thread handle the icon is registered against.
-    window: isize,
+    window: Option<isize>,
     label: String,
 }
 
 impl BalloonNotifier {
     /// Attach to the window whose notification area should show balloons.
-    pub fn new(window: isize, label: impl Into<String>) -> BalloonNotifier {
+    pub fn new(window: Option<isize>, label: impl Into<String>) -> BalloonNotifier {
         BalloonNotifier {
             window,
             label: label.into(),
@@ -475,8 +480,11 @@ impl Notifier for BalloonNotifier {
     }
 
     fn notify(&self, notification: &Notification) -> Result<(), NotifyError> {
+        let Some(window) = self.window else {
+            return Err(NotifyError::Unsupported);
+        };
         platform::show_balloon(
-            self.window,
+            window,
             &self.label,
             &notification.title,
             &notification.body,
@@ -1039,7 +1047,7 @@ mod tests {
     fn the_balloon_reports_the_platform_rather_than_throwing_it_away() {
         // The window handle is zero here, which no real window has; what is being
         // checked is that the call comes back as an answer either way.
-        let balloon = BalloonNotifier::new(0, "Vise Transcoder");
+        let balloon = BalloonNotifier::new(Some(0), "Vise Transcoder");
         let notification = Notification {
             event: "queueFinished".to_string(),
             title: "The queue has finished".to_string(),
