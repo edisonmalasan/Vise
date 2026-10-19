@@ -256,13 +256,13 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 
 - [x] Windows build and installer
 - [ ] macOS build and app bundle
-- [ ] Linux build and package
+- [x] Linux build and package
 - [x] Bundle FFmpeg and ffprobe with release builds
 - [x] Prefer bundled media tooling before PATH discovery
 - [x] Versioned release notes
 - [x] Reproducible build process
 - [x] Update delivery mechanism \(optional)
-**Status:** In progress (6/8 verified; the macOS and Linux packages are pending.)
+**Status:** In progress (7/8 verified; the macOS bundle is the one left.)
 
 A shipped build carries its own encoder rather than relying on whatever the
 machine has, because the filters and encoders the application offers are only

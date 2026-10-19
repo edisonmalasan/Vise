@@ -4,7 +4,7 @@
 # The desktop crate links against the platform's own libraries, so a check that
 # only runs on one platform misses whatever the other one would complain about.
 # This runs the same checks the release workflow runs, on Linux.
-set -uo pipefail
+set -euo pipefail
 cd /src
 export PATH="/root/.cargo/bin:$PATH"
 # The container builds into its own target directory. Sharing the host's would
