@@ -62,28 +62,34 @@
 </head>
 <body>
 <header class="masthead">
-  <h1 data-i18n="app.title">Vise Transcoder</h1>
-  <p data-i18n="app.tagline">Pick a source, scan it, choose the title, range, angle, and tracks, then set the output up on the tabs below.</p>
-</header>
+  <div class="masthead-id">
+    <h1 data-i18n="app.title">Vise Transcoder</h1>
+    <p data-i18n="app.tagline">Pick a source, scan it, choose the title, range, angle, and tracks, then set the output up on the tabs below.</p>
+  </div>
 
-<!-- The toolbar is built from the window catalog: every surface the window
-     offers gets a control that opens it, and a surface it does not offer has
-     no control at all. -->
-<nav class="toolbar" id="toolbar" aria-label="Windows and dialogs"></nav>
+  <!-- The toolbar is built from the window catalog: every surface the window
+       offers gets a control that opens it, and a surface it does not offer has
+       no control at all. The surfaces that are part of the work sit on the
+       left and the ones that configure or describe the application sit on the
+       right, so a row of nine equal buttons does not have to be read all the
+       way through to find the one the user wants. -->
+  <nav class="toolbar" id="toolbar" aria-label="Windows and dialogs"></nav>
+</header>
 
 <!-- Theme, layout direction, and language. Every control here is a preference
      the window holds and resolves; the line underneath says what the window
      resolved and why, so the user never has to work out which of the two
      systems the colours on screen came from. The language lives in the
      preferences rather than here, and a change to it arrives as an event with
-     the two answers that moved. -->
-<section class="card full" aria-labelledby="appearanceHeading">
-  <div class="card-head">
-    <h2 id="appearanceHeading">Appearance</h2>
-    <span class="hint" id="appearanceObservation"></span>
-  </div>
+     the two answers that moved.
 
-  <div class="appearance">
+     This is a strip rather than a panel because it is chrome, not work. It
+     belongs with the title, and it is short enough that the source is still
+     the first thing on the page. -->
+<section class="appearance" aria-labelledby="appearanceHeading">
+  <h2 class="visually-hidden" id="appearanceHeading">Appearance</h2>
+
+  <div class="appearance-options">
     <fieldset>
       <legend data-i18n="appearance.theme">Theme</legend>
       <div class="rules" id="appearanceThemeList"></div>
@@ -97,6 +103,7 @@
   <p class="appearance-summary" id="appearanceSummary" role="status" aria-live="polite"><span
        class="icon-flow" id="appearanceFlow" aria-hidden="true"></span><span
        id="appearanceSummaryText"></span></p>
+  <span class="hint" id="appearanceObservation"></span>
 </section>
 
 <main class="layout">
@@ -536,19 +543,27 @@
         </div>
       </div>
 
-      <div class="row queue-row">
-            <div class="grow">
-              <label for="outPath">Output path</label>
-              <input type="text" id="outPath" spellcheck="false" autocomplete="off" dir="ltr"
-                     placeholder="C:\media\out.mp4" />
-            </div>
-            <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
-            <button type="button" id="openSelectionBtn">Choose titles to queue…</button>
-          </div>
-          <span class="hint" id="queueHint">Scan a source and choose a title first.</span>
         </div>
       </section>
     </main>
+
+<!-- The commit action stays on screen. The work is a long column of choices,
+     and the one thing the user came to do — put it in the queue — must not be
+     something they have to scroll back up to find. The path and the button
+     that uses it sit together, because one without the other is a decision the
+     window cannot carry out. -->
+<div class="actionbar" role="group" aria-label="Output and queue">
+  <div class="actionbar-path">
+    <label for="outPath">Output path</label>
+    <input type="text" id="outPath" spellcheck="false" autocomplete="off" dir="ltr"
+           placeholder="C:\media\out.mp4" />
+  </div>
+  <div class="actionbar-buttons">
+    <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
+    <button type="button" id="openSelectionBtn">Choose titles to queue…</button>
+  </div>
+  <span class="hint" id="queueHint">Scan a source and choose a title first.</span>
+</div>
 
 <!-- Every secondary surface is built here as well, from the catalog: role,
      modal flag, heading, hint, close control, and which control takes focus.

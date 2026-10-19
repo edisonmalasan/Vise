@@ -812,6 +812,12 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
   /* Which surfaces keep themselves up to date while they are open. */
   var POLLED = { queue: 1500, error: 1500, activity: 1500, diagnostics: 2000 };
 
+  /* The surfaces that describe or configure the application rather than being
+     part of the work: what it is, what it is set to, what it is made of. They
+     are pushed to the far end of the toolbar so the ones a reader reaches for
+     while working are found first. */
+  var SETUP_SURFACES = ["about", "presets", "preferences", "diagnostics"];
+
   function shellOf(id) {
     return el("surface-" + id);
   }
@@ -889,6 +895,13 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         button.id = spec.buttonId;
         button.setAttribute("aria-haspopup", "dialog");
         button.title = spec.hint;
+        /* The surfaces that describe or configure the application are pushed to
+           the far end of the row, so the ones that are part of the work are
+           found first. They are marked rather than reordered, so the order the
+           window offers them in is the order they appear. */
+        if (SETUP_SURFACES.indexOf(spec.id) !== -1) {
+          button.classList.add("setup");
+        }
         button.addEventListener("click", function () {
           openSurface(spec.id);
         });
