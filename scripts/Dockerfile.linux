@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         file \
         pkg-config \
         ca-certificates \
+        unzip \
+        xz-utils \
         # the webview toolkit the desktop window renders through
         libwebkit2gtk-4.1-dev \
         libgtk-3-dev \
