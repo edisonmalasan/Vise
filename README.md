@@ -40,13 +40,22 @@ Grab a build for your platform from the
 
 | Platform | Artifact | Notes |
 |---|---|---|
-| **Windows** | `Vise Transcoder_<version>_x64-setup.exe` | NSIS installer, per-user by default |
-| **Linux** | `Vise Transcoder_<version>_amd64.deb` | Debian, Ubuntu, and derivatives |
-| **Linux** | `Vise Transcoder_<version>_amd64.AppImage` | Runs anywhere, no install |
-| **macOS** | `Vise Transcoder_<version>_aarch64.dmg` | Apple silicon; the bundled encoder is the x86_64 build, which macOS runs through Rosetta 2 |
+| **Windows** | `Vise.Transcoder_0.1.0_x64-setup.exe` | NSIS installer, per-user by default |
+| **Linux** | `Vise.Transcoder_0.1.0_amd64.deb` | Debian, Ubuntu, and derivatives |
+| **Linux** | `Vise.Transcoder_0.1.0_amd64.AppImage` | Runs anywhere, no install |
+| **macOS** | `Vise.Transcoder_0.1.0_aarch64.dmg` | Apple silicon; the bundled encoder is the x86_64 build, which macOS runs through Rosetta 2 |
 
 Every build carries the media tooling it was tested with. Nothing else needs to
 be installed.
+
+`SHA256SUMS` sits beside the downloads. Check a file against it with:
+
+```bash
+sha256sum -c SHA256SUMS
+```
+
+GitHub replaces the space in a file name with a dot, which is why the
+downloads are named `Vise.Transcoder_...` rather than `Vise Transcoder_...`.
 
 ## Build from source
 
