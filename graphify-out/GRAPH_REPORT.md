@@ -1,17 +1,17 @@
-# Graph Report - Vise  (2026-10-18)
+# Graph Report - vise  (2026-10-20)
 
 ## Corpus Check
-- 206 files · ~461,148 words
+- 216 files · ~489,117 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 12 file(s) not represented in the graph (top: .toml 5, (none) 4, .cmd 1)
+- Unclassified: 14 file(s) not represented in the graph (top: .toml 5, (none) 5, .cmd 1)
 
 ## Summary
-- 6448 nodes · 15389 edges · 232 communities (215 shown, 17 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 263 edges (avg confidence: 0.85)
+- 6666 nodes · 15999 edges · 245 communities (226 shown, 19 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 268 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e99b1507`
+- Built from commit: `254a5912`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -29,19 +29,19 @@
 - initPageChat
 - src-tauri/src/main.rs
 - modern-screenshot.umd.js
-- HardwareCapabilities
-- deserialize
+- HardwareApi
+- serialize
 - MetadataProcessingOptions
 - el
 - connectSSE
 - handleManualEditActivity
 - applyEditing
-- serialize
+- AudioProcessingOptions
 - media.rs
-- validation.rs
+- ScanResult
 - Session
-- SKILL.md
-- ScanSlot
+- new-work.md
+- scan.rs
 - MessageKey
 - live.md
 - CoreError
@@ -50,13 +50,13 @@
 - pipeline.rs
 - onboard.md
 - createLiveBrowserDomHelpers
-- Operate mode depth (and Read notes)
+- SKILL.md
 - The Toolkit
 - onAnnotDown
 - vise-core/src/lib.rs
 - JobSpec
 - createLiveBrowserSessionState
-- super
+- server.rs
 - tabs/video.rs
 - VideoProcessingOptions
 - preferences/mod.rs
@@ -70,7 +70,7 @@
 - New visual work
 - optimize.md
 - mountSvelteComponentVariant
-- ops.rs
+- pathbuf
 - geometry.rs
 - Impeccable Asset Producer
 - document.md
@@ -91,16 +91,16 @@
 - handleKeyDown
 - numa.rs
 - Init flow
-- supervisor.rs
+- WorkerSupervisor
 - transcode_baseline.rs
-- path
+- tests/cli.rs
 - Common Cognitive Load Violations
 - iOS platform
 - Shape
 - portable.rs
 - command
 - platform.rs
-- NumberViewModel
+- validation.rs
 - Android platform
 - dialogs.rs
 - Persona-Based Design Testing
@@ -137,25 +137,25 @@
 - vise-core
 - crate::Transcoder
 - http.rs
-- api.rs
-- hdr.rs
-- PowerScope
+- ProgressReport
+- HardwareCapabilities
+- crash.rs
 - Local Setup
 - Vise Transcoder
 - encode.rs
 - VideoCodec
-- scan.rs
+- LogLevel
 - actOnAgentTarget
 - runtime.rs
-- Flip
+- FfprobeScanner
 - token.rs
 - vise-worker/src/main.rs
 - i18n.rs
-- SharedState
+- push_log
 - vise-ipc/src/lib.rs
 - actions.rs
 - queue.rs
-- route.rs
+- ValidationReport
 - preferences/updates.rs
 - viewmodel.rs
 - tabs/audio.rs
@@ -163,7 +163,7 @@
 - preferences/hardware.rs
 - appearance.rs
 - output.rs
-- State
+- SharedState
 - diskspace.rs
 - TitleFacts
 - windows/diagnostics.rs
@@ -194,82 +194,95 @@
 - DirectionMode
 - SystemTheme
 - Catalog
-- ChoiceGroupViewModel
+- deserialize
 - SweepExecutor
-- decide
+- Event
 - Backend
-- AppearanceViewModel
-- pathbuf
-- TokenRejection
-- TrackKind
+- .apply
+- RangeMode
+- supervisor.rs
+- AppSettings
 - localization.rs
 - output_and_chapters.rs
-- Diagnostic Scan
+- IsolationPolicy
 - system/power.rs
 - AppcastError
 - windows/mod.rs
 - JobState
 - want_one_of
 - synced
-- bolder.md
+- MetadataSettings
 - TrayAction
-- ScaleMode
-- WorkState
+- PresetVersion
+- super
 - CurlSource
-- PresetAction
+- client.rs
 - Bundled media tooling
 - L
 - ne
 - CheckOutcome
-- Adaptation Strategies
+- TagMode
 - ScanPhase
-- SweepState
-- Impeccable Documenter
-- CropMode
-- Persuade and Experience
-- Read
+- SweepProgress
+- SweepPlan
+- ChapterProcessingOptions
+- path
+- PresetCategory
 - media_depth.rs
 - qt
-- begin_scan_with
+- WorkerConfig
 - PreferenceTabViewModel
 - SourceError
 - HardwareFamily
-- Command guidance
+- ChapterFormat
 - PresetSpec
-- PreviewViewModel
+- roadmap.rs
 - AppcastItem
 - fetch-media-tools.sh
 - ContainerFormat
 - build-release.sh
-- PresetView
+- MessageSource
 - Milestones
 - verify-media-tools.sh
-- FlipMode
+- Operate mode depth (and Read notes)
+- ChapterHandling
+- NotifyScope
+- RecoveredItemKind
 - QueueActionViewModel
+- TextViewModel
+- .parse_element
+- TagOrigin
+- Tone
+- move_entry_by
+- build-linux.sh
+- check-linux.sh
+- check-linux-package.sh
+- check-linux-layout.sh
+- fetch-macos-digests.sh
 
 ## God Nodes (most connected - your core abstractions)
-1. `JobSpec` - 126 edges
+1. `JobSpec` - 141 edges
 2. `CoreError` - 114 edges
 3. `MessageKey` - 108 edges
-4. `TitleFacts` - 59 edges
-5. `call()` - 51 edges
-6. `PresetSpec` - 50 edges
-7. `el()` - 48 edges
-8. `WorkerClient` - 48 edges
-9. `LogService` - 45 edges
-10. `WorkerRuntime` - 44 edges
+4. `TitleFacts` - 60 edges
+5. `WorkerClient` - 52 edges
+6. `call()` - 51 edges
+7. `PresetSpec` - 50 edges
+8. `el()` - 48 edges
+9. `ClientError` - 45 edges
+10. `LogService` - 45 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Group 18 — Localization` --references--> `de()`  [INFERRED]
-  docs/ROADMAP.md → .agents/skills/impeccable/scripts/modern-screenshot.umd.js
 - `Output Contract` --references--> `failed()`  [INFERRED]
   .agents/skills/impeccable/reference/degraded/manual-edit-applier.md → apps/vise-desktop/ui/app.js
+- `Group 18 — Localization` --references--> `de()`  [INFERRED]
+  docs/ROADMAP.md → .agents/skills/impeccable/scripts/modern-screenshot.umd.js
+- `Project` --references--> `main()`  [INFERRED]
+  AGENTS.md → scripts/make-icon.py
 - `Step 2: Act by severity` --references--> `init()`  [INFERRED]
   .agents/skills/impeccable/reference/doctor.md → .agents/skills/impeccable/scripts/live-browser.js
 - `What this owns, and what it does not` --references--> `init()`  [INFERRED]
   .agents/skills/impeccable/reference/doctor.md → .agents/skills/impeccable/scripts/live-browser.js
-- `Commands` --references--> `init()`  [INFERRED]
-  .agents/skills/impeccable/SKILL.md → .agents/skills/impeccable/scripts/live-browser.js
 
 ## Import Cycles
 - 1-file cycle: `crates/vise-ipc/src/numa.rs -> crates/vise-ipc/src/numa.rs`
@@ -279,7 +292,7 @@
 - 2-file cycle: `apps/vise-desktop/src-tauri/src/preferences/mod.rs -> apps/vise-desktop/src-tauri/src/preferences/output.rs -> apps/vise-desktop/src-tauri/src/preferences/mod.rs`
 - 2-file cycle: `crates/vise-core/src/catalog.rs -> crates/vise-core/src/preset.rs -> crates/vise-core/src/catalog.rs`
 
-## Communities (232 total, 17 thin omitted)
+## Communities (245 total, 19 thin omitted)
 
 ### Community 0 - "Apple Design Skill"
 Cohesion: 0.21
@@ -295,23 +308,23 @@ Nodes (47): armPageChatForTyping(), attachSteerFocusDebug(), attachSteerFocusGua
 
 ### Community 11 - "src-tauri/src/main.rs"
 Cohesion: 0.03
-Nodes (53): a_dropped_path_list_is_answered_with_accepted_and_refused_entries(), a_language_switch_re_emits_the_view_models_and_keeps_what_was_typed(), a_language_the_build_does_not_ship_still_opens_a_window(), a_pinned_direction_is_not_moved_by_a_language_change(), a_preset_saved_from_the_tabs_carries_what_the_tabs_hold(), ALERT_EVENT, app_handle(), APPEARANCE_EVENT (+45 more)
+Nodes (53): a_dropped_path_list_is_answered_with_accepted_and_refused_entries(), a_forced_theme_is_never_moved_by_a_report(), a_language_switch_re_emits_the_view_models_and_keeps_what_was_typed(), a_language_the_build_does_not_ship_still_opens_a_window(), a_pinned_direction_is_not_moved_by_a_language_change(), a_preset_saved_from_the_tabs_carries_what_the_tabs_hold(), a_report_that_moves_no_colours_is_not_logged(), ALERT_EVENT (+45 more)
 
 ### Community 12 - "modern-screenshot.umd.js"
 Cohesion: 0.19
 Nodes (22): ae(), be(), dt(), _e(), er(), fe(), ft(), Gt() (+14 more)
 
-### Community 13 - "HardwareCapabilities"
-Cohesion: 0.06
-Nodes (33): detect(), detect_capabilities(), detect_hardware(), detect_hardware_capabilities(), hardware_capabilities(), HardwareAcceleration, HardwareApi, Amf (+25 more)
+### Community 13 - "HardwareApi"
+Cohesion: 0.07
+Nodes (24): HardwareAcceleration, HardwareApi, Amf, Auto, Cuda, D3d11va, Dxva2, Nvenc (+16 more)
 
-### Community 14 - "deserialize"
+### Community 14 - "serialize"
 Cohesion: 0.05
 Nodes (30): to_job_processing(), build_subtitle_filter(), build_subtitle_filter_chain(), build_subtitles(), SubtitleCodec, Ass, Copy, DvbSub (+22 more)
 
 ### Community 15 - "MetadataProcessingOptions"
-Cohesion: 0.13
-Nodes (9): build_metadata(), build_metadata_filter(), build_metadata_filter_chain(), MetadataMode, Copy, Edit, None, MetadataProcessingOptions (+1 more)
+Cohesion: 0.19
+Nodes (5): build_metadata(), build_metadata_filter(), build_metadata_filter_chain(), MetadataProcessingOptions, MetadataTrackConfig
 
 ### Community 16 - "el"
 Cohesion: 0.07
@@ -329,29 +342,29 @@ Nodes (24): clearStoredManualApplyState(), fetchPendingCount(), handleManualEdit
 Cohesion: 0.06
 Nodes (43): addManualContextText(), applyEditing(), buildLocatorForLeaf(), canRestoreManualEditElement(), collectEditableTextRows(), visit(), collectManualContextPieces(), walk() (+35 more)
 
-### Community 20 - "serialize"
-Cohesion: 0.06
-Nodes (25): AudioMixdown, Auto, Dolby, Mono, Stereo, Surround51, Surround71, AudioMode (+17 more)
+### Community 20 - "AudioProcessingOptions"
+Cohesion: 0.08
+Nodes (21): AudioMixdown, Auto, Dolby, Mono, Stereo, Surround51, Surround71, AudioMode (+13 more)
 
 ### Community 21 - "media.rs"
-Cohesion: 0.06
-Nodes (31): application_root(), ChapterInfo, convert_chapter(), convert_format(), convert_stream(), CropDetection, detect_crop(), detect_crop_with() (+23 more)
+Cohesion: 0.07
+Nodes (27): ChapterInfo, convert_chapter(), convert_format(), convert_stream(), FfprobeChapter, FfprobeFormat, FfprobeResponse, FfprobeSideData (+19 more)
 
-### Community 22 - "validation.rs"
-Cohesion: 0.13
-Nodes (32): ScanResult, accepts_a_well_formed_job(), container_audio_support(), container_video_support(), ensure_valid(), known_duration(), minimal_job(), mixdown_channels() (+24 more)
+### Community 22 - "ScanResult"
+Cohesion: 0.15
+Nodes (17): ScanResult, encoder_is_intra_only(), ensure_valid(), known_duration(), MachineFacts, reports_missing_paths(), source_audio_channels(), source_geometry() (+9 more)
 
 ### Community 23 - "Session"
 Cohesion: 0.12
 Nodes (4): Session, session_add_and_read(), session_remove_missing_errors(), SessionSnapshot
 
-### Community 24 - "SKILL.md"
-Cohesion: 0.07
-Nodes (28): Assess Adaptation Challenge, Implement & Verify, Recommended Actions, Recommended Actions, Craft (deprecated alias), Monorepo notes, Opting out of the boot check, Step 1: Run the pass (+20 more)
+### Community 24 - "new-work.md"
+Cohesion: 0.05
+Nodes (34): Recommended Actions, Craft (deprecated alias), Impeccable Documenter, Input Contract, Output Contract, Workflow, Monorepo notes, Opting out of the boot check (+26 more)
 
-### Community 25 - "ScanSlot"
-Cohesion: 0.11
-Nodes (7): ScanProgress, WorkDone, expands_directories_and_filters_names(), is_excluded(), reports_unusable_scan_requests(), ScanService, ScanSlot
+### Community 25 - "scan.rs"
+Cohesion: 0.06
+Nodes (30): StreamInfo, ScanCommand, ScanProgress, WorkDone, WorkState, ScanDone, Unknown, WorkDone (+22 more)
 
 ### Community 26 - "MessageKey"
 Cohesion: 0.02
@@ -370,8 +383,8 @@ Cohesion: 0.07
 Nodes (28): Architecture decision snapshot, Deferred / Future Work, Group 0 — Project foundation, Group 10 — Encoding control and job reliability, Group 11 — Hardware acceleration, Group 12 - Platform packaging and release, Group 13 — Worker process and JSON IPC, Group 14 — Desktop parity with reference product (+20 more)
 
 ### Community 30 - "Responsive Design"
-Cohesion: 0.08
-Nodes (25): Assess Adaptation Challenge, Breakpoints: Content-Driven, Content Adaptation, Desktop Adaptation (Mobile → Desktop), Detect Input Method, Not Just Screen Size, Email Adaptation (Web → Email), Implement Adaptations, Layout Adaptation Patterns (+17 more)
+Cohesion: 0.06
+Nodes (32): Assess Adaptation Challenge, Breakpoints: Content-Driven, Content Adaptation, Desktop Adaptation (Mobile → Desktop), Detect Input Method, Not Just Screen Size, Email Adaptation (Web → Email), Implement Adaptations, Layout Adaptation Patterns (+24 more)
 
 ### Community 31 - "pipeline.rs"
 Cohesion: 0.12
@@ -385,9 +398,9 @@ Nodes (22): Assess Onboarding Needs, Context Over Ceremony, Contextual Help, Des
 Cohesion: 0.16
 Nodes (13): createLiveBrowserDomHelpers(), cloneWithoutChrome(), cssId(), liveUiRoot(), makeFrozenAnchor(), raiseHitModal(), rectIsUsableAnchor(), syncTopLayerHost() (+5 more)
 
-### Community 34 - "Operate mode depth (and Read notes)"
-Cohesion: 0.10
-Nodes (18): Craft floor, Refuse, Verify, Constraints, Failure modes, Flow, $impeccable hooks, Routing (+10 more)
+### Community 34 - "SKILL.md"
+Cohesion: 0.08
+Nodes (21): Before you finish, Scope is sovereign, The amplification, The skeleton test, Why it reads flat, Craft floor, Refuse, Verify (+13 more)
 
 ### Community 35 - "The Toolkit"
 Cohesion: 0.10
@@ -409,21 +422,21 @@ Nodes (20): EncodingMode, Abr, AverageBitrate, AverageBitrateMode, ConstantQuali
 Cohesion: 0.22
 Nodes (15): createLiveBrowserSessionState(), clearHandled(), clearScrollY(), clearSession(), isHandled(), loadSession(), markHandled(), nextCheckpointRevision() (+7 more)
 
-### Community 40 - "super"
-Cohesion: 0.05
-Nodes (16): ALPHABET, builds_loopback_addresses_only(), DEFAULT_TIMEOUT, serialises_command_bodies(), BIND_ADDRESS, bind_listener(), binds_loopback_only_and_reports_its_port(), falls_back_when_the_requested_port_is_busy() (+8 more)
+### Community 40 - "server.rs"
+Cohesion: 0.09
+Nodes (12): BIND_ADDRESS, bind_listener(), binds_loopback_only_and_reports_its_port(), falls_back_when_the_requested_port_is_busy(), handle_connection(), handshake_is_published_when_configured(), publish_handshake_is_a_no_op_without_a_path(), ServerError (+4 more)
 
 ### Community 41 - "tabs/video.rs"
 Cohesion: 0.07
-Nodes (31): a_number_field_reads_whole_numbers_and_reports_anything_else(), NumField, rate_control(), a_bitrate_mode_wants_a_bit_rate_and_offers_two_pass(), a_fixed_frame_rate_needs_a_sane_number(), a_quality_value_outside_the_range_is_refused(), a_source_with_hdr_metadata_opens_both_hdr_rows(), a_target_size_needs_a_duration_to_work_out_from() (+23 more)
+Nodes (31): a_number_field_reads_whole_numbers_and_reports_anything_else(), NumField, a_bitrate_mode_wants_a_bit_rate_and_offers_two_pass(), a_fixed_frame_rate_needs_a_sane_number(), a_quality_value_outside_the_range_is_refused(), a_source_with_hdr_metadata_opens_both_hdr_rows(), a_target_size_needs_a_duration_to_work_out_from(), a_valid_change_is_applied() (+23 more)
 
 ### Community 42 - "VideoProcessingOptions"
-Cohesion: 0.11
-Nodes (10): build_video_filter_chain(), ColourRange, Full, Limited, FrameRateMode, Auto, Constant, Variable (+2 more)
+Cohesion: 0.09
+Nodes (15): build_video_filter_chain(), ColourRange, Full, Limited, FlipMode, Both, Horizontal, None (+7 more)
 
 ### Community 43 - "preferences/mod.rs"
 Cohesion: 0.06
-Nodes (50): a_change_is_validated_before_it_is_written(), a_change_reaches_the_code_paths_that_consume_it(), a_decode_device_cannot_be_named_before_the_media_tools_have_been_looked_for(), a_decode_device_this_machine_does_not_have_is_refused_rather_than_stored(), a_document_with_no_record_adopts_the_folder_it_already_named(), a_folder_that_has_not_been_chosen_is_shown_rather_than_refusing_everything_else(), a_record_from_a_newer_build_is_read_never_written_and_never_lost(), a_record_that_is_not_readable_gives_the_defaults_and_is_left_alone() (+42 more)
+Nodes (51): a_change_is_validated_before_it_is_written(), a_change_reaches_the_code_paths_that_consume_it(), a_decode_device_cannot_be_named_before_the_media_tools_have_been_looked_for(), a_decode_device_this_machine_does_not_have_is_refused_rather_than_stored(), a_document_with_no_record_adopts_the_folder_it_already_named(), a_folder_that_has_not_been_chosen_is_shown_rather_than_refusing_everything_else(), a_record_from_a_newer_build_is_read_never_written_and_never_lost(), a_record_that_is_not_readable_gives_the_defaults_and_is_left_alone() (+43 more)
 
 ### Community 44 - "animate.md"
 Cohesion: 0.12
@@ -434,24 +447,24 @@ Cohesion: 0.12
 Nodes (16): 1. Read the screenshot (if present), 2. Wrap the element, 3. Load the action's reference, 4. Plan three variants: identity first, then mode, then axes, 5. Apply the freeform prompt (if present), 6. Deliver variants, 7. Parameters (composition-sized, 0-4 per variant), 8. Signal done (+8 more)
 
 ### Community 46 - "load_settings"
-Cohesion: 0.07
-Nodes (23): AppSettings, load_app_settings(), load_config(), load_settings(), named_string(), read_settings(), save_app_settings(), save_config() (+15 more)
+Cohesion: 0.10
+Nodes (14): load_settings(), save_settings(), settings_persistence(), tmp_path(), user_create_edit_delete_persists(), a_file_from_a_newer_build_is_never_downgraded(), a_file_that_declares_no_version_is_read_as_the_oldest_one_and_migrated_forward(), a_missing_empty_or_broken_file_reads_as_the_defaults_or_an_error() (+6 more)
 
 ### Community 47 - "AudioCodec"
-Cohesion: 0.12
-Nodes (24): audio_label(), AudioCodec, Aac, Ac3, Eac3, Flac, Mp3, Opus (+16 more)
+Cohesion: 0.11
+Nodes (24): audio_codec_of(), audio_label(), AudioCodec, Aac, Ac3, Eac3, Flac, Mp3 (+16 more)
 
 ### Community 48 - "Generate Report"
-Cohesion: 0.29
-Nodes (7): Audit Health Score, Detailed Findings by Severity, Executive Summary, Generate Report, Implementation Integrity Verdict, Patterns & Systemic Issues, Positive Findings
+Cohesion: 0.13
+Nodes (14): 1. Accessibility (A11y), 2. Performance, 3. Theming, 4. Responsive Design, 5. Implementation Integrity (CRITICAL), Audit Health Score, Detailed Findings by Severity, Diagnostic Scan (+6 more)
 
 ### Community 49 - "showToast"
 Cohesion: 0.15
 Nodes (17): abandonForeignSession(), abandonSupersededGo(), captureAndEmit(), checkpointPayload(), compileShader(), discardOrphanedSession(), handleDiscard(), markSessionHandled() (+9 more)
 
 ### Community 50 - "catalog.rs"
-Cohesion: 0.05
-Nodes (54): described_in(), a_codec_entry_is_migrated_and_an_unknown_one_is_refused(), a_copy_is_independent_of_the_preset_it_was_copied_from(), a_hardware_encoder_this_machine_has_is_used_as_written(), a_hardware_encoder_this_machine_lacks_becomes_its_software_stand_in(), a_software_preset_needs_no_hardware_to_answer_for(), builtin_catalog(), BUILTIN_CATALOG_JSON (+46 more)
+Cohesion: 0.09
+Nodes (39): a_copy_is_independent_of_the_preset_it_was_copied_from(), a_hardware_encoder_this_machine_has_is_used_as_written(), a_hardware_encoder_this_machine_lacks_becomes_its_software_stand_in(), a_software_preset_needs_no_hardware_to_answer_for(), builtin_catalog(), BUILTIN_CATALOG_JSON, builtin_entries_in(), builtin_entry() (+31 more)
 
 ### Community 51 - "New visual work"
 Cohesion: 0.10
@@ -465,7 +478,7 @@ Nodes (13): Animation Performance, Assess Performance Issues, Core Web Vitals Op
 Cohesion: 0.10
 Nodes (35): acceptedDomAlreadyClean(), applyOriginalAttrsToSvelteAnchor(), clearHandledWrapperReloadStamp(), commitAcceptedSvelteComponentToDom(), componentModuleCandidates(), deferredRecoverySuperseded(), describeMountFailure(), detectDevServerBase() (+27 more)
 
-### Community 54 - "ops.rs"
+### Community 54 - "pathbuf"
 Cohesion: 0.11
 Nodes (20): BatchArgs, Cli, Commands, Batch, Presets, Transcode, parse(), PresetCommands (+12 more)
 
@@ -483,7 +496,7 @@ Nodes (23): Component translation rules, Narrative mapping, Pitfalls, Scan mode 
 
 ### Community 58 - "compatibility.rs"
 Cohesion: 0.09
-Nodes (37): apply_common(), AudioDefaultsInput, Change, rules_view(), ChoiceOption, audio_codec_availability_follows_the_container(), audio_codec_options(), audio_codecs_for() (+29 more)
+Nodes (36): apply_common(), AudioDefaultsInput, Change, rules_view(), ChoiceOption, audio_codec_availability_follows_the_container(), audio_codec_options(), audio_codecs_for() (+28 more)
 
 ### Community 59 - "critique.md"
 Cohesion: 0.17
@@ -498,8 +511,8 @@ Cohesion: 0.17
 Nodes (11): Accessibility Resilience, Assess Hardening Needs, Edge Cases & Boundary Conditions, Error Handling, Hardening Dimensions, Input Validation & Sanitization, Internationalization (i18n), Performance Resilience (+3 more)
 
 ### Community 62 - "WorkerClient"
-Cohesion: 0.10
-Nodes (13): a_worker_that_closes_without_replying_counts_as_gone(), ClientError, Decode, Protocol, Rejected, Unreachable, encode_body(), RawReply (+5 more)
+Cohesion: 0.11
+Nodes (13): wait_for_encode(), wait_for_scan(), ClientError, Decode, Protocol, Rejected, Unreachable, encode_body() (+5 more)
 
 ### Community 63 - "timespan.rs"
 Cohesion: 0.07
@@ -510,8 +523,8 @@ Cohesion: 0.07
 Nodes (52): agentHasWorkInFlight(), agentStatusText(), applyLiveBarPreference(), barPaletteForTheme(), brandMarkSvg(), buildDesignHeader(), buildSteerQueueHint(), cursorForInsertAxis() (+44 more)
 
 ### Community 65 - "AGENTS.md"
-Cohesion: 0.15
-Nodes (11): Architecture Non-Negotiables, Autonomous Orchestration Mode, Branch Lifecycle, Build, Test, and Development Commands, Git Workflow, Graphify, Obsidian / Cross-Project Knowledge, Project (+3 more)
+Cohesion: 0.07
+Nodes (23): Architecture Non-Negotiables, Autonomous Orchestration Mode, Branch Lifecycle, Build, Test, and Development Commands, Git Workflow, Graphify, Obsidian / Cross-Project Knowledge, Project (+15 more)
 
 ### Community 66 - "clarify.md"
 Cohesion: 0.18
@@ -526,8 +539,8 @@ Cohesion: 0.18
 Nodes (11): Design Health Score, Design Specificity Verdict, Generate Combined Critique Report, Minor Observations, Overall Impression, Persona Red Flags, Priority Issues, Questions to Consider (+3 more)
 
 ### Community 69 - "windows/log.rs"
-Cohesion: 0.07
-Nodes (46): a_cleared_worker_buffer_is_a_reset_too(), a_filter_level_this_build_does_not_name_is_refused(), a_page_with_no_session_is_treated_as_no_information_rather_than_as_a_reset(), a_stream_keeps_the_order_the_worker_sent_and_asks_only_for_what_is_new(), a_window_that_cannot_keep_every_line_says_so_instead_of_growing(), a_worker_that_dropped_older_lines_says_so_and_keeps_saying_so(), a_worker_that_starts_numbering_again_is_not_waited_on_forever(), ActivityLog (+38 more)
+Cohesion: 0.13
+Nodes (33): a_cleared_worker_buffer_is_a_reset_too(), a_filter_level_this_build_does_not_name_is_refused(), a_page_with_no_session_is_treated_as_no_information_rather_than_as_a_reset(), a_stream_keeps_the_order_the_worker_sent_and_asks_only_for_what_is_new(), a_window_that_cannot_keep_every_line_says_so_instead_of_growing(), a_worker_that_dropped_older_lines_says_so_and_keeps_saying_so(), a_worker_that_starts_numbering_again_is_not_waited_on_forever(), ActivityViewModel (+25 more)
 
 ### Community 70 - "polish.md"
 Cohesion: 0.18
@@ -549,16 +562,16 @@ Nodes (43): a_group_that_does_exist_is_honoured_and_the_mode_reads_back(), a_gro
 Cohesion: 0.20
 Nodes (10): Completion gate, Init flow, Step 1: Load current state, Step 2: Explore the project, Step 3: Interview for product truth, Step 4: Write PRODUCT.md, Step 5: Record workflow defaults, Step 6: Wrap up or resume (+2 more)
 
-### Community 75 - "supervisor.rs"
-Cohesion: 0.06
-Nodes (28): DEFAULT_HANDSHAKE_TIMEOUT, ENV_HANDSHAKE, ENV_PARENT_PID, ENV_PORT, ENV_TOKEN, Handshake, handshake_files_round_trip(), pipe_is_closed() (+20 more)
+### Community 75 - "WorkerSupervisor"
+Cohesion: 0.11
+Nodes (11): WorkerDeath, SupervisorError, Client, HandshakeTimeout, IsolationDisabled, Shutdown, Spawn, WorkerExited (+3 more)
 
 ### Community 76 - "transcode_baseline.rs"
-Cohesion: 0.40
+Cohesion: 0.57
 Nodes (7): end_to_end_job_spec(), generate_source(), scanner(), tool(), transcode_to_mkv(), transcode_to_mp4(), transcode_to_webm()
 
-### Community 77 - "path"
-Cohesion: 0.15
+### Community 77 - "tests/cli.rs"
+Cohesion: 0.16
 Nodes (11): batch_transcode(), ffmpeg(), preset_transcode(), single_transcode(), source(), crop_detection_runs_on_generated_media(), generate_basic_media(), generate_chaptered_media() (+3 more)
 
 ### Community 78 - "Common Cognitive Load Violations"
@@ -578,12 +591,16 @@ Cohesion: 0.07
 Nodes (49): a_kind_can_be_pointed_somewhere_else_on_its_own(), a_portable_build_writes_its_state_beside_the_executable(), a_relative_directory_that_climbs_out_is_refused_and_says_which_line(), a_relative_directory_that_stays_inside_is_allowed_however_deep(), an_absolute_directory_is_taken_as_written(), an_installed_build_ignores_a_directory_it_cannot_honoured(), an_installed_build_writes_its_state_in_the_configuration_directory(), default_settings() (+41 more)
 
 ### Community 82 - "command"
-Cohesion: 0.20
-Nodes (3): generate_source(), tool(), transcode_with_video_processing()
+Cohesion: 0.11
+Nodes (6): generate_source(), tool(), transcode_with_audio_processing(), generate_source(), tool(), transcode_with_video_processing()
 
 ### Community 83 - "platform.rs"
 Cohesion: 0.07
 Nodes (40): parent_is_alive(), a_platform_that_cannot_move_a_priority_says_so_rather_than_pretending(), ABOVE_NORMAL_PRIORITY_CLASS, ascii(), BELOW_NORMAL_PRIORITY_CLASS, CloseHandle(), ControlError, Failed (+32 more)
+
+### Community 84 - "validation.rs"
+Cohesion: 0.16
+Nodes (37): a_container_that_can_carry_the_chosen_codecs_is_accepted(), a_deblock_strength_outside_the_filters_range_is_refused(), a_destination_that_cannot_be_written_is_refused(), a_destination_that_is_a_folder_is_refused(), a_filter_the_encoder_cannot_apply_is_refused(), a_layout_the_source_cannot_produce_is_refused(), a_lossless_job_that_carries_no_rate_is_accepted(), a_lossless_request_may_not_carry_a_rate() (+29 more)
 
 ### Community 85 - "Android platform"
 Cohesion: 0.25
@@ -591,7 +608,7 @@ Nodes (8): Android platform, Color & theming, Components & motion, Layout & stru
 
 ### Community 86 - "dialogs.rs"
 Cohesion: 0.05
-Nodes (50): alert_headline(), ask_for_alert(), clear_errors(), confirm_alert(), dismiss_alert(), error_view(), is_confirmed(), tick_alert() (+42 more)
+Nodes (46): about_view(), alert_headline(), ask_for_alert(), is_confirmed(), a_destructive_action_waits_before_it_can_be_confirmed(), a_problem_without_a_context_still_reads_as_a_line(), a_recorded_problem_is_listed_newest_first_with_its_own_report(), a_warning_is_labelled_and_counted_apart_from_an_error() (+38 more)
 
 ### Community 87 - "Persona-Based Design Testing"
 Cohesion: 0.25
@@ -607,11 +624,11 @@ Nodes (7): name, private, scripts, build, dev, tauri:build, version
 
 ### Community 90 - "worker_api.rs"
 Cohesion: 0.13
-Nodes (21): a_worker_that_dies_without_being_asked_is_detected_and_replaced(), encode_contract_rejects_an_invalid_job(), encode_contract_runs_pauses_resumes_and_stops(), encode_contract_stops_a_running_job(), generate_source(), handshake_reports_a_generated_token_and_an_ephemeral_port(), init_command(), logging_contract_reads_and_resets() (+13 more)
+Nodes (33): a_user_requested_stop_is_not_reported_as_a_crash(), a_worker_killed_mid_encode_fails_only_its_job_and_the_next_job_still_runs(), a_worker_that_dies_without_being_asked_is_detected_and_replaced(), consecutive_worker_deaths_are_replaced_and_then_reported_rather_than_looping(), encode_contract_rejects_an_invalid_job(), encode_contract_runs_pauses_resumes_and_stops(), encode_contract_stops_a_running_job(), encode_progress() (+25 more)
 
 ### Community 91 - "LogService"
 Cohesion: 0.10
-Nodes (17): a_folder_that_is_inside_its_bounds_loses_nothing(), a_log_the_folder_does_not_own_is_never_touched(), a_worker_with_no_log_folder_writes_no_encode_logs_and_says_nothing(), an_encode_log_is_opened_under_the_resolved_folder_and_never_above_it(), an_encode_writes_its_own_file_and_the_session_file_both(), an_open_encode_log_is_never_the_one_a_rotation_removes(), append_line(), drops_oldest_entries_and_reports_truncation() (+9 more)
+Nodes (19): message(), LogMessage, a_folder_that_is_inside_its_bounds_loses_nothing(), a_log_the_folder_does_not_own_is_never_touched(), a_worker_with_no_log_folder_writes_no_encode_logs_and_says_nothing(), an_encode_log_is_opened_under_the_resolved_folder_and_never_above_it(), an_encode_writes_its_own_file_and_the_session_file_both(), an_open_encode_log_is_never_the_one_a_rotation_removes() (+11 more)
 
 ### Community 92 - "Generate Report"
 Cohesion: 0.29
@@ -626,15 +643,15 @@ Cohesion: 0.29
 Nodes (6): Checks, in order, Disposition, Impeccable Finish Reviewer, Input Contract, Output Contract, Verdict Pass
 
 ### Community 95 - "app.js"
-Cohesion: 0.05
-Nodes (165): Checks, Entry Atomicity, Impeccable Manual Edit Applier, Input Contract, Output Contract, Workflow, acceptPaths(), actionButton() (+157 more)
+Cohesion: 0.06
+Nodes (159): acceptPaths(), actionButton(), activatePreferenceTab(), activateTab(), appearanceOptions(), applyAppearance(), applyChoice(), applyLanguage() (+151 more)
 
 ### Community 96 - "live-browser-ignores.js"
 Cohesion: 0.52
 Nodes (6): globToRegex(), matchesScope(), normalizeIgnoreRule(), normalizeIgnoreValue(), pageCandidates(), resolveDetectIgnores()
 
 ### Community 97 - "tests/subtitles.rs"
-Cohesion: 0.18
+Cohesion: 0.50
 Nodes (6): burn_in_runs(), generate_source(), scanner(), srt_to_mp4_text_conversion(), text_subtitle_passthrough(), tool()
 
 ### Community 98 - "Vise Transcoder {VERSION} Release Notes"
@@ -642,8 +659,8 @@ Cohesion: 0.29
 Nodes (6): Changes, Highlights, Known Issues, Platforms, Verification, Vise Transcoder {VERSION} Release Notes
 
 ### Community 99 - "Diagnostic Scan"
-Cohesion: 0.18
-Nodes (9): 1. Accessibility (VoiceOver / TalkBack), 2. Performance, 3. Appearance & Theming, 4. Platform Conformance (CRITICAL), 5. Adaptivity, Diagnostic Scan, Comps, Directions (+1 more)
+Cohesion: 0.33
+Nodes (6): 1. Accessibility (VoiceOver / TalkBack), 2. Performance, 3. Appearance & Theming, 4. Platform Conformance (CRITICAL), 5. Adaptivity, Diagnostic Scan
 
 ### Community 100 - "Visualize: Direction Comps & Asset Production"
 Cohesion: 0.33
@@ -651,7 +668,7 @@ Nodes (5): After approval: the comp becomes a spec, Generate three compositional
 
 ### Community 102 - "preset_catalog.rs"
 Cohesion: 0.05
-Nodes (30): builtin_entries(), builtin_preset(), builtin_presets(), BuiltInPreset, a_catalog_entry_that_breaks_a_rule_is_reported_rather_than_shipped(), a_directory_of_exported_presets_can_be_imported_again(), a_file_written_before_the_version_existed_is_migrated_and_kept(), a_hardware_preset_reaches_the_encoder_the_pipeline_reads() (+22 more)
+Nodes (26): builtin_entries(), builtin_preset(), builtin_presets(), a_catalog_entry_that_breaks_a_rule_is_reported_rather_than_shipped(), a_directory_of_exported_presets_can_be_imported_again(), a_file_written_before_the_version_existed_is_migrated_and_kept(), a_hardware_preset_reaches_the_encoder_the_pipeline_reads(), a_library_can_be_reordered_without_losing_anything() (+18 more)
 
 ### Community 103 - "Project Context"
 Cohesion: 0.33
@@ -666,16 +683,16 @@ Cohesion: 0.10
 Nodes (12): CANCELLED, EncodeCommand, FAILED, init_command_reports_unsupported_switches(), init_command_resolves_disk_log_path(), init_command_resolves_the_per_encode_log_folder(), InitCommand, INVALID (+4 more)
 
 ### Community 106 - "capability.rs"
-Cohesion: 0.13
-Nodes (21): CapabilityViewModel, a_machine_with_no_accelerator_says_encoding_runs_on_the_processor(), a_machine_with_no_tools_gets_a_report_that_says_so(), a_report_is_built_from_the_injected_detection(), an_empty_list_is_shown_as_none_rather_than_as_a_blank_section(), CapabilityReport, detected(), HARDWARE_MARKERS (+13 more)
+Cohesion: 0.06
+Nodes (39): CapabilityViewModel, a_machine_with_no_accelerator_says_encoding_runs_on_the_processor(), a_machine_with_no_tools_gets_a_report_that_says_so(), a_report_is_built_from_the_injected_detection(), an_empty_list_is_shown_as_none_rather_than_as_a_blank_section(), CapabilityReport, detected(), HARDWARE_MARKERS (+31 more)
 
 ### Community 107 - "windows/presets.rs"
-Cohesion: 0.09
-Nodes (44): a_built_in_preset_cannot_be_renamed_or_deleted_but_can_be_copied(), a_category_and_an_entry_this_build_does_not_have_are_refused_by_name(), a_default_that_points_at_a_deleted_preset_is_reported_as_no_name(), a_duplicate_name_is_a_warning_rather_than_a_refusal(), a_hardware_preset_is_closed_on_a_machine_without_the_chip(), a_machine_that_was_never_probed_closes_nothing_and_says_so(), a_preset_name_is_required_before_anything_is_stored(), a_preset_summary_names_what_it_leaves_alone() (+36 more)
+Cohesion: 0.06
+Nodes (62): a_built_in_preset_cannot_be_renamed_or_deleted_but_can_be_copied(), a_category_and_an_entry_this_build_does_not_have_are_refused_by_name(), a_default_that_points_at_a_deleted_preset_is_reported_as_no_name(), a_duplicate_name_is_a_warning_rather_than_a_refusal(), a_hardware_preset_is_closed_on_a_machine_without_the_chip(), a_machine_that_was_never_probed_closes_nothing_and_says_so(), a_preset_name_is_required_before_anything_is_stored(), a_preset_summary_names_what_it_leaves_alone() (+54 more)
 
 ### Community 108 - "advanced.rs"
-Cohesion: 0.05
-Nodes (40): a_portable_settings_file_that_took_isolation_away_closes_the_control_with_its_reason(), ACTION_ON_FAILURE, ACTION_TIMEOUT, ActionSettings, AdvancedSettings, available(), level_effect(), LOG_LEVEL (+32 more)
+Cohesion: 0.06
+Nodes (36): a_portable_settings_file_that_took_isolation_away_closes_the_control_with_its_reason(), ACTION_ON_FAILURE, ACTION_TIMEOUT, ActionSettings, AdvancedSettings, available(), level_effect(), LOG_LEVEL (+28 more)
 
 ### Community 109 - "Heuristics Scoring Guide"
 Cohesion: 0.50
@@ -690,8 +707,8 @@ Cohesion: 0.07
 Nodes (43): a_bundle_is_byte_for_byte_the_same_for_the_same_session(), a_different_session_produces_a_different_bundle(), a_document_that_cannot_be_read_is_still_redacted_rather_than_dropped(), a_log_too_long_to_send_is_cut_on_a_line_and_says_so(), a_path_inside_a_sentence_is_reduced_rather_than_the_whole_sentence(), a_secret_is_removed_by_its_key_as_well_as_by_its_value(), a_secret_shorter_than_a_word_is_not_scrubbed_out_of_ordinary_text(), a_token_appears_nowhere_in_the_bundle() (+35 more)
 
 ### Community 112 - "dimensions.rs"
-Cohesion: 0.18
-Nodes (17): a_crop_must_be_even_or_the_encoder_refuses_it(), a_manual_crop_is_checked_against_the_frame(), a_shape_crop_centres_the_largest_rectangle_it_can(), a_shape_crop_needs_a_frame_size(), aspect_ratio_value(), crop_rect(), DimensionsSettings, DimensionsTabViewModel (+9 more)
+Cohesion: 0.08
+Nodes (33): a_crop_must_be_even_or_the_encoder_refuses_it(), a_manual_crop_is_checked_against_the_frame(), a_shape_crop_centres_the_largest_rectangle_it_can(), a_shape_crop_needs_a_frame_size(), aspect_ratio_value(), crop_rect(), CropMode, AspectRatio (+25 more)
 
 ### Community 113 - "tooling.rs"
 Cohesion: 0.13
@@ -702,12 +719,12 @@ Cohesion: 0.50
 Nodes (3): Added, Changelog, [Unreleased]
 
 ### Community 115 - "router.rs"
-Cohesion: 0.11
-Nodes (36): HttpRequest, HttpResponse, answers_idle_progress_routes(), answers_title_routes_before_a_scan(), answers_token_routes(), bad_request(), control_routes_report_when_nothing_is_running(), decode_body() (+28 more)
+Cohesion: 0.10
+Nodes (35): HttpRequest, HttpResponse, answers_idle_progress_routes(), answers_title_routes_before_a_scan(), answers_token_routes(), bad_request(), control_routes_report_when_nothing_is_running(), decode_body() (+27 more)
 
 ### Community 116 - "Route"
-Cohesion: 0.08
-Nodes (21): Route, .ALL, GetAllLogMessages, GetLogMessagesFromIndex, GetMainTitle, GetPreview, GetTitles, GetWorkerInfo (+13 more)
+Cohesion: 0.06
+Nodes (29): access_denied_message(), every_listed_route_parses_and_needs_a_token_except_the_banner(), messages_are_vise_branded(), parses_every_documented_route(), Route, .ALL, GetAllLogMessages, GetLogMessagesFromIndex (+21 more)
 
 ### Community 117 - "Vise Desktop"
 Cohesion: 0.40
@@ -718,20 +735,20 @@ Cohesion: 0.60
 Nodes (5): vise-cli, vise-core, vise-desktop, vise-ipc, vise-worker
 
 ### Community 122 - "http.rs"
-Cohesion: 0.11
+Cohesion: 0.12
 Nodes (11): find_head_end(), HttpParseError, InvalidContentLength, MalformedHead, MalformedHeader, MalformedRequestLine, TruncatedBody, MAX_BODY_BYTES (+3 more)
 
-### Community 123 - "api.rs"
+### Community 123 - "ProgressReport"
 Cohesion: 0.13
-Nodes (17): done_report(), scanning_report(), DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT, describe(), is_success(), is_terminal(), poll_encode_until() (+9 more)
+Nodes (15): done_report(), scanning_report(), DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT, describe(), is_success(), is_terminal(), poll_encode_until() (+7 more)
 
-### Community 124 - "hdr.rs"
-Cohesion: 0.11
-Nodes (18): capabilities_are_read_from_the_encoder_probe(), dolby_vision_can_be_stripped_or_refused(), dolby_vision_pass_through_needs_hevc_and_a_capable_encoder(), DolbyVisionAction, ExtractRpu, PassThrough, Strip, DolbyVisionOptions (+10 more)
+### Community 124 - "HardwareCapabilities"
+Cohesion: 0.12
+Nodes (19): a_device_for_one_vendor_does_not_unlock_another(), a_hardware_encoder_with_its_device_is_offered(), a_hardware_encoder_without_its_device_is_not_offered(), a_machine_with_a_card_offers_it(), a_machine_with_no_card_offers_the_software_encoder(), a_software_encoder_needs_no_device(), an_encoder_that_is_not_listed_is_not_offered_whatever_the_device(), detect() (+11 more)
 
-### Community 125 - "PowerScope"
-Cohesion: 0.20
-Nodes (3): PowerScope, System, SystemAndDisplay
+### Community 125 - "crash.rs"
+Cohesion: 0.13
+Nodes (19): a_job_that_was_not_stopped_is_not_cancelled_by_one_that_was(), a_user_requested_stop_is_not_a_crash(), a_worker_killed_mid_job_fails_only_that_job_and_names_the_exit_status(), a_worker_that_answered_is_recorded_as_finished(), a_worker_that_answers_again_clears_the_death_streak(), an_encode_failure_is_a_failed_job_and_not_a_crash(), consecutive_worker_deaths_back_off_and_then_report_instead_of_looping(), death() (+11 more)
 
 ### Community 126 - "Local Setup"
 Cohesion: 0.29
@@ -742,16 +759,16 @@ Cohesion: 0.29
 Nodes (6): Build and test, Documentation, Notes, Requirements, Run the CLI, Vise Transcoder
 
 ### Community 128 - "encode.rs"
-Cohesion: 0.10
-Nodes (24): EncodeProgress, close_encode_log(), control_routes_require_a_running_encode(), encode_log_label(), EncodeControl, EncodeService, EncodeSlot, finish() (+16 more)
+Cohesion: 0.07
+Nodes (27): EncodeProgress, PowerScope, System, SystemAndDisplay, close_encode_log(), control_routes_require_a_running_encode(), encode_log_label(), EncodeControl (+19 more)
 
 ### Community 129 - "VideoCodec"
-Cohesion: 0.13
-Nodes (17): video_label(), apply(), load(), parse_audio(), parse_container(), parse_video(), Preset, VideoCodec (+9 more)
+Cohesion: 0.11
+Nodes (18): video_codec_id(), video_label(), apply(), load(), parse_audio(), parse_container(), parse_video(), Preset (+10 more)
 
-### Community 130 - "scan.rs"
-Cohesion: 0.17
-Nodes (16): StreamInfo, ScanCommand, apply_init(), build_titles(), builds_titles_from_a_scan_result(), command(), default_title(), filters_titles_by_duration_bounds() (+8 more)
+### Community 130 - "LogLevel"
+Cohesion: 0.10
+Nodes (11): ActivityLog, LogLine, LogSource, Desktop, Worker, LogLevel, .ALL, Debug (+3 more)
 
 ### Community 131 - "actOnAgentTarget"
 Cohesion: 0.29
@@ -761,28 +778,28 @@ Nodes (17): actOnAgentTarget(), agentTargetBusyReason(), agentTargetOverlayGone(
 Cohesion: 0.08
 Nodes (17): ServerBanner, monitor_leaves_a_live_parent_alone(), parent_monitor_ignores_pid_zero(), parent_monitor_terminates_when_the_parent_is_gone(), run(), spawn_parent_monitor(), stdin_is_pipe(), wake_listener() (+9 more)
 
-### Community 133 - "Flip"
-Cohesion: 0.21
-Nodes (7): DimensionsInput, Flip, Both, Horizontal, None, Vertical, unknown_names_and_bad_turns_are_refused()
+### Community 133 - "FfprobeScanner"
+Cohesion: 0.12
+Nodes (10): application_root(), CropDetection, detect_crop(), detect_crop_with(), extract_preview(), extract_preview_with(), FfprobeScanner, find_tool() (+2 more)
 
 ### Community 134 - "token.rs"
-Cohesion: 0.14
-Nodes (10): accepts_the_registered_token(), constant_time_eq(), generate_token(), GENERATED_TOKEN_LEN, generated_tokens_are_long_and_unique(), next_counter(), rejects_everything_when_no_token_is_registered(), rejects_missing_and_invalid_tokens() (+2 more)
+Cohesion: 0.10
+Nodes (14): accepts_the_registered_token(), constant_time_eq(), generate_token(), GENERATED_TOKEN_LEN, generated_tokens_are_long_and_unique(), next_counter(), rejection_messages_describe_the_route_and_header(), rejects_everything_when_no_token_is_registered() (+6 more)
 
 ### Community 135 - "vise-worker/src/main.rs"
 Cohesion: 0.18
 Nodes (8): command_line_overrides_the_environment(), main(), Overrides, parse_arguments(), parses_arguments_in_both_forms(), refuses_to_start_without_a_port_and_token(), resolve_settings(), STANDALONE_NOTICE
 
 ### Community 136 - "i18n.rs"
-Cohesion: 0.04
-Nodes (57): a_duplicate_key_is_refused_rather_than_silently_dropped(), a_malformed_file_is_refused_with_the_file_named(), a_missing_key_and_an_unknown_key_are_both_reported(), a_placeholder_that_does_not_match_the_key_is_a_problem(), a_resolved_catalog_carries_both_answers_together(), a_translation_that_is_still_the_base_sentence_is_reported(), an_incomplete_locale_falls_back_and_says_so(), AR_DESCRIPTIONS (+49 more)
+Cohesion: 0.05
+Nodes (47): a_duplicate_key_is_refused_rather_than_silently_dropped(), a_malformed_file_is_refused_with_the_file_named(), a_missing_key_and_an_unknown_key_are_both_reported(), a_placeholder_that_does_not_match_the_key_is_a_problem(), a_resolved_catalog_carries_both_answers_together(), a_translation_that_is_still_the_base_sentence_is_reported(), AR_DESCRIPTIONS, AR_MESSAGES (+39 more)
 
-### Community 137 - "SharedState"
-Cohesion: 0.12
-Nodes (57): activity_window(), add_job(), apply_when_done(), build_tray(), cancel_all(), cancel_job(), cancel_job_confirmed(), cancel_one() (+49 more)
+### Community 137 - "push_log"
+Cohesion: 0.09
+Nodes (61): a_job_the_user_stopped_is_cancelled_and_never_counted_against_the_worker(), a_partial_the_sweep_cannot_remove_is_named_rather_than_hidden(), a_request_that_cannot_be_answered_is_told_apart_from_a_dead_worker(), a_worker_that_dies_mid_job_fails_that_job_tidies_its_partial_and_clears_the_streak(), a_worker_that_keeps_dying_stops_the_queue_instead_of_looping(), appearance_view(), apply_outcome(), apply_preset_action() (+53 more)
 
 ### Community 138 - "vise-ipc/src/lib.rs"
-Cohesion: 0.11
+Cohesion: 0.10
 Nodes (3): LOOPBACK_HOST, PROTOCOL_VERSION, WORKER_NAME
 
 ### Community 139 - "actions.rs"
@@ -791,27 +808,27 @@ Nodes (32): a_command_that_cannot_be_started_is_reported_rather_than_panicking()
 
 ### Community 140 - "queue.rs"
 Cohesion: 0.07
-Nodes (47): policy(), a_batch_with_nothing_left_to_queue_is_refused_rather_than_succeeding_with_nothing(), a_collision_inside_the_batch_names_both_titles_and_one_on_disk_names_the_file(), a_name_that_differs_only_in_case_is_still_a_collision(), a_name_the_filesystem_would_refuse_is_refused_with_the_character_named(), a_policy_that_numbers_the_names_shows_the_numbered_names_on_the_sheet(), a_queued_title_only_differs_from_the_base_job_by_its_index_and_output(), a_source_with_no_titles_tells_the_user_to_scan_first() (+39 more)
+Nodes (44): a_batch_with_nothing_left_to_queue_is_refused_rather_than_succeeding_with_nothing(), a_collision_inside_the_batch_names_both_titles_and_one_on_disk_names_the_file(), a_name_that_differs_only_in_case_is_still_a_collision(), a_name_the_filesystem_would_refuse_is_refused_with_the_character_named(), a_policy_that_numbers_the_names_shows_the_numbered_names_on_the_sheet(), a_queued_title_only_differs_from_the_base_job_by_its_index_and_output(), a_source_with_no_titles_tells_the_user_to_scan_first(), asking_about_a_collision_refuses_the_whole_batch_and_names_the_file() (+36 more)
 
-### Community 141 - "route.rs"
-Cohesion: 0.23
-Nodes (8): access_denied_message(), every_listed_route_parses_and_needs_a_token_except_the_banner(), messages_are_vise_branded(), parses_every_documented_route(), Unknown, TOKEN_HEADER, UNKNOWN_ROUTE_MESSAGE, unknown_routes_are_flagged()
+### Community 141 - "ValidationReport"
+Cohesion: 0.12
+Nodes (25): a_job_is_judged_before_it_is_queued_and_every_problem_is_reported(), a_job_that_cannot_run_is_refused_by_the_queue_before_it_is_claimed(), a_job_the_tabs_would_queue_is_claimed_and_marked_running(), a_sweep_is_refused_while_the_real_queue_has_an_encode_running(), a_window_without_a_worker_reports_itself_as_running_the_pipeline(), add_job(), check_job(), ClaimStop (+17 more)
 
 ### Community 142 - "preferences/updates.rs"
 Cohesion: 0.06
-Nodes (31): a_day_count_becomes_the_date_everybody_writes(), a_frequency_of_never_resolves_to_no_interval_and_no_date(), add_days(), CHANNEL, CheckFrequency, .ALL, Daily, Monthly (+23 more)
+Nodes (30): a_day_count_becomes_the_date_everybody_writes(), a_frequency_of_never_resolves_to_no_interval_and_no_date(), add_days(), CHANNEL, CheckFrequency, .ALL, Daily, Monthly (+22 more)
 
 ### Community 143 - "viewmodel.rs"
-Cohesion: 0.06
-Nodes (56): TitleFactsViewModel, a_foreign_language_audio_track_says_so_on_its_own_row(), a_language_reported_as_its_own_code_is_not_shown_twice(), a_selection_carries_the_source_label_the_picker_shows(), a_source_without_angles_reports_a_single_one(), an_angle_beyond_the_source_is_refused(), AngleViewModel, audio_track_view() (+48 more)
+Cohesion: 0.09
+Nodes (41): a_foreign_language_audio_track_says_so_on_its_own_row(), a_language_reported_as_its_own_code_is_not_shown_twice(), a_source_without_angles_reports_a_single_one(), an_angle_beyond_the_source_is_refused(), audio_track_view(), chapter(), chapter_range_uses_the_chosen_boundaries(), chapter_view() (+33 more)
 
 ### Community 144 - "tabs/audio.rs"
-Cohesion: 0.12
-Nodes (27): a_copied_track_closes_every_control_that_would_re_encode_it(), a_mixdown_cannot_invent_speakers_the_track_does_not_have(), a_track_change_only_touches_that_track(), a_track_inherits_the_defaults_until_it_says_otherwise(), a_track_that_cannot_be_mixed_refuses_the_whole_job(), an_encoder_with_a_quality_value_needs_one(), audio(), AudioRules (+19 more)
+Cohesion: 0.13
+Nodes (25): a_copied_track_closes_every_control_that_would_re_encode_it(), a_mixdown_cannot_invent_speakers_the_track_does_not_have(), a_track_change_only_touches_that_track(), a_track_inherits_the_defaults_until_it_says_otherwise(), a_track_that_cannot_be_mixed_refuses_the_whole_job(), an_encoder_with_a_quality_value_needs_one(), audio(), AudioRules (+17 more)
 
 ### Community 145 - "general.rs"
-Cohesion: 0.06
-Nodes (31): a_language_the_picker_sent_is_read_and_one_it_cannot_show_is_kept(), a_stored_value_outside_the_bounds_is_reported_rather_than_trusted(), an_unknown_range_is_refused_with_the_names_that_would_work(), DEFAULT_PREVIEW_FRAMES, DEFAULT_RANGE_MODE, FOLLOW_SYSTEM, GeneralSettings, KEEP_DUPLICATE_TITLES (+23 more)
+Cohesion: 0.07
+Nodes (30): a_language_the_picker_sent_is_read_and_one_it_cannot_show_is_kept(), a_stored_value_outside_the_bounds_is_reported_rather_than_trusted(), an_unknown_range_is_refused_with_the_names_that_would_work(), DEFAULT_PREVIEW_FRAMES, DEFAULT_RANGE_MODE, FOLLOW_SYSTEM, GeneralSettings, KEEP_DUPLICATE_TITLES (+22 more)
 
 ### Community 146 - "preferences/hardware.rs"
 Cohesion: 0.08
@@ -819,91 +836,91 @@ Nodes (29): a_device_detection_did_not_find_is_offered_as_missing_with_a_reason(
 
 ### Community 147 - "appearance.rs"
 Cohesion: 0.10
-Nodes (26): a_chosen_theme_paints_in_both_observations(), a_platform_report_does_not_override_the_page(), a_preference_is_read_and_written_in_the_settings_file(), a_settings_file_that_is_not_json_reads_as_the_defaults(), a_stored_value_this_build_does_not_know_falls_back_to_the_default(), an_observation_that_did_not_change_says_so(), an_unknown_choice_is_refused_with_the_names_that_would_work(), APPEARANCE_KEY (+18 more)
+Nodes (25): a_chosen_theme_paints_in_both_observations(), a_platform_report_does_not_override_the_page(), a_preference_is_read_and_written_in_the_settings_file(), a_settings_file_that_is_not_json_reads_as_the_defaults(), a_stored_value_this_build_does_not_know_falls_back_to_the_default(), an_observation_that_did_not_change_says_so(), APPEARANCE_KEY, AppearanceOptionViewModel (+17 more)
 
 ### Community 148 - "output.rs"
-Cohesion: 0.09
-Nodes (29): a_folder_that_exists_is_accepted_and_trimmed(), a_folder_that_is_not_there_is_refused_with_the_path_that_was_typed(), a_record_whose_two_answers_disagree_is_reported_and_the_queue_gets_one(), an_empty_folder_is_refused_by_name_rather_than_stored(), an_unknown_collision_is_refused_with_the_names_that_would_work(), COLLISION, CollisionPreference, .ALL (+21 more)
+Cohesion: 0.08
+Nodes (31): text_control(), a_folder_that_exists_is_accepted_and_trimmed(), a_folder_that_is_not_there_is_refused_with_the_path_that_was_typed(), a_record_whose_two_answers_disagree_is_reported_and_the_queue_gets_one(), an_empty_folder_is_refused_by_name_rather_than_stored(), an_unknown_collision_is_refused_with_the_names_that_would_work(), COLLISION, CollisionPreference (+23 more)
 
-### Community 149 - "State"
-Cohesion: 0.11
-Nodes (30): apply_preview_crop(), check_for_updates_now(), clear_recent_sources(), close_window(), error_report(), forget_recent_source(), import_subtitles(), list_jobs() (+22 more)
+### Community 149 - "SharedState"
+Cohesion: 0.07
+Nodes (70): AppearanceViewModel, activity_window(), apply_preview_crop(), browse_catalog(), cancel_sweep(), check_for_updates_now(), choose_range(), choose_title() (+62 more)
 
 ### Community 150 - "diskspace.rs"
 Cohesion: 0.08
 Nodes (30): a_file_that_already_exists_is_a_better_estimate_than_any_formula(), a_job_of_known_size_needs_twice_its_size_and_the_reserve(), a_target_size_the_job_states_wins_over_any_formula(), a_volume_that_could_not_be_read_does_not_stop_the_queue(), a_volume_that_is_already_mostly_full_is_refused_even_for_a_tiny_job(), a_volume_with_no_size_still_has_to_clear_the_reserve(), BITS_PER_BYTE, enough_room_starts_the_job() (+22 more)
 
 ### Community 151 - "TitleFacts"
-Cohesion: 0.12
-Nodes (28): burn_in_available(), SubtitleFacts, TitleFacts, a_bitmap_track_cannot_be_written_into_an_mp4(), a_burn_in_chosen_forced_track_reaches_the_job_model(), a_track_can_step_outside_the_job_behaviour(), an_imported_file_is_refused_when_the_container_cannot_carry_it(), an_imported_file_is_used_when_no_track_is_chosen() (+20 more)
+Cohesion: 0.11
+Nodes (32): burn_in_available(), SubtitleFacts, TitleFacts, a_bitmap_track_cannot_be_written_into_an_mp4(), a_burn_in_chosen_forced_track_reaches_the_job_model(), a_track_can_step_outside_the_job_behaviour(), an_imported_file_is_refused_when_the_container_cannot_carry_it(), an_imported_file_is_used_when_no_track_is_chosen() (+24 more)
 
 ### Community 152 - "windows/diagnostics.rs"
-Cohesion: 0.10
-Nodes (25): a_folder_with_no_logs_says_so_rather_than_showing_an_empty_table(), a_range_is_planned_the_moment_it_is_set(), a_range_nobody_confirmed_is_refused_and_the_surface_says_why(), a_refused_plan_reaches_the_page_rather_than_only_the_test(), a_report_is_remembered_once_per_kind(), a_second_sweep_cannot_start_while_the_first_is_running(), a_sweep_hands_out_one_run_at_a_time_and_keeps_its_own_table(), a_sweep_is_refused_while_the_real_queue_is_encoding() (+17 more)
+Cohesion: 0.12
+Nodes (21): a_folder_with_no_logs_says_so_rather_than_showing_an_empty_table(), a_range_is_planned_the_moment_it_is_set(), a_range_nobody_confirmed_is_refused_and_the_surface_says_why(), a_refused_plan_reaches_the_page_rather_than_only_the_test(), a_report_is_remembered_once_per_kind(), a_second_sweep_cannot_start_while_the_first_is_running(), a_sweep_hands_out_one_run_at_a_time_and_keeps_its_own_table(), a_sweep_is_refused_while_the_real_queue_is_encoding() (+13 more)
 
 ### Community 153 - "sources.rs"
 Cohesion: 0.09
-Nodes (33): a_missing_settings_file_reads_as_an_empty_list(), ALTERNATE_SEPARATOR, classifies_files_and_folders(), config_root(), default_settings_path(), drop_report_keeps_accepted_and_refused_paths(), file_name_of(), forget_and_clear_remove_entries() (+25 more)
+Nodes (32): a_missing_settings_file_reads_as_an_empty_list(), ALTERNATE_SEPARATOR, classifies_files_and_folders(), config_root(), default_settings_path(), drop_report_keeps_accepted_and_refused_paths(), file_name_of(), forget_and_clear_remove_entries() (+24 more)
 
 ### Community 154 - "EncoderId"
 Cohesion: 0.07
-Nodes (24): EncoderId, AmfAv1, AmfH264, AmfH265, Av1, Dnxhr, Ffv1, NvencAv1 (+16 more)
+Nodes (20): EncoderId, AmfAv1, AmfH264, AmfH265, Av1, Dnxhr, Ffv1, NvencAv1 (+12 more)
 
 ### Community 155 - "whendone.rs"
 Cohesion: 0.08
-Nodes (22): a_stored_action_this_build_cannot_do_is_reported_on_the_tab_and_in_the_problems(), a_wait_with_nothing_to_act_on_says_it_has_no_effect(), ACTION, an_answer_this_build_cannot_give_is_refused_rather_than_stored(), DELAY_SECONDS, MAX_DELAY_SECONDS, read_delay(), tab_view() (+14 more)
+Nodes (23): number_control(), a_stored_action_this_build_cannot_do_is_reported_on_the_tab_and_in_the_problems(), a_wait_with_nothing_to_act_on_says_it_has_no_effect(), ACTION, an_answer_this_build_cannot_give_is_refused_rather_than_stored(), DELAY_SECONDS, MAX_DELAY_SECONDS, read_delay() (+15 more)
 
 ### Community 156 - "notify.rs"
-Cohesion: 0.07
-Nodes (24): a_message_longer_than_the_field_is_cut_rather_than_run_past_it(), balloon_available(), BalloonNotifier, destroy_icon(), GetModuleHandleW(), GetProcAddress(), IDI_APPLICATION, IMAGE_ICON (+16 more)
+Cohesion: 0.08
+Nodes (30): a_failure_is_worth_a_notification_wherever_the_window_is(), a_message_longer_than_the_field_is_cut_rather_than_run_past_it(), a_pause_always_says_why(), a_queue_that_finishes_where_you_can_see_it_is_not_a_notification(), an_empty_reason_becomes_a_sentence_rather_than_a_blank(), decide(), decide_with_focus(), focused() (+22 more)
 
 ### Community 157 - "filters.rs"
-Cohesion: 0.14
-Nodes (27): a_colour_space_is_chosen_or_the_source_one_is_kept(), a_custom_value_outside_its_range_is_reported_and_not_applied(), a_deblock_block_size_outside_the_range_is_reported_not_accepted(), a_filter_that_does_not_exist_is_refused_with_its_name(), a_known_filter_change_is_applied(), a_named_strength_becomes_a_number_and_a_custom_value_overrides_it(), apply_named(), colour_space_options() (+19 more)
+Cohesion: 0.10
+Nodes (30): NumberViewModel, a_colour_space_is_chosen_or_the_source_one_is_kept(), a_custom_value_outside_its_range_is_reported_and_not_applied(), a_deblock_block_size_outside_the_range_is_reported_not_accepted(), a_filter_that_does_not_exist_is_refused_with_its_name(), a_known_filter_change_is_applied(), a_named_strength_becomes_a_number_and_a_custom_value_overrides_it(), apply_named() (+22 more)
 
 ### Community 158 - "enclog.rs"
 Cohesion: 0.09
 Nodes (25): a_folder_inside_both_bounds_is_left_alone(), a_log_that_is_being_written_is_never_removed_and_never_moved(), a_log_the_user_is_reading_is_never_removed(), a_very_long_title_is_capped_rather_than_rejected(), an_encounter_of_protected_files_leaves_the_bound_unmet_rather_than_deleting_one(), decide_rotation(), ENCODE_LOG_PREFIX, ENCODE_LOG_SUFFIX (+17 more)
 
 ### Community 159 - "Notification"
-Cohesion: 0.09
-Nodes (13): a_refused_notification_falls_back_to_the_log_rather_than_being_lost(), FallbackNotifier, LogNotifier, Notification, Notifier, NotifyError, Refused, Unsupported (+5 more)
+Cohesion: 0.08
+Nodes (16): a_refused_notification_falls_back_to_the_log_rather_than_being_lost(), balloon_available(), BalloonNotifier, destroy_icon(), FallbackNotifier, LogNotifier, Notification, Notifier (+8 more)
 
 ### Community 160 - "persistence.rs"
 Cohesion: 0.13
 Nodes (24): a_corrupt_file_is_reported_and_left_alone(), a_file_from_a_newer_build_is_read_and_not_thrown_away(), a_finished_job_stays_finished_and_a_failed_one_stays_failed(), a_job_that_is_not_in_the_queue_is_not_in_the_snapshot(), a_priority_for_a_job_that_is_not_there_is_dropped_rather_than_resurrected(), a_queue_that_was_never_saved_is_not_reported_as_lost(), a_running_job_comes_back_interrupted_and_never_as_a_job_that_just_started(), a_summary_names_how_many_jobs_were_interrupted() (+16 more)
 
 ### Community 161 - "Job"
-Cohesion: 0.16
-Nodes (12): file_name(), is_finished(), JobPriority, High, Low, Normal, position_in(), queue_view() (+4 more)
+Cohesion: 0.12
+Nodes (18): an_empty_queue_offers_nothing_to_clear_empty_or_cancel(), an_empty_queue_says_so_and_closes_its_whole_queue_controls(), every_row_control_says_why_it_is_closed_or_confirms_first(), file_name(), is_finished(), JobPriority, High, Low (+10 more)
 
 ### Community 162 - "DesktopState"
-Cohesion: 0.11
-Nodes (36): a_sweep_is_refused_while_the_real_queue_has_an_encode_running(), a_window_without_a_worker_reports_itself_as_running_the_pipeline(), an_export_that_can_be_written_is_recorded_once_per_kind(), an_export_that_cannot_be_written_is_reported_rather_than_saved_over(), cancel_sweep(), check_output_directory(), collision_policy(), confirm_sweep_range() (+28 more)
+Cohesion: 0.13
+Nodes (24): an_export_that_can_be_written_is_recorded_once_per_kind(), an_export_that_cannot_be_written_is_reported_rather_than_saved_over(), check_output_directory(), check_presets_against_this_machine(), collision_policy(), DesktopState, fetch_preview_still(), output_extension() (+16 more)
 
 ### Community 163 - "tabs/metadata.rs"
-Cohesion: 0.08
-Nodes (36): a_change_arrives_as_camel_case_and_is_applied(), a_copied_value_cannot_be_changed_until_the_mode_says_so(), a_removed_tag_is_shown_as_such_and_can_be_restored(), a_removed_tag_stays_removed_across_a_change_of_title(), a_tag_can_be_added_edited_restored_and_removed(), a_tag_name_the_media_tools_would_misread_is_refused(), a_tag_row_with_no_name_is_reported_as_a_problem(), a_title_with_no_tags_says_so_rather_than_showing_an_empty_list() (+28 more)
+Cohesion: 0.19
+Nodes (18): a_change_arrives_as_camel_case_and_is_applied(), a_copied_value_cannot_be_changed_until_the_mode_says_so(), a_removed_tag_is_shown_as_such_and_can_be_restored(), a_removed_tag_stays_removed_across_a_change_of_title(), a_tag_name_the_media_tools_would_misread_is_refused(), a_tag_row_with_no_name_is_reported_as_a_problem(), a_title_with_no_tags_says_so_rather_than_showing_an_empty_list(), a_value_the_tools_cannot_write_is_refused() (+10 more)
 
 ### Community 164 - "tabs/mod.rs"
 Cohesion: 0.12
-Nodes (17): MetadataInput, a_default_set_of_choices_can_be_queued(), a_problem_in_any_tab_blocks_the_queue(), a_target_size_without_a_duration_refuses_the_job(), a_turn_moves_the_filter_before_the_scale(), every_choice_the_tabs_show_reaches_the_job_spec(), facts(), frame_rate() (+9 more)
+Nodes (17): a_default_set_of_choices_can_be_queued(), a_problem_in_any_tab_blocks_the_queue(), a_target_size_without_a_duration_refuses_the_job(), a_turn_moves_the_filter_before_the_scale(), every_choice_the_tabs_show_reaches_the_job_spec(), facts(), frame_rate(), named() (+9 more)
 
 ### Community 165 - "sweep.rs"
-Cohesion: 0.11
-Nodes (31): a_finished_sweep_asks_for_nothing_more(), a_narrow_range_is_planned_exactly_as_it_was_asked(), a_plan_is_one_job_per_quality_value_and_nothing_else(), a_range_outside_the_scale_is_clamped_rather_than_refused(), a_range_too_long_to_sample_is_narrowed_by_widening_the_step_not_by_changing_the_range(), a_range_with_no_step_or_no_order_is_refused_with_a_reason(), a_run_in_flight_when_the_sweep_is_cancelled_still_reports_and_says_it_was_stopped(), a_run_reported_twice_is_reported_once() (+23 more)
+Cohesion: 0.18
+Nodes (25): a_finished_sweep_asks_for_nothing_more(), a_narrow_range_is_planned_exactly_as_it_was_asked(), a_plan_is_one_job_per_quality_value_and_nothing_else(), a_range_outside_the_scale_is_clamped_rather_than_refused(), a_range_too_long_to_sample_is_narrowed_by_widening_the_step_not_by_changing_the_range(), a_range_with_no_step_or_no_order_is_refused_with_a_reason(), a_run_in_flight_when_the_sweep_is_cancelled_still_reports_and_says_it_was_stopped(), a_run_reported_twice_is_reported_once() (+17 more)
 
 ### Community 166 - "chapter.rs"
-Cohesion: 0.06
-Nodes (33): build_chapter_filter(), build_chapter_filter_chain(), build_chapters(), Chapter, ChapterFormat, Csv, Txt, Xml (+25 more)
+Cohesion: 0.13
+Nodes (19): Chapter, ChapterImportError, ChapterTrackConfig, collect_named(), csv_accepts_a_header_and_a_two_column_row(), csv_reads_starts_ends_and_names(), csv_refuses_a_bad_row_with_its_line(), parse_chapters() (+11 more)
 
 ### Community 167 - "results.rs"
 Cohesion: 0.12
 Nodes (21): a_job_with_no_quality_value_says_so_rather_than_guessing_one(), a_title_with_a_comma_and_a_quote_round_trips_through_the_csv(), an_empty_queue_exports_a_header_and_nothing_else(), COLUMNS, container_name(), csv_field(), EXPORT_VERSION, file_name() (+13 more)
 
 ### Community 168 - "source.rs"
-Cohesion: 0.14
-Nodes (19): audio(), a_forced_subtitle_track_is_recognised_from_its_description(), a_quarter_turn_swaps_the_frame_axes(), an_unknown_language_is_named_once(), audio(), audio_facts(), facts_follow_the_chosen_title(), facts_without_a_title_are_empty_rather_than_wrong() (+11 more)
+Cohesion: 0.11
+Nodes (21): audio(), a_forced_subtitle_track_is_recognised_from_its_description(), a_quarter_turn_swaps_the_frame_axes(), an_unknown_language_is_named_once(), audio(), audio_facts(), facts_follow_the_chosen_title(), facts_without_a_title_are_empty_rather_than_wrong() (+13 more)
 
 ### Community 169 - "Locale"
 Cohesion: 0.08
@@ -915,22 +932,22 @@ Nodes (19): a_closed_row_says_why_in_its_own_place(), a_pause_and_a_resume_are_n
 
 ### Community 171 - "scanflow.rs"
 Cohesion: 0.12
-Nodes (24): a_failed_scan_reports_the_reason_and_clears_results(), a_new_flow_starts_idle_and_empty(), a_new_source_clears_everything_the_previous_scan_produced(), a_range_without_a_title_is_refused(), a_scan_that_finished_without_titles_is_a_problem(), an_unusable_range_is_refused_with_its_reason(), choosing_a_title_moves_the_track_and_range_selection(), choosing_tracks_drops_numbers_the_title_does_not_have() (+16 more)
+Nodes (25): a_failed_scan_reports_the_reason_and_clears_results(), a_new_flow_starts_idle_and_empty(), a_new_source_clears_everything_the_previous_scan_produced(), a_range_without_a_title_is_refused(), a_scan_that_finished_without_titles_is_a_problem(), an_unusable_range_is_refused_with_its_reason(), choosing_a_title_moves_the_track_and_range_selection(), choosing_tracks_drops_numbers_the_title_does_not_have() (+17 more)
 
 ### Community 172 - "Integration"
-Cohesion: 0.14
-Nodes (16): a_queue_paused_for_want_of_space_is_announced_once(), a_refresh_with_nothing_happening_says_nothing_and_publishes_once(), an_encode_in_a_worker_process_leaves_the_hold_to_the_worker(), an_encode_in_this_window_holds_and_then_lets_go(), Effect, CheckForUpdates, HoldPower, Log (+8 more)
+Cohesion: 0.15
+Nodes (14): a_queue_paused_for_want_of_space_is_announced_once(), a_refresh_with_nothing_happening_says_nothing_and_publishes_once(), an_encode_in_a_worker_process_leaves_the_hold_to_the_worker(), an_encode_in_this_window_holds_and_then_lets_go(), Effect, CheckForUpdates, HoldPower, Log (+6 more)
 
 ### Community 173 - "system/updates.rs"
 Cohesion: 0.11
 Nodes (19): a_feed_is_read_into_the_releases_it_lists(), a_feed_that_declares_an_entity_is_refused_rather_than_resolved(), ALLOWED_SCHEMES, an_artifact_that_is_not_over_https_is_refused(), attribute(), child_text(), element(), element_from() (+11 more)
 
 ### Community 174 - "chapters.rs"
-Cohesion: 0.08
-Nodes (41): text_control(), a_change_that_names_nothing_is_refused(), a_file_that_does_not_parse_is_refused_and_the_list_is_untouched(), a_format_this_build_does_not_read_is_refused_by_name(), a_marker_can_be_edited_retimed_and_removed(), a_marker_cannot_end_after_the_title_does(), a_marker_with_a_time_that_is_not_a_number_is_named_in_the_message(), a_parsed_chapter_file_is_shown_before_it_replaces_anything() (+33 more)
+Cohesion: 0.21
+Nodes (24): a_change_that_names_nothing_is_refused(), a_file_that_does_not_parse_is_refused_and_the_list_is_untouched(), a_marker_can_be_edited_retimed_and_removed(), a_marker_cannot_end_after_the_title_does(), a_marker_with_a_time_that_is_not_a_number_is_named_in_the_message(), a_parsed_chapter_file_is_shown_before_it_replaces_anything(), ChapterImportOutcomeViewModel, ChapterImportSettings (+16 more)
 
 ### Community 175 - "src/power.rs"
-Cohesion: 0.14
+Cohesion: 0.12
 Nodes (17): a_hold_carries_the_continuous_flag_and_a_release_does_not(), ascii(), available(), ES_CONTINUOUS, GetModuleHandleW(), GetProcAddress(), kernel32_function(), PowerError (+9 more)
 
 ### Community 176 - "locale.rs"
@@ -938,8 +955,8 @@ Cohesion: 0.14
 Nodes (22): a_language_this_build_does_not_ship_falls_back_and_says_so(), a_left_to_right_language_under_a_pinned_right_to_left_direction_stays_mirrored(), a_pinned_direction_survives_a_right_to_left_language(), a_regional_tag_reads_its_own_language(), an_empty_language_is_refused_with_the_names_that_would_work(), choosing_a_language_moves_the_layout_through_the_observation(), choosing_the_same_language_twice_reports_nothing_changed(), every_shipped_language_is_offered_in_its_own_name() (+14 more)
 
 ### Community 177 - "DirectionMode"
-Cohesion: 0.11
-Nodes (12): DEFAULT_DIRECTION_MODE, DirectionMode, .ALL, Auto, Ltr, Rtl, ResolvedDirection, Ltr (+4 more)
+Cohesion: 0.10
+Nodes (13): an_unknown_choice_is_refused_with_the_names_that_would_work(), DEFAULT_DIRECTION_MODE, DirectionMode, .ALL, Auto, Ltr, Rtl, ResolvedDirection (+5 more)
 
 ### Community 178 - "SystemTheme"
 Cohesion: 0.09
@@ -947,51 +964,55 @@ Nodes (14): DEFAULT_THEME_MODE, ResolvedTheme, Dark, Light, summary(), SystemThe
 
 ### Community 179 - "Catalog"
 Cohesion: 0.12
-Nodes (12): a_key_no_file_has_is_named_rather_than_shown_as_a_key(), a_region_tag_reads_its_own_language_before_the_base(), base_catalog(), Catalog, formatting_fills_what_it_is_given_and_leaves_the_rest_visible(), Gap, MessageSource, Base (+4 more)
+Nodes (13): a_key_no_file_has_is_named_rather_than_shown_as_a_key(), a_region_tag_reads_its_own_language_before_the_base(), base_catalog(), Catalog, catalog_for_tag(), formatting_fills_what_it_is_given_and_leaves_the_rest_visible(), normalize_locale_tag(), primary_subtag() (+5 more)
 
-### Community 180 - "ChoiceGroupViewModel"
-Cohesion: 0.09
-Nodes (23): a_group_keeps_the_options_it_was_given(), blocked_options_keep_their_reason(), ChoiceGroup, ChoiceGroupViewModel, ChoiceOptionViewModel, number_in_range(), ranged_numbers_are_checked_against_their_bounds(), ToggleViewModel (+15 more)
+### Community 180 - "deserialize"
+Cohesion: 0.08
+Nodes (21): a_group_keeps_the_options_it_was_given(), blocked_options_keep_their_reason(), ChoiceGroup, ChoiceGroupViewModel, ChoiceOptionViewModel, number_in_range(), ranged_numbers_are_checked_against_their_bounds(), ToggleViewModel (+13 more)
 
 ### Community 181 - "SweepExecutor"
 Cohesion: 0.14
-Nodes (3): SweepExecutor, SweepRange, SweepRun
+Nodes (7): an_empty_table_says_so_rather_than_looking_like_a_failure(), SweepExecutor, SweepOutcome, SweepResultRow, SweepResults, SweepRun, the_table_is_ordered_by_quality_and_scaled_against_the_smallest_success()
 
-### Community 182 - "decide"
-Cohesion: 0.12
-Nodes (19): a_failure_is_worth_a_notification_wherever_the_window_is(), a_pause_always_says_why(), a_queue_that_finishes_where_you_can_see_it_is_not_a_notification(), an_empty_reason_becomes_a_sentence_rather_than_a_blank(), decide(), decide_with_focus(), Event, .ALL (+11 more)
+### Community 182 - "Event"
+Cohesion: 0.25
+Nodes (7): Event, .ALL, EncodeFailed, QueueFinished, QueuePaused, UpdateAvailable, UpdateCheckFailed
 
 ### Community 183 - "Backend"
-Cohesion: 0.40
-Nodes (5): about_view(), Backend, InProcess, Worker, build_backend()
+Cohesion: 0.15
+Nodes (12): Backend, InProcess, Worker, build_backend(), build_tray(), check_for_releases(), executable_dir(), main() (+4 more)
 
-### Community 184 - "AppearanceViewModel"
-Cohesion: 0.22
-Nodes (10): AppearanceViewModel, a_forced_theme_is_never_moved_by_a_report(), a_report_that_moves_no_colours_is_not_logged(), appearance_view(), observe_platform_theme(), record_system_theme(), report_locale(), report_system_theme() (+2 more)
+### Community 184 - ".apply"
+Cohesion: 0.14
+Nodes (10): a_format_this_build_does_not_read_is_refused_by_name(), a_title_without_markers_says_so_and_still_allows_adding_one(), a_valid_change_is_applied(), accepting_a_parsed_file_replaces_the_list_and_clears_the_candidate(), ChapterImportInput, ChapterSettings, MarkerInput, MarkerSettings (+2 more)
 
-### Community 185 - "pathbuf"
-Cohesion: 0.24
-Nodes (3): generate_source(), tool(), transcode_with_audio_processing()
+### Community 185 - "RangeMode"
+Cohesion: 0.13
+Nodes (12): a_selection_carries_the_source_label_the_picker_shows(), AngleViewModel, chapter_range_without_chapters_is_refused_with_a_reason(), format_duration(), mode_choices(), RangeMode, Chapters, PointToPoint (+4 more)
 
-### Community 186 - "TokenRejection"
-Cohesion: 0.28
-Nodes (4): rejection_messages_describe_the_route_and_header(), TokenRejection, Invalid, Missing
+### Community 186 - "supervisor.rs"
+Cohesion: 0.13
+Nodes (13): DEFAULT_HANDSHAKE_TIMEOUT, ENV_HANDSHAKE, ENV_PARENT_PID, ENV_PORT, ENV_TOKEN, Handshake, handshake_files_round_trip(), pipe_is_closed() (+5 more)
 
-### Community 187 - "TrackKind"
-Cohesion: 0.33
-Nodes (6): Packet, TrackKind, Audio, Data, Subtitle, Video
+### Community 187 - "AppSettings"
+Cohesion: 0.13
+Nodes (8): AppSettings, load_app_settings(), load_config(), named_string(), read_settings(), save_app_settings(), save_config(), SettingsStore
+
+### Community 188 - "localization.rs"
+Cohesion: 0.12
+Nodes (3): locale_from_environment(), the_locale_the_environment_names_is_the_one_the_window_opens_in(), the_right_to_left_language_is_a_shipped_one_and_it_is_mirrored()
 
 ### Community 189 - "output_and_chapters.rs"
-Cohesion: 0.15
+Cohesion: 0.10
 Nodes (9): edited_markers_become_a_second_input_that_is_cleaned_up(), encoder_options_reach_the_plan(), flag(), generate_source(), only_mp4_gets_the_front_loaded_index(), plan_for(), the_front_loaded_index_can_be_turned_off(), tool() (+1 more)
 
-### Community 190 - "Diagnostic Scan"
-Cohesion: 0.33
-Nodes (6): 1. Accessibility (A11y), 2. Performance, 3. Theming, 4. Responsive Design, 5. Implementation Integrity (CRITICAL), Diagnostic Scan
+### Community 190 - "IsolationPolicy"
+Cohesion: 0.15
+Nodes (6): a_threshold_of_one_stops_at_the_first_death(), CrashDecision, Backoff, Restart, CrashGuard, IsolationPolicy
 
 ### Community 191 - "system/power.rs"
-Cohesion: 0.26
-Nodes (16): SystemFacts, a_preference_that_asks_for_no_hold_wins_over_a_running_encode(), a_worker_holding_the_machine_is_the_answer_when_isolation_is_on(), Action, Hold, Release, StayPut, an_encode_in_this_window_takes_the_hold_it_asked_for() (+8 more)
+Cohesion: 0.25
+Nodes (17): SystemFacts, a_preference_that_asks_for_no_hold_wins_over_a_running_encode(), a_worker_holding_the_machine_is_the_answer_when_isolation_is_on(), Action, Hold, Release, StayPut, an_encode_in_this_window_takes_the_hold_it_asked_for() (+9 more)
 
 ### Community 192 - "AppcastError"
 Cohesion: 0.11
@@ -1002,40 +1023,40 @@ Cohesion: 0.14
 Nodes (13): button_id(), every_openable_surface_has_one_toolbar_control_and_the_alert_has_none(), every_surface_carries_the_focus_and_escape_rules_the_page_needs(), focus_returns_to_the_surface_that_was_in_front_before(), spec_of(), SurfaceCatalogViewModel, SurfaceKind, Dialog (+5 more)
 
 ### Community 194 - "JobState"
-Cohesion: 0.10
-Nodes (17): RecoveredItemKind, Cancelled, Failed, Finished, Interrupted, Waiting, is_runnable(), is_running() (+9 more)
+Cohesion: 0.14
+Nodes (13): state_label(), is_runnable(), is_running(), JobState, Cancelled, Completed, Failed, Paused (+5 more)
 
 ### Community 195 - "want_one_of"
 Cohesion: 0.18
 Nodes (12): read_log_level(), a_switch_reads_from_a_switch_and_nothing_else(), describe(), kind_of(), validate(), want_number(), want_one_of(), want_one_of_names() (+4 more)
 
 ### Community 196 - "synced"
-Cohesion: 0.20
-Nodes (14): a_job_moves_up_and_down_and_stops_at_the_ends(), a_new_job_joins_at_the_end_and_a_removed_one_is_forgotten(), a_priority_this_build_does_not_use_is_refused_by_name(), a_running_job_reports_its_progress_and_a_finished_one_does_not(), every_row_control_says_why_it_is_closed_or_confirms_first(), finished_jobs_are_the_ones_a_clear_takes(), job(), nothing_is_offered_to_cancel_when_the_encoder_is_idle() (+6 more)
+Cohesion: 0.29
+Nodes (10): a_job_moves_up_and_down_and_stops_at_the_ends(), a_new_job_joins_at_the_end_and_a_removed_one_is_forgotten(), a_priority_this_build_does_not_use_is_refused_by_name(), a_running_job_reports_its_progress_and_a_finished_one_does_not(), finished_jobs_are_the_ones_a_clear_takes(), job(), priority_moves_a_job_across_the_bands_without_reordering_the_rest(), synced() (+2 more)
 
-### Community 197 - "bolder.md"
-Cohesion: 0.33
-Nodes (5): Before you finish, Scope is sovereign, The amplification, The skeleton test, Why it reads flat
+### Community 197 - "MetadataSettings"
+Cohesion: 0.25
+Nodes (4): a_tag_can_be_added_edited_restored_and_removed(), MetadataSettings, the_attachment_switches_reach_the_job_options(), the_mode_and_the_summary_switch_are_one_setting()
 
 ### Community 198 - "TrayAction"
 Cohesion: 0.14
 Nodes (11): TrayAction, About, .ALL, CancelCurrent, CheckForUpdates, OpenQueue, PauseQueue, PreventSleep (+3 more)
 
-### Community 199 - "ScaleMode"
-Cohesion: 0.33
-Nodes (5): ScaleMode, Aspect, Exact, Fit, Keep
+### Community 199 - "PresetVersion"
+Cohesion: 0.17
+Nodes (10): a_codec_entry_is_migrated_and_an_unknown_one_is_refused(), declared_version(), migrate_preset_document(), PRESET_SCHEMA_VERSION, PRESET_UNVERSIONED, PresetMigration, PresetVersion, read_preset_document() (+2 more)
 
-### Community 200 - "WorkState"
-Cohesion: 0.33
-Nodes (5): WorkState, ScanDone, Unknown, WorkDone, Working
+### Community 200 - "super"
+Cohesion: 0.14
+Nodes (7): no_update_when_same(), ReleaseInfo, update_available_when_latest_newer(), UpdateManifest, version_less_than(), VISE_VERSION, ALPHABET
 
 ### Community 201 - "CurlSource"
 Cohesion: 0.17
 Nodes (8): no_source_reason(), a_fetch_of_something_that_is_not_an_https_address_does_not_run_at_all(), check(), CurlSource, is_allowed_url(), one_line(), the_fetch_is_an_argument_vector_and_the_url_is_only_one_of_the_arguments(), which()
 
-### Community 202 - "PresetAction"
-Cohesion: 0.15
-Nodes (11): action_word(), PresetAction, Apply, ClearDefault, Clone, Create, Delete, Edit (+3 more)
+### Community 202 - "client.rs"
+Cohesion: 0.14
+Nodes (5): a_worker_that_closes_without_replying_counts_as_gone(), builds_loopback_addresses_only(), DEFAULT_TIMEOUT, rejects_unreachable_workers_without_panicking(), serialises_command_bodies()
 
 ### Community 203 - "Bundled media tooling"
 Cohesion: 0.33
@@ -1053,45 +1074,45 @@ Nodes (12): Ct(), Et(), It(), J(), ne(), Se(), St(), _t() (+4 more)
 Cohesion: 0.20
 Nodes (7): CheckOutcome, Available, Failed, NotConfigured, UpToDate, every_outcome_says_what_happened_in_one_line(), what_a_check_found_is_summarised_in_one_line_without_installing_anything()
 
-### Community 207 - "Adaptation Strategies"
-Cohesion: 0.40
-Nodes (5): Adaptation Strategies, Orientation & foldables, Phone → Tablet (iPad / large screens), Platform → platform (iOS ↔ Android), Web → native (porting a website or web app)
+### Community 207 - "TagMode"
+Cohesion: 0.13
+Nodes (8): TagMode, Copy, Edit, None, MetadataMode, Copy, Edit, None
 
 ### Community 208 - "ScanPhase"
 Cohesion: 0.20
 Nodes (6): phase_of(), ScanPhase, Failed, Idle, Ready, Scanning
 
-### Community 209 - "SweepState"
-Cohesion: 0.33
-Nodes (5): SweepState, Cancelled, Finished, Idle, Running
+### Community 209 - "SweepProgress"
+Cohesion: 0.18
+Nodes (8): SweepRowViewModel, SweepViewModel, SweepProgress, SweepState, Cancelled, Finished, Idle, Running
 
-### Community 210 - "Impeccable Documenter"
-Cohesion: 0.40
-Nodes (4): Impeccable Documenter, Input Contract, Output Contract, Workflow
+### Community 210 - "SweepPlan"
+Cohesion: 0.16
+Nodes (3): SWEEP_FOLDER, SweepPlan, SweepRange
 
-### Community 211 - "CropMode"
-Cohesion: 0.40
-Nodes (4): CropMode, AspectRatio, Manual, None
+### Community 211 - "ChapterProcessingOptions"
+Cohesion: 0.25
+Nodes (4): build_chapter_filter(), build_chapter_filter_chain(), build_chapters(), ChapterProcessingOptions
 
-### Community 212 - "Persuade and Experience"
-Cohesion: 0.50
-Nodes (3): Comps, Directions, Persuade and Experience
+### Community 212 - "path"
+Cohesion: 0.23
+Nodes (11): a_destination_with_no_partials_sweeps_clean(), a_folder_that_cannot_be_listed_leaves_nothing_behind(), a_partial_sits_next_to_the_destination_and_names_its_writer(), MARKER, partial_output_path(), partial_output_path_for(), partial_outputs_for(), PartialCleanup (+3 more)
 
-### Community 213 - "Read"
-Cohesion: 0.50
-Nodes (3): Comps, Directions, Read
+### Community 213 - "PresetCategory"
+Cohesion: 0.14
+Nodes (10): CATEGORIES, category_counts(), PresetCategory, Devices, General, Hardware, Matroska, Professional (+2 more)
 
 ### Community 214 - "media_depth.rs"
-Cohesion: 0.36
+Cohesion: 0.28
 Nodes (10): a_lossless_job_never_hands_the_encoder_a_rate_control_value(), a_real_lossless_ffv1_flac_mkv_is_produced(), an_mp4_faststart_flag_is_not_written_into_other_containers(), deblock_is_applied_when_the_job_asks_for_it(), dolby_vision_and_hdr10_plus_arguments_follow_the_capable_encoder(), generate_source(), lossless_spec(), mp4_faststart_and_ipod_profile_are_applied() (+2 more)
 
 ### Community 215 - "qt"
 Cohesion: 0.27
 Nodes (10): de(), Ie(), Lt(), Mt(), oe(), Ot(), qt(), Re() (+2 more)
 
-### Community 216 - "begin_scan_with"
-Cohesion: 0.36
-Nodes (7): begin_scan(), begin_scan_with(), scan_options_build_the_worker_command(), scan_options_default_to_no_previews_and_no_limits(), scan_status(), ScanOptions, ScanStatusViewModel
+### Community 216 - "WorkerConfig"
+Cohesion: 0.21
+Nodes (6): refuses_to_start_when_isolation_is_disabled(), reports_a_missing_worker_executable(), shutdown_is_a_no_op_without_a_worker(), starting_twice_reuses_the_running_worker(), temp_dir(), WorkerConfig
 
 ### Community 217 - "PreferenceTabViewModel"
 Cohesion: 0.20
@@ -1105,17 +1126,17 @@ Nodes (7): SourceError, Empty, InvalidCharacter, NotASource, NotFound, RelativeM
 Cohesion: 0.20
 Nodes (8): HardwareFamily, .ALL, MediaFoundation, Nvenc, Qsv, Software, Vcn, VideoToolbox
 
-### Community 220 - "Command guidance"
-Cohesion: 0.50
-Nodes (3): Command guidance, No-argument routing: the context-aware menu, Workflow questions
+### Community 220 - "ChapterFormat"
+Cohesion: 0.18
+Nodes (8): ChapterFormat, Csv, Txt, Xml, ChapterMode, Copy, Edit, None
 
 ### Community 221 - "PresetSpec"
-Cohesion: 0.13
-Nodes (16): SubtitleMode, BurnIn, None, Passthrough, apply(), apply_encoder_settings(), apply_preset(), apply_rate_control() (+8 more)
+Cohesion: 0.12
+Nodes (17): SubtitleMode, BurnIn, None, Passthrough, apply(), apply_encoder_settings(), apply_preset(), apply_rate_control() (+9 more)
 
-### Community 222 - "PreviewViewModel"
-Cohesion: 0.36
-Nodes (10): fetch_preview_still(), point_preview_at_title(), preview_view(), preview_window(), reset_preview_crop(), select_preview_still(), set_preview_crop(), set_preview_still_count() (+2 more)
+### Community 222 - "roadmap.rs"
+Cohesion: 0.44
+Nodes (9): a_group_marked_complete_has_nothing_left_unchecked(), Counts, every_group_states_the_counts_its_own_checkboxes_add_up_to(), parse(), roadmap(), row_group(), stated_counts(), the_checker_itself_reads_a_roadmap_it_wrote() (+1 more)
 
 ### Community 223 - "AppcastItem"
 Cohesion: 0.27
@@ -1123,43 +1144,79 @@ Nodes (8): an_artifact_that_does_not_match_the_hash_is_not_offered(), Appcast, A
 
 ### Community 224 - "fetch-media-tools.sh"
 Cohesion: 0.83
-Nodes (3): host_platform(), read_lock(), fetch-media-tools.sh script
+Nodes (3): host_platform(), read_platform(), fetch-media-tools.sh script
 
 ### Community 225 - "ContainerFormat"
-Cohesion: 0.17
-Nodes (15): container_of(), container_label(), a_request_that_asks_for_nothing_is_supported_everywhere(), AttachmentDecision, matroska_carries_both_cover_art_and_attachments(), mp4_carries_cover_art_but_not_attachments(), resolve(), webm_carries_neither_and_says_so() (+7 more)
+Cohesion: 0.15
+Nodes (17): container_of(), container_label(), a_request_that_asks_for_nothing_is_supported_everywhere(), AttachmentDecision, matroska_carries_both_cover_art_and_attachments(), mp4_carries_cover_art_but_not_attachments(), resolve(), webm_carries_neither_and_says_so() (+9 more)
 
-### Community 227 - "PresetView"
-Cohesion: 0.36
-Nodes (5): CatalogViewModel, PresetActionViewModel, PresetCategoryViewModel, PresetView, PresetViewModel
+### Community 227 - "MessageSource"
+Cohesion: 0.20
+Nodes (7): an_incomplete_locale_falls_back_and_says_so(), Gap, MessageSource, Base, BaseLanguage, Label, Locale
 
 ### Community 228 - "Milestones"
 Cohesion: 0.25
 Nodes (8): Milestone 1 - First usable transcoder, Milestone 2 - CLI and batch workflows, Milestone 3 - Editing and fidelity parity, Milestone 4 - Performance and platform parity, Milestone 5 - Reference-product parity, Milestone 6 - Desktop polish and operations, Milestone 7 - Media depth, Milestones
 
-### Community 231 - "FlipMode"
+### Community 230 - "Operate mode depth (and Read notes)"
+Cohesion: 0.22
+Nodes (9): Color, Components, Layout, Motion, Operate mode depth (and Read notes), Product constraints, Product permissions, The product slop test (+1 more)
+
+### Community 231 - "ChapterHandling"
+Cohesion: 0.31
+Nodes (5): ChapterHandling, Copy, Edit, None, ChaptersInput
+
+### Community 232 - "NotifyScope"
 Cohesion: 0.25
-Nodes (6): to_job_geometry_orientation(), FlipMode, Both, Horizontal, None, Vertical
+Nodes (4): NotifyScope, All, FailuresOnly, Never
+
+### Community 233 - "RecoveredItemKind"
+Cohesion: 0.25
+Nodes (6): RecoveredItemKind, Cancelled, Failed, Finished, Interrupted, Waiting
+
+### Community 235 - "TextViewModel"
+Cohesion: 0.29
+Nodes (3): TextViewModel, closed_text(), invalid_text()
+
+### Community 237 - "TagOrigin"
+Cohesion: 0.33
+Nodes (5): TagEntry, TagOrigin, Edited, Removed, Source
+
+### Community 238 - "Tone"
+Cohesion: 0.40
+Nodes (4): Tone, Attention, Failure, Information
+
+### Community 240 - "build-linux.sh"
+Cohesion: 0.50
+Nodes (3): MSYS2_ARG_CONV_EXCL, MSYS_NO_PATHCONV, build-linux.sh script
+
+### Community 241 - "check-linux.sh"
+Cohesion: 0.50
+Nodes (3): CARGO_TARGET_DIR, PATH, check-linux.sh script
+
+### Community 242 - "check-linux-package.sh"
+Cohesion: 0.83
+Nodes (3): fail(), note(), check-linux-package.sh script
 
 ## Knowledge Gaps
-- **550 isolated node(s):** `System`, `Light`, `Dark`, `Light`, `Dark` (+545 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1974 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **17 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **566 isolated node(s):** `System`, `Light`, `Dark`, `Light`, `Dark` (+561 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 2022 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **19 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `JobSpec` connect `JobSpec` to `encode.rs`, `VideoCodec`, `SharedState`, `src-tauri/src/main.rs`, `actions.rs`, `queue.rs`, `HardwareCapabilities`, `deserialize`, `MetadataProcessingOptions`, `serialize`, `diskspace.rs`, `TitleFacts`, `windows/diagnostics.rs`, `Session`, `validation.rs`, `CoreError`, `pipeline.rs`, `persistence.rs`, `Job`, `DesktopState`, `tabs/mod.rs`, `sweep.rs`, `chapter.rs`, `results.rs`, `vise-core/src/lib.rs`, `VideoProcessingOptions`, `AudioCodec`, `SweepExecutor`, `media_depth.rs`, `PresetSpec`, `ContainerFormat`, `contract.rs`, `hdr.rs`?**
-  _High betweenness centrality (0.032) - this node is a cross-community bridge._
+- **Why does `JobSpec` connect `JobSpec` to `encode.rs`, `VideoCodec`, `push_log`, `src-tauri/src/main.rs`, `actions.rs`, `ValidationReport`, `queue.rs`, `HardwareApi`, `serialize`, `MetadataProcessingOptions`, `AudioProcessingOptions`, `SharedState`, `diskspace.rs`, `TitleFacts`, `windows/diagnostics.rs`, `Session`, `ScanResult`, `CoreError`, `pipeline.rs`, `persistence.rs`, `Job`, `tabs/mod.rs`, `sweep.rs`, `vise-core/src/lib.rs`, `results.rs`, `VideoProcessingOptions`, `AudioCodec`, `SweepExecutor`, `ChapterProcessingOptions`, `validation.rs`, `media_depth.rs`, `PresetSpec`, `ContainerFormat`, `contract.rs`, `capability.rs`?**
+  _High betweenness centrality (0.053) - this node is a cross-community bridge._
 - **What connects `System`, `Light`, `Dark` to the rest of the system?**
-  _550 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _566 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `live-browser.js` be split into smaller, more focused modules?**
   _Cohesion score 0.027676548803309366 - nodes in this community are weakly interconnected._
-- **Why does `MessageKey` connect `MessageKey` to `i18n.rs`, `SystemTheme`, `appearance.rs`, `Catalog`, `ops.rs`?**
-  _High betweenness centrality (0.026) - this node is a cross-community bridge._
+- **Why does `MessageKey` connect `MessageKey` to `MessageSource`, `i18n.rs`, `SystemTheme`, `appearance.rs`, `Catalog`, `pathbuf`?**
+  _High betweenness centrality (0.019) - this node is a cross-community bridge._
 - **Should `initPageChat` be split into smaller, more focused modules?**
   _Cohesion score 0.08880666049953746 - nodes in this community are weakly interconnected._
-- **Why does `init()` connect `initGlobalBar` to `live-browser.js`, `onAnnotDown`, `handleKeyDown`, `Init flow`, `initPageChat`, `connectSSE`, `handleManualEditActivity`, `SKILL.md`, `live.md`?**
-  _High betweenness centrality (0.021) - this node is a cross-community bridge._
+- **Why does `init()` connect `initGlobalBar` to `live-browser.js`, `SKILL.md`, `onAnnotDown`, `handleKeyDown`, `Init flow`, `initPageChat`, `connectSSE`, `handleManualEditActivity`, `new-work.md`, `live.md`?**
+  _High betweenness centrality (0.019) - this node is a cross-community bridge._
 - **Should `src-tauri/src/main.rs` be split into smaller, more focused modules?**
-  _Cohesion score 0.029696969696969697 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.028910891089108912 - nodes in this community are weakly interconnected._

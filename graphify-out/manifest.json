@@ -72,9 +72,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/Cargo.toml": {
-    "mtime": 1792324395.6673834,
-    "seen": 1792324751.0058284,
-    "ast_hash": "50d358fde675055553931711ed7a568f",
+    "mtime": 1792417956.249303,
+    "seen": 1792428297.4469717,
+    "ast_hash": "267f67c49e418938d2b01d29ff3c8764",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/build.rs": {
@@ -96,8 +96,8 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/gen/schemas/desktop-schema.json": {
-    "mtime": 1792220237.4375277,
-    "seen": 1792316628.1665075,
+    "mtime": 1792396656.7064788,
+    "seen": 1792428297.4473977,
     "ast_hash": "a3a32061a4992819efadf828ae12c84a",
     "semantic_hash": ""
   },
@@ -108,15 +108,15 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/main.rs": {
-    "mtime": 1792321854.909415,
-    "seen": 1792324751.007403,
-    "ast_hash": "e72926ad9e5c074dc1957ab3319155ba",
+    "mtime": 1792424016.5468147,
+    "seen": 1792428297.4479501,
+    "ast_hash": "1ca4e355a27f51ae93ab0b7c4529a937",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/tauri.conf.json": {
-    "mtime": 1792324434.0759244,
-    "seen": 1792324751.0176125,
-    "ast_hash": "6cb32c9799710dcad2a90a969544aaa2",
+    "mtime": 1792417972.013349,
+    "seen": 1792428297.4521158,
+    "ast_hash": "d3e8570e1968b7d440054f142fc4c80f",
     "semantic_hash": ""
   },
   "crates/vise-cli/Cargo.toml": {
@@ -186,9 +186,9 @@
     "semantic_hash": ""
   },
   "crates/vise-core/src/hardware.rs": {
-    "mtime": 1792247048.0270562,
-    "seen": 1792316628.167567,
-    "ast_hash": "b537a7a0223fc3d45346ff46612faf09",
+    "mtime": 1792424016.5582528,
+    "seen": 1792428297.4560668,
+    "ast_hash": "fbded9aec1282220f9860767be77a420",
     "semantic_hash": ""
   },
   "crates/vise-core/src/job.rs": {
@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   "docs/ROADMAP.md": {
-    "mtime": 1792324706.9570386,
-    "seen": 1792324751.0691712,
-    "ast_hash": "92191c85c07dc0fa981f3771267235fe",
+    "mtime": 1792428192.426028,
+    "seen": 1792428297.472378,
+    "ast_hash": "76ec0621c538fcf1d3bcb8ed682dc469",
     "semantic_hash": ""
   },
   "docs/release-notes-template.md": {
@@ -672,9 +672,9 @@
     "semantic_hash": ""
   },
   "crates/vise-ipc/src/contract.rs": {
-    "mtime": 1792321854.914713,
-    "seen": 1792324751.0370715,
-    "ast_hash": "36d6a63717ddb239f6fc507160cc74f4",
+    "mtime": 1792327378.1347117,
+    "seen": 1792428297.4612317,
+    "ast_hash": "8915c40db55deccbe945c90311d018a4",
     "semantic_hash": ""
   },
   "crates/vise-ipc/src/http.rs": {
@@ -684,15 +684,15 @@
     "semantic_hash": ""
   },
   "crates/vise-ipc/src/lib.rs": {
-    "mtime": 1792321854.916219,
-    "seen": 1792324751.0375063,
-    "ast_hash": "c69945521d72034e0f39366afaee5d50",
+    "mtime": 1792327378.1381035,
+    "seen": 1792428297.461503,
+    "ast_hash": "5af91d6ca1a65c2ff5b14e7930b242ee",
     "semantic_hash": ""
   },
   "crates/vise-ipc/src/portable.rs": {
-    "mtime": 1792316593.685216,
-    "seen": 1792316628.1685405,
-    "ast_hash": "02913f2a56d9b0c3e17b3a5371d9b9af",
+    "mtime": 1792424016.5635607,
+    "seen": 1792428297.461633,
+    "ast_hash": "908293206a7828c24764350fffd1edb1",
     "semantic_hash": ""
   },
   "crates/vise-ipc/src/route.rs": {
@@ -702,9 +702,9 @@
     "semantic_hash": ""
   },
   "crates/vise-ipc/src/supervisor.rs": {
-    "mtime": 1792321854.9197876,
-    "seen": 1792324751.0384212,
-    "ast_hash": "12b8d0c58b499689e1ffffee2274b1c6",
+    "mtime": 1792327378.1406379,
+    "seen": 1792428297.4618816,
+    "ast_hash": "02e6a74317ba8bdfe3f3e885122599b6",
     "semantic_hash": ""
   },
   "crates/vise-ipc/src/timespan.rs": {
@@ -720,9 +720,9 @@
     "semantic_hash": ""
   },
   "crates/vise-ipc/src/validation.rs": {
-    "mtime": 1792321854.922302,
-    "seen": 1792324751.03896,
-    "ast_hash": "69f1444c6c67ab9c652a93fe25a49d82",
+    "mtime": 1792327378.143157,
+    "seen": 1792428297.4621336,
+    "ast_hash": "ce6384f88e638a11b908b8f70c87b12a",
     "semantic_hash": ""
   },
   "crates/vise-worker/Cargo.toml": {
@@ -732,15 +732,15 @@
     "semantic_hash": ""
   },
   "crates/vise-worker/src/encode.rs": {
-    "mtime": 1792321854.9243033,
-    "seen": 1792324751.0392003,
-    "ast_hash": "417fcc013660fbd5c9acc82e9102e69a",
+    "mtime": 1792424016.5635607,
+    "seen": 1792428297.4622638,
+    "ast_hash": "5e3d3d102f72dffce51c6656ac02feec",
     "semantic_hash": ""
   },
   "crates/vise-worker/src/lib.rs": {
-    "mtime": 1792175363.784356,
-    "seen": 1792316628.1685596,
-    "ast_hash": "a8dfc45be03d1c0fed20819da63b25b9",
+    "mtime": 1792424016.5650852,
+    "seen": 1792428297.4622674,
+    "ast_hash": "26ead419507aba87634a4f60a6502e9f",
     "semantic_hash": ""
   },
   "crates/vise-worker/src/log.rs": {
@@ -762,9 +762,9 @@
     "semantic_hash": ""
   },
   "crates/vise-worker/src/router.rs": {
-    "mtime": 1792321854.9253545,
-    "seen": 1792324751.0401263,
-    "ast_hash": "520b1e2525f7991b1b6e9a93cde456af",
+    "mtime": 1792327378.14629,
+    "seen": 1792428297.462837,
+    "ast_hash": "39a36a8043017dba6e34ed02b34bee3e",
     "semantic_hash": ""
   },
   "crates/vise-worker/src/runtime.rs": {
@@ -786,9 +786,9 @@
     "semantic_hash": ""
   },
   "crates/vise-worker/tests/worker_api.rs": {
-    "mtime": 1792321854.9268537,
-    "seen": 1792324751.0407703,
-    "ast_hash": "e4c7c8cf4f56bb3165ff1c5be0cc0ec4",
+    "mtime": 1792424016.566596,
+    "seen": 1792428297.4633636,
+    "ast_hash": "a64ff87ddc4992d6831d3852f0585f08",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/appearance.rs": {
@@ -852,15 +852,15 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/sources.rs": {
-    "mtime": 1792180724.371953,
-    "seen": 1792316628.1665292,
-    "ast_hash": "c004d42867f16f396b160603df9d6449",
+    "mtime": 1792424016.5483272,
+    "seen": 1792428297.4490879,
+    "ast_hash": "5fcde3dd18602b151f178e77a7efe897",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/system/actions.rs": {
-    "mtime": 1792251031.7928884,
-    "seen": 1792316628.166531,
-    "ast_hash": "c1042ec8f598d90daf6f31db4e71d28e",
+    "mtime": 1792424016.549364,
+    "seen": 1792428297.4490902,
+    "ast_hash": "65a1bb203acd288e303a51c6125b4368",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/system/bundle.rs": {
@@ -870,9 +870,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/system/diskspace.rs": {
-    "mtime": 1792251031.7954106,
-    "seen": 1792316628.1665337,
-    "ast_hash": "21d39f17ec0ae77563adfaa617779b18",
+    "mtime": 1792424016.5508726,
+    "seen": 1792428297.4492214,
+    "ast_hash": "65a7cd3819b768dd52ec752b7bc721a4",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/system/mod.rs": {
@@ -882,9 +882,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/system/notify.rs": {
-    "mtime": 1792251031.7974098,
-    "seen": 1792316628.166536,
-    "ast_hash": "8c0c67a8ef2456bd786b7085853cbbf4",
+    "mtime": 1792424016.5513756,
+    "seen": 1792428297.4493492,
+    "ast_hash": "8be6cc1493d33d1609cdf52ccf2e6a75",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/system/persistence.rs": {
@@ -900,9 +900,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/system/results.rs": {
-    "mtime": 1792316593.647437,
-    "seen": 1792316628.1665409,
-    "ast_hash": "230f5202b92a4399d2a7e51e49a1cdc1",
+    "mtime": 1792424016.5528855,
+    "seen": 1792428297.449608,
+    "ast_hash": "49d5b22c5dc09925a27286e0cac0c078",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/system/tray.rs": {
@@ -966,9 +966,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/tabs/source.rs": {
-    "mtime": 1792321854.9117043,
-    "seen": 1792324751.014479,
-    "ast_hash": "2aecadc61aa585198cf27009ea40bb7a",
+    "mtime": 1792327378.1331913,
+    "seen": 1792428297.4509325,
+    "ast_hash": "0f3027a883c322df3cf03565a702dff9",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/tabs/subtitles.rs": {
@@ -996,9 +996,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/windows/diagnostics.rs": {
-    "mtime": 1792316593.6497245,
-    "seen": 1792316628.1665654,
-    "ast_hash": "cfb686396a9c5f9542acecfd4dd8db4f",
+    "mtime": 1792424016.5544205,
+    "seen": 1792428297.4514706,
+    "ast_hash": "90a39552e68bd579443f790f524da299",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/windows/dialogs.rs": {
@@ -1020,9 +1020,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/windows/presets.rs": {
-    "mtime": 1792275245.8737922,
-    "seen": 1792316628.1665766,
-    "ast_hash": "9a67257c8e9ea3d0eb41e31fdd3497d0",
+    "mtime": 1792424016.5556774,
+    "seen": 1792428297.4518604,
+    "ast_hash": "3b125f8633a3f9351c42f0d6806075a2",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/windows/preview.rs": {
@@ -1122,15 +1122,15 @@
     "semantic_hash": ""
   },
   "crates/vise-core/src/capability.rs": {
-    "mtime": 1792316593.6694274,
-    "seen": 1792316628.1672964,
-    "ast_hash": "aa0b8d9b6ecf0b4f4f89800842631633",
+    "mtime": 1792424016.5567627,
+    "seen": 1792428297.4556808,
+    "ast_hash": "dc3dd3f8a00b7ede25f6d8a465130471",
     "semantic_hash": ""
   },
   "crates/vise-core/src/catalog.rs": {
-    "mtime": 1792275245.896564,
-    "seen": 1792316628.167298,
-    "ast_hash": "1e3cf61ae7955c2921a442f83702a9d9",
+    "mtime": 1792424016.5572479,
+    "seen": 1792428297.4556842,
+    "ast_hash": "7ea8ad26e87947a170f214ee5143019e",
     "semantic_hash": ""
   },
   "crates/vise-core/src/hdr.rs": {
@@ -1158,9 +1158,9 @@
     "semantic_hash": ""
   },
   "crates/vise-core/tests/diagnostics.rs": {
-    "mtime": 1792316593.6750534,
-    "seen": 1792316628.1678078,
-    "ast_hash": "88324a627626c73545a12269e238abc4",
+    "mtime": 1792424016.5599203,
+    "seen": 1792428297.4592516,
+    "ast_hash": "d006bfde912089410b3f7e8d60a1f7aa",
     "semantic_hash": ""
   },
   "crates/vise-core/tests/localization.rs": {
@@ -1176,15 +1176,15 @@
     "semantic_hash": ""
   },
   "crates/vise-core/tests/output_and_chapters.rs": {
-    "mtime": 1792185295.8507547,
-    "seen": 1792316628.168245,
-    "ast_hash": "6aa332f3aa9e07139aab62c8a572d6b6",
+    "mtime": 1792424016.5609243,
+    "seen": 1792428297.4599137,
+    "ast_hash": "3866d6255b45177f8a55810591c8084c",
     "semantic_hash": ""
   },
   "crates/vise-core/tests/preset_catalog.rs": {
-    "mtime": 1792247048.0320559,
-    "seen": 1792316628.1682487,
-    "ast_hash": "54fa8303285a5f167898c7620ceea345",
+    "mtime": 1792424016.561981,
+    "seen": 1792428297.4599166,
+    "ast_hash": "a03b515ef11864da9014766982cad9bd",
     "semantic_hash": ""
   },
   "crates/vise-core/tests/settings_versioning.rs": {
@@ -1212,39 +1212,141 @@
     "semantic_hash": ""
   },
   "crates/vise-core/src/tooling.rs": {
-    "mtime": 1792323559.2990837,
-    "seen": 1792324751.032793,
-    "ast_hash": "8d8302d654468d92268fb9dbe36d3fc4",
+    "mtime": 1792424016.5592582,
+    "seen": 1792428297.4588978,
+    "ast_hash": "34cf87f21e03c38c846c9d3fb2bce818",
     "semantic_hash": ""
   },
   "media-tools.json": {
-    "mtime": 1792323559.3051155,
-    "seen": 1792324751.040775,
-    "ast_hash": "d20ce7bf9033025071a7711f6b2cfa88",
+    "mtime": 1792419773.1774368,
+    "seen": 1792428297.463368,
+    "ast_hash": "d7d31af90bb8e8a54384e47f39d45dc6",
     "semantic_hash": ""
   },
   "scripts/build-release.sh": {
-    "mtime": 1792324434.077445,
-    "seen": 1792324751.0407782,
-    "ast_hash": "34b5330d9c156bbe7d3fedd3e31ca4ca",
+    "mtime": 1792417972.0176127,
+    "seen": 1792428297.463373,
+    "ast_hash": "0fcc02edaa29f62194df30dbc665a88e",
     "semantic_hash": ""
   },
   "scripts/fetch-media-tools.sh": {
-    "mtime": 1792324434.0784972,
-    "seen": 1792324751.0407813,
-    "ast_hash": "4d5529b95460b082dc43456e01921904",
+    "mtime": 1792419773.1799703,
+    "seen": 1792428297.4633958,
+    "ast_hash": "7fd60652518355105e235b34f073cfa1",
     "semantic_hash": ""
   },
   "scripts/verify-media-tools.sh": {
-    "mtime": 1792323559.3086956,
-    "seen": 1792324751.0407836,
-    "ast_hash": "2a8155ffa11794e72480bc754bffe491",
+    "mtime": 1792419773.1809762,
+    "seen": 1792428297.4634013,
+    "ast_hash": "6eaf11f236ff059629c05eb5a2fcba64",
     "semantic_hash": ""
   },
   "docs/media-tooling.md": {
     "mtime": 1792323559.3021004,
     "seen": 1792324751.0706515,
     "ast_hash": "d40750ef6a9472500fed8f5d505bf441",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/src-tauri/gen/schemas/linux-schema.json": {
+    "mtime": 1792424016.544779,
+    "seen": 1792428297.4473999,
+    "ast_hash": "a3a32061a4992819efadf828ae12c84a",
+    "semantic_hash": ""
+  },
+  "crates/vise-core/tests/roadmap.rs": {
+    "mtime": 1792327378.1337075,
+    "seen": 1792428297.4600866,
+    "ast_hash": "c7f09b2eda635f5f75ea5eebd3815efa",
+    "semantic_hash": ""
+  },
+  "crates/vise-ipc/src/crash.rs": {
+    "mtime": 1792327378.1360197,
+    "seen": 1792428297.4612346,
+    "ast_hash": "ab54aa905d4617688aebe75ec009cc6e",
+    "semantic_hash": ""
+  },
+  "crates/vise-ipc/src/partial.rs": {
+    "mtime": 1792327378.1391132,
+    "seen": 1792428297.46163,
+    "ast_hash": "9438f01e6745988fe45a60388a7f4f4c",
+    "semantic_hash": ""
+  },
+  "scripts/build-linux.sh": {
+    "mtime": 1792424016.5676012,
+    "seen": 1792428297.4633706,
+    "ast_hash": "0934c739e5afab415670c02232064ee7",
+    "semantic_hash": ""
+  },
+  "scripts/check-linux-layout.sh": {
+    "mtime": 1792417972.0176127,
+    "seen": 1792428297.4633753,
+    "ast_hash": "11067f3e50816651d1842779c111dc93",
+    "semantic_hash": ""
+  },
+  "scripts/check-linux-package.sh": {
+    "mtime": 1792417972.019184,
+    "seen": 1792428297.463378,
+    "ast_hash": "7f3f90d6b1720b7fe41068b9a1636cd1",
+    "semantic_hash": ""
+  },
+  "scripts/check-linux.sh": {
+    "mtime": 1792428192.4275448,
+    "seen": 1792428297.4633915,
+    "ast_hash": "8d3f15888478fa77600057a83c0769ea",
+    "semantic_hash": ""
+  },
+  "scripts/fetch-macos-digests.sh": {
+    "mtime": 1792419773.1794546,
+    "seen": 1792428297.4633937,
+    "ast_hash": "e55cb21f45c161f9e149f521f17e95cf",
+    "semantic_hash": ""
+  },
+  "scripts/make-icon.py": {
+    "mtime": 1792417972.0217795,
+    "seen": 1792428297.4633987,
+    "ast_hash": "0cba4ff4d43bdd92c17fa93d7685f696",
+    "semantic_hash": ""
+  },
+  ".github/workflows/release.yml": {
+    "mtime": 1792428192.4254897,
+    "seen": 1792428297.4711108,
+    "ast_hash": "de8a20dd76e49faebf178cdbdd327349",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/src-tauri/icons/128x128.png": {
+    "mtime": 1792417972.0067384,
+    "seen": 1792428297.473271,
+    "ast_hash": "17e7d188c0bc284ddae4d05cc2e9fa78",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/src-tauri/icons/256x256.png": {
+    "mtime": 1792417972.0067384,
+    "seen": 1792428297.4732735,
+    "ast_hash": "7a8d965926f70b4678a295a58f3afce4",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/src-tauri/icons/32x32.png": {
+    "mtime": 1792417972.0086586,
+    "seen": 1792428297.4732754,
+    "ast_hash": "b306560291ac11f3b21f17e8d4df37cc",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/src-tauri/icons/512x512.png": {
+    "mtime": 1792417972.0086586,
+    "seen": 1792428297.4732769,
+    "ast_hash": "1432d004743355fee25b3d038c5f9f80",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/src-tauri/icons/64x64.png": {
+    "mtime": 1792417972.0101683,
+    "seen": 1792428297.4732785,
+    "ast_hash": "373aeb62b2aadc514e9e847f95a93979",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/src-tauri/icons/icon.png": {
+    "mtime": 1792417972.0106802,
+    "seen": 1792428297.47328,
+    "ast_hash": "1432d004743355fee25b3d038c5f9f80",
     "semantic_hash": ""
   }
 }
