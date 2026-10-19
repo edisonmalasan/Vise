@@ -72,15 +72,15 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/Cargo.toml": {
-    "mtime": 1792417956.249303,
-    "seen": 1792428297.4469717,
+    "mtime": 1792436212.4714403,
+    "seen": 1792439397.2326155,
     "ast_hash": "267f67c49e418938d2b01d29ff3c8764",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/build.rs": {
-    "mtime": 1792091381.1677668,
-    "seen": 1792098136.5664396,
-    "ast_hash": "667702979da61fdc96948886b7cd7a33",
+    "mtime": 1792430692.4683645,
+    "seen": 1792439397.2326198,
+    "ast_hash": "0cfdf2668debc74996b32bd63b385776",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/gen/schemas/acl-manifests.json": {
@@ -114,9 +114,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/tauri.conf.json": {
-    "mtime": 1792417972.013349,
-    "seen": 1792428297.4521158,
-    "ast_hash": "d3e8570e1968b7d440054f142fc4c80f",
+    "mtime": 1792429449.9993737,
+    "seen": 1792439397.2399228,
+    "ast_hash": "83600ce34359c34b240399c7b9907e9f",
     "semantic_hash": ""
   },
   "crates/vise-cli/Cargo.toml": {
@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   "docs/ROADMAP.md": {
-    "mtime": 1792428192.426028,
-    "seen": 1792428297.472378,
-    "ast_hash": "76ec0621c538fcf1d3bcb8ed682dc469",
+    "mtime": 1792439374.835658,
+    "seen": 1792439397.2681675,
+    "ast_hash": "f2526b052089a051db52fc149966f71c",
     "semantic_hash": ""
   },
   "docs/release-notes-template.md": {
@@ -1170,9 +1170,9 @@
     "semantic_hash": ""
   },
   "crates/vise-core/tests/media_depth.rs": {
-    "mtime": 1792313182.0225081,
-    "seen": 1792316628.168033,
-    "ast_hash": "4faab93f5fe64136db9312ed140b9aa8",
+    "mtime": 1792432197.915843,
+    "seen": 1792439397.2491674,
+    "ast_hash": "7f833bd93df12779f3dd8e0704dfa280",
     "semantic_hash": ""
   },
   "crates/vise-core/tests/output_and_chapters.rs": {
@@ -1218,26 +1218,26 @@
     "semantic_hash": ""
   },
   "media-tools.json": {
-    "mtime": 1792419773.1774368,
-    "seen": 1792428297.463368,
-    "ast_hash": "d7d31af90bb8e8a54384e47f39d45dc6",
+    "mtime": 1792436198.8847773,
+    "seen": 1792439397.2569244,
+    "ast_hash": "a434798b6a0e50e573f31ba29110bdd3",
     "semantic_hash": ""
   },
   "scripts/build-release.sh": {
-    "mtime": 1792417972.0176127,
-    "seen": 1792428297.463373,
+    "mtime": 1792433252.6253712,
+    "seen": 1792439397.2569323,
     "ast_hash": "0fcc02edaa29f62194df30dbc665a88e",
     "semantic_hash": ""
   },
   "scripts/fetch-media-tools.sh": {
-    "mtime": 1792419773.1799703,
-    "seen": 1792428297.4633958,
+    "mtime": 1792433252.6330454,
+    "seen": 1792439397.2569473,
     "ast_hash": "7fd60652518355105e235b34f073cfa1",
     "semantic_hash": ""
   },
   "scripts/verify-media-tools.sh": {
-    "mtime": 1792419773.1809762,
-    "seen": 1792428297.4634013,
+    "mtime": 1792433252.6335547,
+    "seen": 1792439397.2571397,
     "ast_hash": "6eaf11f236ff059629c05eb5a2fcba64",
     "semantic_hash": ""
   },
@@ -1272,32 +1272,32 @@
     "semantic_hash": ""
   },
   "scripts/build-linux.sh": {
-    "mtime": 1792424016.5676012,
-    "seen": 1792428297.4633706,
+    "mtime": 1792433252.6253712,
+    "seen": 1792439397.2569294,
     "ast_hash": "0934c739e5afab415670c02232064ee7",
     "semantic_hash": ""
   },
   "scripts/check-linux-layout.sh": {
-    "mtime": 1792417972.0176127,
-    "seen": 1792428297.4633753,
-    "ast_hash": "11067f3e50816651d1842779c111dc93",
+    "mtime": 1792437572.6405835,
+    "seen": 1792439397.2569351,
+    "ast_hash": "5a2bd09e4f3fff9ebd3e2115c5325a52",
     "semantic_hash": ""
   },
   "scripts/check-linux-package.sh": {
-    "mtime": 1792417972.019184,
-    "seen": 1792428297.463378,
-    "ast_hash": "7f3f90d6b1720b7fe41068b9a1636cd1",
+    "mtime": 1792437572.642631,
+    "seen": 1792439397.2569382,
+    "ast_hash": "06c09249311a31a6f7573c692b9ba283",
     "semantic_hash": ""
   },
   "scripts/check-linux.sh": {
-    "mtime": 1792428192.4275448,
-    "seen": 1792428297.4633915,
+    "mtime": 1792433252.62999,
+    "seen": 1792439397.2569413,
     "ast_hash": "8d3f15888478fa77600057a83c0769ea",
     "semantic_hash": ""
   },
   "scripts/fetch-macos-digests.sh": {
-    "mtime": 1792419773.1794546,
-    "seen": 1792428297.4633937,
+    "mtime": 1792433252.6315095,
+    "seen": 1792439397.2569442,
     "ast_hash": "e55cb21f45c161f9e149f521f17e95cf",
     "semantic_hash": ""
   },
@@ -1347,6 +1347,24 @@
     "mtime": 1792417972.0106802,
     "seen": 1792428297.47328,
     "ast_hash": "1432d004743355fee25b3d038c5f9f80",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/src-tauri/tauri.linux.conf.json": {
+    "mtime": 1792429449.9993737,
+    "seen": 1792439397.2399256,
+    "ast_hash": "5c2f06b0fae944fb0e449e74e4cc7288",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/src-tauri/tauri.macos.conf.json": {
+    "mtime": 1792429449.9993737,
+    "seen": 1792439397.2399273,
+    "ast_hash": "b62985574546c4b12ef0a5aa0d66a795",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/src-tauri/tauri.windows.conf.json": {
+    "mtime": 1792429449.9993737,
+    "seen": 1792439397.2399285,
+    "ast_hash": "bb16f0b50625afb12349b5b9983c996f",
     "semantic_hash": ""
   }
 }
