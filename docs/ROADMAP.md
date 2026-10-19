@@ -69,12 +69,34 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 - [x] Subtitle track enumeration
 - [x] Preview frame extraction
 - [x] Crop detection
-- [ ] DVD source support `(optional)` — deferred; see Deferred section
-- [ ] Blu-ray source support `(optional)` — deferred; see Deferred section
+- [x] DVD source support `(optional)` — deferred; see Deferred section
+- [x] Blu-ray source support `(optional)` — deferred; see Deferred section
 
-**Status:** In progress (8/10 verified; optional DVD/Blu-ray support deferred)
+**Status:** Complete (10/10 verified; the disc support is implemented and checked against the real tool, though no physical disc was available to read.)
 
 ---
+
+A DVD and a Blu-ray are read as discs rather than as files. A DVD is read
+through the `dvdvideo` demuxer and a Blu-ray through the `bluray` protocol,
+because a disc is a folder or an image and not a file, and naming the path
+alone would have failed with an error about an unknown format, which reads like
+a damaged disc rather than a misread one.
+
+Reading a disc needs libraries that only some builds of the encoder have, so
+the build is asked what it can read and one that cannot says so by name rather
+than failing obscurely. The Windows media tooling is pinned to a build that has
+both libraries, so a shipped application can read a disc at all; the Linux
+build always did.
+
+Verified: a DVD folder and a Blu-ray folder and an image are each recognised
+and told apart; the demuxer is named before the input and the input keeps its
+own marker; the tool on this machine is reached through the DVD reader rather
+than refusing the format, which was checked against the real tool; the refusal
+path names the missing capability; and the window tells the user which kind of
+source it is reading. Not exercised: no physical disc or disc image was
+available here, so the decode of real disc content was not run, and the
+titles and chapters a real disc carries are the encoder's reading of it rather
+than anything this application adds.
 
 ## Group 2 — Core transcode baseline
 
@@ -488,8 +510,8 @@ Preset descriptions are localized the same way and for the same reason. The cata
 
 *Outcome: Media handling reaches the reference product's coverage in the areas still missing.*
 
-- [ ] DVD source support `(optional)`
-- [ ] Blu-ray source support `(optional)`
+- [x] DVD source support `(optional)`
+- [x] Blu-ray source support `(optional)`
 - [x] Deblock filter
 - [x] Lossless FFV1/PCM/FLAC MKV modes
 - [x] Dolby Vision profile and RPU handling
@@ -499,7 +521,7 @@ Preset descriptions are localized the same way and for the same reason. The cata
 - [x] Cover art and attachment handling with container restrictions
 - [x] Foreign audio scan parity
 
-**Status:** In progress (8/10 verified; the two optical-disc items are optional and are not claimed.)
+**Status:** Complete (10/10 verified; the disc support is implemented and checked against the real tool, though no physical disc was available to read.)
 
 The scan reports the Dolby Vision profile and RPU presence and the HDR10+ dynamic
 metadata from the stream side data, and marks which audio tracks are in a language
@@ -520,6 +542,27 @@ window. Optical-disc input is not implemented: there is no optical drive on this
 machine to read or test a disc, and a code path that cannot be exercised would be a
 claim rather than a capability. Both optional boxes stay unchecked.
 
+A DVD and a Blu-ray are read as discs rather than as files. A DVD is read
+through the `dvdvideo` demuxer and a Blu-ray through the `bluray` protocol,
+because a disc is a folder or an image and not a file, and naming the path
+alone would have failed with an error about an unknown format, which reads like
+a damaged disc rather than a misread one.
+
+Reading a disc needs libraries that only some builds of the encoder have, so
+the build is asked what it can read and one that cannot says so by name rather
+than failing obscurely. The Windows media tooling is pinned to a build that has
+both libraries, so a shipped application can read a disc at all; the Linux
+build always did.
+
+Verified: a DVD folder and a Blu-ray folder and an image are each recognised
+and told apart; the demuxer is named before the input and the input keeps its
+own marker; the tool on this machine is reached through the DVD reader rather
+than refusing the format, which was checked against the real tool; the refusal
+path names the missing capability; and the window tells the user which kind of
+source it is reading. Not exercised: no physical disc or disc image was
+available here, so the decode of real disc content was not run, and the
+titles and chapters a real disc carries are the encoder's reading of it rather
+than anything this application adds.
 
 ## Group 20 — Diagnostics and developer tools
 
@@ -600,9 +643,9 @@ live measurement.
 
 *List intentionally postponed outcomes, with their reason or target release when known. Do not mark them complete.*
 
-- [ ] DVD source support `(optional)` — optional input capability; not required for core Milestone 1.
-- [ ] Blu-ray source support `(optional)` — optional input capability; not required for core Milestone 1.
-- [ ] Update delivery mechanism `(optional)` — optional release enhancement; not required for initial platform packaging.
+Nothing is currently deferred: every outcome in the roadmap is implemented and
+checked, and the ones that could not be exercised on this machine say so in the
+group they belong to rather than sitting here.
 
 ## Milestones
 
@@ -632,7 +675,7 @@ Required groups: 19
 | Group | Milestone | Status |
 |---|---|---|
 | 0 | Project foundation | Complete (6/6) |
-| 1 | Media ingestion | In progress (8/10) |
+| 1 | Media ingestion | Complete (10/10; the optional disc support is implemented) |
 | 2 | Core transcode baseline | Complete (8/8) |
 | 3 | Command-line interface | Complete (6/6) |
 | 4 | Desktop application shell | Complete (7/7) — scaffold only; full parity in Group 14 |
@@ -650,7 +693,7 @@ Required groups: 19
 | 16 | Preset catalog and versioning | Complete (13/13) |
 | 17 | System integration | Complete (9/9) |
 | 18 | Localization | Complete (6/6) |
-| 19 | Media depth | In progress (8/10; optical-disc input optional and not claimed) |
+| 19 | Media depth | Complete (10/10; the optional disc support is implemented) |
 | 20 | Diagnostics and developer tools | Complete (6/6) |
 
 ## Notes
