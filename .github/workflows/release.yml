@@ -169,8 +169,12 @@ jobs:
       - name: the files to publish
         run: |
           mkdir -p publish
+          # A space in a file name becomes a dot when GitHub stores the asset,
+          # so the name is changed here rather than after the fact: a checksum
+          # file that names a file the release does not have is a checksum file
+          # that fails, and "sha256sum -c" is exactly what a person runs.
           find artifacts -type f \( -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name '*.dmg' \) \
-            -exec cp {} publish/ \;
+            -exec bash -c 'for file; do cp "$file" "publish/$(basename "${file// /.}")"; done' _ {} +
           echo "publish: the files that will be published"
           ls -la publish
       - name: the checksums
