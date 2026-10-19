@@ -253,9 +253,44 @@ fn dolby_vision_and_hdr10_plus_arguments_follow_the_capable_encoder() {
     let plan = Transcoder::default().plan(&spec).expect("plan");
     // The software HEVC encoder is the one that carries both private options.
     assert_eq!(plan.video_encoder, "libx265");
-    assert!(plan
+
+    // Whether the arguments go in depends on what this machine's encoder was
+    // built to do, so what is checked is the rule rather than one machine's
+    // answer: the arguments are there when the encoder can carry them, and the
+    // plan says so when it cannot.
+    let caps = vise_core::HdrCapabilities::detect(
+        vise_core::FfprobeScanner::default()
+            .ffmpeg_path()
+            .map(std::path::PathBuf::from)
+            .as_deref(),
+    );
+    let carries_dolby = plan
         .args
         .windows(2)
-        .any(|pair| pair == ["-dolbyvision", "1"]));
-    assert!(plan.args.windows(2).any(|pair| pair == ["-udu_sei", "1"]));
+        .any(|pair| pair == ["-dolbyvision", "1"]);
+    let carries_sei = plan.args.windows(2).any(|pair| pair == ["-udu_sei", "1"]);
+    if caps.dolby_vision_rpu {
+        assert!(carries_dolby, "the encoder can carry it: {:?}", plan.args);
+    } else {
+        assert!(
+            !carries_dolby,
+            "the encoder cannot carry it: {:?}",
+            plan.args
+        );
+        assert!(
+            !plan.hdr_claims.is_empty(),
+            "the request is reported rather than dropped: {:?}",
+            plan.hdr_claims
+        );
+    }
+    if caps.hdr10_plus_sei {
+        assert!(carries_sei, "the encoder can carry it: {:?}", plan.args);
+    } else {
+        assert!(!carries_sei, "the encoder cannot carry it: {:?}", plan.args);
+        assert!(
+            !plan.hdr_claims.is_empty(),
+            "the request is reported rather than dropped: {:?}",
+            plan.hdr_claims
+        );
+    }
 }
