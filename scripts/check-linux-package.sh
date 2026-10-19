@@ -6,7 +6,10 @@
 # build tree happened to hold.
 set -uo pipefail
 
-deb_dir="${1:-/src/target/release/bundle/deb}"
+# The package is looked for beside the repository rather than at a fixed path,
+# so the same check runs in a container, on a build runner, and on a machine.
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+deb_dir="${1:-$repo/target/release/bundle/deb}"
 root=/tmp/vise-package-check
 rm -rf "$root"
 mkdir -p "$root"
