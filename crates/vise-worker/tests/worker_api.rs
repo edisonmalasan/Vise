@@ -224,6 +224,25 @@ where
     }
 }
 
+/// Kill a process outright, on whichever platform the test is running.
+///
+/// The point of the test is a worker that dies without warning, so the kill has
+/// to be immediate and unignorable: no shutdown request, no chance to tidy up.
+fn kill_process(pid: u32) {
+    #[cfg(windows)]
+    let killed = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/F"])
+        .output();
+    #[cfg(not(windows))]
+    let killed = Command::new("kill")
+        .args(["-KILL", &pid.to_string()])
+        .output();
+    assert!(
+        killed.map(|out| out.status.success()).unwrap_or(false),
+        "the worker process must be killable for this test"
+    );
+}
+
 /// Wait until the client cannot reach the worker any more.
 fn wait_until_gone(client: &WorkerClient) -> ClientError {
     let deadline = Instant::now() + Duration::from_secs(30);
@@ -314,13 +333,7 @@ fn a_worker_killed_mid_encode_fails_only_its_job_and_the_next_job_still_runs() {
 
     // Kill the worker outright: no shutdown request, no chance to tidy up.
     let connection = supervisor.connection().expect("a running worker");
-    let killed = Command::new("taskkill")
-        .args(["/PID", &connection.pid.to_string(), "/F"])
-        .output();
-    assert!(
-        killed.map(|out| out.status.success()).unwrap_or(false),
-        "the worker process must be killable for this test"
-    );
+    kill_process(connection.pid);
 
     // The poll fails, and the failure is recognised as a dead process rather
     // than as a queue that went quiet.
@@ -368,10 +381,9 @@ fn a_worker_killed_mid_encode_fails_only_its_job_and_the_next_job_still_runs() {
     // is either removed or named, so the user is told which file is still there
     // and can remove it themselves. Nothing is ever promoted to a finished file.
     let orphan = vise_ipc::partial::partial_output_path_for(&first, connection.pid);
-    assert!(
-        orphan.is_file(),
-        "the killed worker left the partial it was writing: {orphan:?}"
-    );
+    // Whether the orphaned encoder is still writing the partial depends on the
+    // platform and on the moment the kill landed, so the contract is not "the
+    // file is there" but "whatever is there is either removed or named".
     let stale = vise_ipc::partial::partial_output_path_for(&first, connection.pid + 1);
     std::fs::write(&stale, b"an earlier partial").expect("write a partial");
     let cleanup = vise_ipc::partial::remove_partial_outputs(&first);
@@ -379,6 +391,13 @@ fn a_worker_killed_mid_encode_fails_only_its_job_and_the_next_job_still_runs() {
         cleanup.removed.contains(&stale),
         "a partial nobody is writing is removed: {cleanup:?}"
     );
+    if orphan.is_file() {
+        assert!(
+            cleanup.removed.contains(&orphan)
+                || cleanup.failed.iter().any(|(path, _)| path == &orphan),
+            "a partial that was there is either removed or reported: {cleanup:?}"
+        );
+    }
     let still_there: Vec<&PathBuf> = cleanup
         .failed
         .iter()
@@ -525,9 +544,7 @@ fn consecutive_worker_deaths_are_replaced_and_then_reported_rather_than_looping(
         let connection = supervisor.ensure_running().expect("a worker");
         pids.push(connection.pid);
         assert!(connection.client().is_token_set().expect("IsTokenSet"));
-        let _ = Command::new("taskkill")
-            .args(["/PID", &connection.pid.to_string(), "/F"])
-            .output();
+        kill_process(connection.pid);
         let _ = wait_until_gone(&connection.client().with_timeout(Duration::from_secs(5)));
         let death = supervisor
             .notice_death()

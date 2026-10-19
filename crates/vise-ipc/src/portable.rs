@@ -811,6 +811,9 @@ mod tests {
         assert!(roots.refusals.is_empty());
     }
 
+    // This test is about Windows path shapes: a network share is a path only
+    // Windows has, so the behaviour it checks has one answer on one platform.
+    #[cfg(windows)]
     #[test]
     fn an_absolute_directory_is_taken_as_written() {
         // A network share is a deliberate choice, so it is honoured — but only in

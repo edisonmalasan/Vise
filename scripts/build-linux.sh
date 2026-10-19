@@ -73,6 +73,10 @@ docker run --rm \
   bash -c "
     set -euo pipefail
     export PATH=\"/root/.cargo/bin:\$PATH\"
+    # The container builds into its own target directory. Sharing the host's
+    # would put a Linux binary where the host's Windows one lives, and the two
+    # would overwrite each other on every build.
+    export CARGO_TARGET_DIR=/build/target
     mkdir -p /build/target
     echo 'build-linux: installing pinned media tools'
     ./scripts/fetch-media-tools.sh linux-x86_64

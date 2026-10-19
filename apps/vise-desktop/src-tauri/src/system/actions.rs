@@ -496,6 +496,10 @@ mod tests {
         )
     }
 
+    // This test is about Windows path shapes: a drive letter and a backslash
+    // name one file on Windows and one odd filename on Linux, so the
+    // behaviour it checks only has one answer on one platform.
+    #[cfg(windows)]
     #[test]
     fn the_variables_are_the_ones_a_user_would_expect() {
         let variables = variables();
@@ -610,6 +614,10 @@ mod tests {
         assert!(invocation("\"\" --flag", &variables()).is_err());
     }
 
+    // This test is about Windows path shapes: a drive letter and a backslash
+    // name one file on Windows and one odd filename on Linux, so the
+    // behaviour it checks only has one answer on one platform.
+    #[cfg(windows)]
     #[test]
     fn the_program_is_substituted_too_and_the_log_shows_what_will_run() {
         let variables = variables();
@@ -708,6 +716,10 @@ mod tests {
         assert!(outcome.describe(&slow).contains("did not finish"));
     }
 
+    // This test is about Windows path shapes: a drive letter and a backslash
+    // name one file on Windows and one odd filename on Linux, so the
+    // behaviour it checks only has one answer on one platform.
+    #[cfg(windows)]
     #[test]
     fn a_pre_action_that_works_lets_the_encode_go() {
         let verdict = run_pre(

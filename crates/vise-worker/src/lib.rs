@@ -128,6 +128,18 @@ pub fn spawn_parent_monitor(runtime: Arc<WorkerRuntime>, parent_pid: u32, port: 
                     let mut buffer = [0u8; 64];
                     match stdin.read(&mut buffer) {
                         Ok(0) => {
+                            // End of file on the standard input is a hint, not a
+                            // fact: a worker started without a pipe inherits
+                            // whatever the parent had, and that reaches
+                            // end-of-file at once. The parent being gone is the
+                            // fact, and the other watcher is already asking.
+                            if parent_is_alive(parent_pid) {
+                                logs.warn(
+                                    "standard input reached end of file but the parent is still running; \
+                                     the process-id watcher will decide",
+                                );
+                                return;
+                            }
                             logs.warn("parent process pipe closed; terminating the worker process");
                             flag.store(true, Ordering::SeqCst);
                             wake_listener(port);

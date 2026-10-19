@@ -8,8 +8,8 @@
 //!
 //! # Detection is injected, not performed
 //!
-//! Detection shells out to ffmpeg twice — once for the encoder and decoder
-//! lists, once for the HEVC encoder's help text — and that is a fact about the
+//! Detection shells out to ffmpeg twice â€” once for the encoder and decoder
+//! lists, once for the HEVC encoder's help text â€” and that is a fact about the
 //! machine, not about the report. So [`CapabilityReport::from_detected`] takes
 //! the detection as an argument and the report is a pure function of it, which
 //! is what lets a test pin the report against a ffmpeg build nobody in this
@@ -365,6 +365,7 @@ mod tests {
 
     fn detected() -> HardwareCapabilities {
         HardwareCapabilities {
+            devices: Vec::new(),
             ffmpeg_path: Some(PathBuf::from("/opt/ffmpeg")),
             hwaccels: vec!["cuda".into(), "vaapi".into(), "cuda".into()],
             encoders: vec![

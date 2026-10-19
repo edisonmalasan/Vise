@@ -423,6 +423,10 @@ mod tests {
         );
     }
 
+    // This test is about Windows path shapes: a drive letter and a backslash
+    // name one file on Windows and one odd filename on Linux, so the
+    // behaviour it checks only has one answer on one platform.
+    #[cfg(windows)]
     #[test]
     fn normalises_separators_and_trailing_slashes() {
         let native = MAIN_SEPARATOR;

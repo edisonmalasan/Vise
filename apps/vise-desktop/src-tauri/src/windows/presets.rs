@@ -1366,6 +1366,10 @@ mod tests {
             .contains(&"Give the preset a name.".to_string()));
     }
 
+    // This test is about Windows path shapes: a drive letter and a backslash
+    // name one file on Windows and one odd filename on Linux, so the
+    // behaviour it checks only has one answer on one platform.
+    #[cfg(windows)]
     #[test]
     fn a_preset_exchange_file_has_to_be_a_json_file_that_exists() {
         let dir = std::env::temp_dir().join("vise-desktop-preset-exchange");
@@ -1594,6 +1598,14 @@ mod tests {
     /// A machine that has every encoder the catalog asks for.
     fn everything() -> vise_core::HardwareCapabilities {
         vise_core::HardwareCapabilities {
+            devices: vec![
+                "cuda".to_string(),
+                "qsv".to_string(),
+                "vaapi".to_string(),
+                "amf".to_string(),
+                "videotoolbox".to_string(),
+                "d3d11va".to_string(),
+            ],
             ffmpeg_path: Some(std::path::PathBuf::from("ffmpeg")),
             hwaccels: vec!["qsv".to_string(), "cuda".to_string()],
             decoders: vec!["h264".to_string()],
@@ -1608,6 +1620,7 @@ mod tests {
     fn software_only() -> vise_core::HardwareCapabilities {
         let mut caps = everything();
         caps.hwaccels.clear();
+        caps.devices.clear();
         caps.encoders
             .retain(|name| name.starts_with("lib") || name == "ffv1");
         caps

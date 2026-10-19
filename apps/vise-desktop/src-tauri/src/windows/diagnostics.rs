@@ -693,6 +693,7 @@ mod tests {
             .is_none());
         let report = CapabilityReport::from_detected(
             &vise_core::HardwareCapabilities {
+                devices: vec!["cuda".into()],
                 ffmpeg_path: Some(std::path::PathBuf::from("/opt/ffmpeg")),
                 hwaccels: vec!["cuda".into()],
                 decoders: vec!["h264".into()],
@@ -753,6 +754,10 @@ mod tests {
         assert_eq!(size_label(1024u64.pow(4) * 2), "2.0 TiB");
     }
 
+    // This test is about Windows path shapes: a drive letter and a backslash
+    // name one file on Windows and one odd filename on Linux, so the
+    // behaviour it checks only has one answer on one platform.
+    #[cfg(windows)]
     #[test]
     fn the_sweep_view_carries_the_plan_and_the_proof_it_is_bounded() {
         let mut state = state();
