@@ -48,7 +48,27 @@
   --focus: #1a56c4;
   --focus-halo: #ffffff;
   --radius: 10px;
-  --gap: 16px;
+
+  /* The spacing scale.
+   *
+   * One value repeated everywhere gives every element the same weight, and a
+   * page where nothing is louder than anything else has no hierarchy at all.
+   * The scale is a 4-unit base, and the intervals below are chosen for the
+   * relationships they express rather than for a round number: tight inside a
+   * control, a little looser between the parts of a group, and clearly looser
+   * between groups than within them.
+   */
+  --space-1: 4px;   /* inside one control */
+  --space-2: 8px;   /* between two controls that act together */
+  --space-3: 12px;  /* between the parts of one card */
+  --space-4: 16px;  /* a card's own padding */
+  --space-5: 24px;  /* between two groups */
+  --space-6: 32px;  /* between two bands of the page */
+  --space-7: 48px;  /* the page's own margin */
+
+  /* The room the pinned action bar takes at the foot of the window. The bar
+     wraps on a narrow window, so the space is generous rather than exact. */
+  --actionbar-space: 96px;
 }
 
 /* The theme the window asked for. */
@@ -130,6 +150,15 @@ body {
   font-size: 14px;
   line-height: 1.5;
   padding: 20px;
+  /* The window is a shell, not a document: the title and the appearance strip
+     stay put, the work scrolls between them, and the action bar stays at the
+     foot. The page itself never scrolls, so the one control the reader came
+     to use is never more than a glance away, and nothing is ever hidden
+     underneath it. */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
 }
 
 h1 {
@@ -156,19 +185,52 @@ p {
   margin: 0 0 8px;
 }
 
+/* The masthead is a bar, not a title block.
+ *
+ * The name and the controls that open the other windows belong on one line:
+ * the person using this has come to do something, and the windows are the
+ * tools for doing it. A title and a paragraph stacked above nine buttons pushed
+ * the first thing they needed — the source — below the fold. */
 .masthead {
-  margin-bottom: var(--gap);
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+}
+
+.masthead-id {
+  min-width: 0;
+}
+
+.masthead h1 {
+  font-size: 17px;
+  line-height: 1.2;
+  margin: 0;
 }
 
 .masthead p {
   color: var(--muted);
-  margin: 0;
+  font-size: 12px;
+  margin: 2px 0 0;
+  max-width: 62ch;
 }
 
 .layout {
+  align-items: start;
   display: grid;
-  gap: var(--gap);
+  /* The bands are separated by more space than the parts inside a band, so the
+     page reads as three steps rather than one long column of equal boxes. */
+  gap: var(--space-6);
   grid-template-columns: 1fr;
+  /* The work is what scrolls; the title, the appearance strip, and the action
+     bar are the window around it. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 @media (min-width: 1000px) {
@@ -187,14 +249,14 @@ p {
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: var(--space-3);
+  padding: var(--space-4);
 }
 
 .card-head {
   align-items: baseline;
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   justify-content: space-between;
 }
 
@@ -339,10 +401,13 @@ label.switch:focus-within {
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   justify-content: center;
-  min-height: 108px;
-  padding: 16px;
+  /* A drop target has to be big enough to aim at, but it is not the content:
+     the path field below it is how a file is usually chosen, so the zone is a
+     band rather than a block that pushes the field off the screen. */
+  min-height: 64px;
+  padding: var(--space-3);
   text-align: center;
 }
 
@@ -801,7 +866,7 @@ label.switch .facts {
   gap: 6px;
   /* The status block keeps its height between states so the list below it
      never jumps while a scan runs. */
-  min-height: 74px;
+  min-height: 56px;
 }
 
 .status-line {
@@ -941,8 +1006,13 @@ td.controls {
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: var(--gap);
+  gap: var(--space-2);
+}
+
+/* The surfaces that describe or configure the application are pushed to the far
+   end of the row, so the ones that are part of the work are found first. */
+.toolbar button.setup {
+  margin-inline-start: var(--space-5);
 }
 
 .toolbar button {
@@ -1143,17 +1213,131 @@ button.warn:hover:not(:disabled) {
 
 /* Appearance ---------------------------------------------------------------- */
 
-/* The two pickers sit side by side on a wide window and stack on a narrow one,
-   in whichever direction the window is laid out. */
+/* The appearance strip is chrome, and chrome belongs on one line.
+ *
+ * It used to be a panel of its own above the work, which put a preference the
+ * reader changes once between them and the thing they came to do. The options
+ * are now a row of switches, and the line underneath says what the window
+ * resolved and why, so the reason is still available without the panel. */
 .appearance {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  margin-bottom: var(--space-6);
+  padding: var(--space-3) var(--space-4);
+}
+
+.appearance-options {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+}
+
+.appearance fieldset {
+  border: 0;
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  /* The fieldset has no border of its own, but its contents are still inset
+     from the strip's edge, so nothing sits flush against a boundary. */
+  padding: var(--space-1) var(--space-1) var(--space-1) 0;
+}
+
+.appearance legend {
+  float: inline-start;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0;
+}
+
+/* The options are a row of switches. Each one's explanation is left for the
+   summary line, which says what the window actually resolved; showing every
+   explanation at once is what made this tall in the first place. */
+.appearance .rules {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.appearance .choice {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--space-2);
+  padding: 3px 12px 3px 10px;
+}
+
+.appearance .choice:hover {
+  border-color: var(--border-strong);
+}
+
+.appearance .choice:has(input:checked) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.appearance .choice .text {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.appearance .choice .facts {
+  display: none;
 }
 
 .appearance-summary {
   color: var(--muted);
   margin: 0;
+}
+
+/* The action bar ------------------------------------------------------------ */
+
+/* The commit action stays on screen.
+ *
+ * The work is a long column of choices, and the one thing the reader came to
+ * do — put it in the queue — was at the bottom of it, three screens down. The
+ * bar is pinned to the foot of the window, so the path and the button that
+ * uses it are always together and always reachable. */
+.actionbar {
+  align-items: center;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.actionbar-path {
+  display: flex;
+  flex: 1 1 320px;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.actionbar-path label {
+  font-size: 12px;
+}
+
+.actionbar-buttons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.actionbar .hint {
+  flex: 1 1 100%;
 }
 
 /* Activity ----------------------------------------------------------------- */
@@ -1430,10 +1614,23 @@ button.warn:hover:not(:disabled) {
 
 .catalog-option[aria-selected="true"] {
   background: var(--accent-wash);
-  /* The edge is drawn on the inline-start side rather than as an inset shadow
-     so it follows the reading direction instead of always sitting on the left. */
-  border-inline-start: 3px solid var(--accent);
-  padding-inline-start: 7px;
+  /* The chosen entry is marked by weight and a dot beside its name, rather than
+     by a thick coloured edge: a heavy border on one side of a row is the one
+     thing every generated interface does, and it reads as a tag rather than as
+     a selection. */
+  font-weight: 600;
+}
+
+/* The dot sits with the name, on the reading side, so it travels with the
+   title rather than with the row. */
+.catalog-option[aria-selected="true"] .preset-head::before {
+  background: var(--accent);
+  border-radius: 50%;
+  content: "";
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 6px;
+  width: 6px;
 }
 
 /* A preset this machine cannot run stays in the list, read-only, with the
