@@ -255,14 +255,14 @@ Target parity: reference transcoder architecture at version 1.11.2 and its user-
 *Outcome: Installable platform builds, release notes, and reproducible releases are available.*
 
 - [x] Windows build and installer
-- [ ] macOS build and app bundle
+- [x] macOS build and app bundle
 - [x] Linux build and package
 - [x] Bundle FFmpeg and ffprobe with release builds
 - [x] Prefer bundled media tooling before PATH discovery
 - [x] Versioned release notes
 - [x] Reproducible build process
 - [x] Update delivery mechanism \(optional)
-**Status:** In progress (7/8 verified; the macOS bundle is the one left.)
+**Status:** Complete (8/8 verified; all three platforms build and package.)
 
 A shipped build carries its own encoder rather than relying on whatever the
 machine has, because the filters and encoders the application offers are only
@@ -633,7 +633,7 @@ Required groups: 19
 | 9 | Chapters and metadata | Complete (6/6) |
 | 10 | Encoding control and job reliability | Complete (10/10) |
 | 11 | Hardware acceleration | Complete (7/7) |
-| 12 | Platform packaging and release | In progress (7/8; the macOS bundle is the one left) |
+| 12 | Platform packaging and release | Complete (8/8; all three platforms build and package) |
 | 13 | Worker process and JSON IPC | Complete (9/9) |
 | 14 | Desktop parity with reference product | Complete (18/18) |
 | 15 | Preferences surface | Complete (8/8) |
