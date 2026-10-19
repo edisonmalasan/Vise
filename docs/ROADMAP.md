@@ -633,7 +633,7 @@ Required groups: 19
 | 9 | Chapters and metadata | Complete (6/6) |
 | 10 | Encoding control and job reliability | Complete (10/10) |
 | 11 | Hardware acceleration | Complete (7/7) |
-| 12 | Platform packaging and release | In progress (6/8; Windows installer and bundled tooling done) |
+| 12 | Platform packaging and release | In progress (7/8; the macOS bundle is the one left) |
 | 13 | Worker process and JSON IPC | Complete (9/9) |
 | 14 | Desktop parity with reference product | Complete (18/18) |
 | 15 | Preferences surface | Complete (8/8) |
