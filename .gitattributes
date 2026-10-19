@@ -1,0 +1,27 @@
+# Shell scripts are checked out with LF endings whatever the host does.
+#
+# Without this, Git on Windows writes CRLF into the scripts, and a Linux container
+# reading the mounted working tree fails on the shebang line with
+# "env: 'bash\r': No such file or directory" — which reads like a missing shell
+# rather than a line-ending problem, and costs an hour to find.
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+
+# Generated schemas are written by the Tauri build with whatever endings it
+# likes; normalising them only produces noise in the diff.
+apps/vise-desktop/src-tauri/gen/schemas/** -text
+
+# Images and packaged media are binary whatever Git thinks.
+*.ico binary
+*.png binary
+*.exe binary
+*.zip binary
+*.7z binary
