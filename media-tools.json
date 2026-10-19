@@ -1,12 +1,16 @@
 {
-  "comment": "Pinned media tooling. Bump deliberately: a new ffmpeg means new encoder availability and therefore new test expectations. 'archive_sha256' is the digest the publisher publishes for the archive; 'digests' are of the extracted binaries and are filled in by the first verified fetch. A build must not be published while any digest still reads REPLACE_WITH_SHA256.",
+  "comment": "Pinned media tooling. Bump deliberately: a new ffmpeg means new encoder availability and therefore new test expectations. 'sha256' on an archive is the digest of the archive as published; a per-binary digest is only needed when the archive itself is not pinned, because a pinned archive already determines what is inside it. A build must not be published while an archive digest still reads REPLACE_WITH_SHA256.",
   "platforms": {
     "windows-x86_64": {
-      "archive": "ffmpeg-8.1.2-essentials_build.zip",
-      "url": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip",
-      "archive_sha256": "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec",
+      "version": "8.1.2",
+      "archives": [
+        {
+          "name": "ffmpeg-8.1.2-essentials_build.zip",
+          "url": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.2-essentials_build.zip",
+          "sha256": "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec"
+        }
+      ],
       "license": "GPL-3.0-or-later",
-      "member_prefix": "ffmpeg-8.1.2-essentials_build/bin",
       "tools": [
         "ffmpeg.exe",
         "ffprobe.exe"
@@ -17,11 +21,15 @@
       }
     },
     "linux-x86_64": {
-      "archive": "ffmpeg-release-amd64-static.tar.xz",
-      "url": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
-      "archive_sha256": "abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67",
+      "version": "release-amd64-static",
+      "archives": [
+        {
+          "name": "ffmpeg-release-amd64-static.tar.xz",
+          "url": "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
+          "sha256": "abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67"
+        }
+      ],
       "license": "GPL-3.0-or-later",
-      "member_prefix": "",
       "tools": [
         "ffmpeg",
         "ffprobe"
@@ -32,18 +40,27 @@
       }
     },
     "darwin-x86_64": {
-      "archive": "ffmpeg-release-amd64-static.zip",
-      "url": "https://osxexperts.net/ffmpeg80intel.zip",
-      "archive_sha256": "REPLACE_WITH_SHA256",
+      "version": "9.0.2",
+      "archives": [
+        {
+          "name": "ffmpeg-9.0.2.zip",
+          "url": "https://evermeet.cx/ffmpeg/ffmpeg-9.0.2.zip",
+          "sha256": "4acc0be580f9b2788029eb7bd4d645ff87968911b0a62aeeb3940d42d54558d5"
+        },
+        {
+          "name": "ffprobe-9.0.2.zip",
+          "url": "https://evermeet.cx/ffmpeg/ffprobe-9.0.2.zip",
+          "sha256": "24a9c968cd4da72d99c7245e914b921815835eb6dff01d99868031aebaf1d439"
+        }
+      ],
       "license": "GPL-3.0-or-later",
-      "member_prefix": "",
       "tools": [
         "ffmpeg",
         "ffprobe"
       ],
       "digests": {
-        "ffmpeg": "REPLACE_WITH_SHA256",
-        "ffprobe": "REPLACE_WITH_SHA256"
+        "ffmpeg": "a45b462cf91ed89148ae218c4577e30896485d7a6792c3673bcf5f823fa01b63",
+        "ffprobe": "a29f8c2e03553223a8b480b1a1f04c42f680c138fa952c20086718a075db38cb"
       }
     }
   }
