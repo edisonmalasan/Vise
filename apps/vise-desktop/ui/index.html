@@ -79,11 +79,15 @@
     <!-- The steps. The window owns the words: each one says which message it
          wants, so a locale that lacks one shows the base language rather than
          a blank. -->
+    <h2 class="rail-heading" data-i18n="rail.job">The job</h2>
     <nav class="steps" id="steps" aria-label="Steps"></nav>
 
     <!-- The windows the application can open. They are built from the window
          catalog: every surface the window offers gets a control that opens it,
-         and a surface it does not offer has no control at all. -->
+         and a surface it does not offer has no control at all. They are under
+         a heading of their own because they are a different kind of thing from
+         the steps: one moves the work along, the other opens a window. -->
+    <h2 class="rail-heading" data-i18n="rail.application">The application</h2>
     <nav class="rail-tools" id="toolbar" aria-label="Windows and dialogs"></nav>
 
     <!-- Theme and layout direction. Every control here is a preference the
@@ -126,7 +130,7 @@
     </div>
 
     <div class="dropzone" id="dropzone" data-dragging="false">
-      <strong>Drop a file or folder here</strong>
+      <strong id="dropTitle">Drop a file or folder here</strong>
       <span class="hint" id="dropHint">Or type the full path below and open it.</span>
     </div>
 

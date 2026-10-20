@@ -245,6 +245,24 @@
     offer(el("clearSourceBtn"), Boolean(source));
     offer(el("scanBtn"), Boolean(source));
     state.stepAnswers.source = source ? source.name : "";
+    /* Once a source is chosen the drop target is only a way to replace it, so
+       the card says so and the zone itself becomes a strip. The work the
+       reader came for is below it and should not be pushed out of the way by
+       the means of choosing the source. */
+    var panel = document.querySelector('.step-panel[data-step="source"]');
+    if (panel) {
+      panel.dataset.loaded = source ? "true" : "false";
+    }
+    setText(
+      el("dropTitle"),
+      source ? "Drop another one here" : "Drop a file or folder here"
+    );
+    setText(
+      el("dropHint"),
+      source
+        ? "to replace the current source."
+        : "Or type the full path below and open it."
+    );
     if (source) {
       setText(el("sourceKind"), source.kind === "folder" ? "Folder" : "File");
       setText(el("sourceName"), source.name);
@@ -966,12 +984,18 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
    *
    * This is what makes the rail a summary of the job rather than only a way
    * to move around it: the state of every step is visible whether or not that
-   * step is the one the reader is on. */
+   * step is the one the reader is on. A step that has an answer is also
+   * marked, so the pipeline can be seen as a shape rather than read. */
   function renderStepAnswers() {
     STEPS.forEach(function (step) {
       var node = el("stepAnswer-" + step.id);
+      var answer = state.stepAnswers[step.id] || "";
       if (node) {
-        setText(node, state.stepAnswers[step.id] || "");
+        setText(node, answer);
+      }
+      var button = el("step-" + step.id);
+      if (button) {
+        button.dataset.done = answer ? "true" : "false";
       }
     });
   }
