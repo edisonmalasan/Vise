@@ -1,7 +1,7 @@
 # Graph Report - vise  (2026-10-20)
 
 ## Corpus Check
-- 228 files · ~505,614 words
+- 228 files · ~505,838 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 16 file(s) not represented in the graph (top: (none) 7, .toml 5, .cmd 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `cde26306`
+- Built from commit: `2efd4680`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -1249,7 +1249,7 @@ Nodes (5): Highlights, Known issues, Platforms, Verification, Vise Transcoder 0.
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `JobSpec` connect `JobSpec` to `encode.rs`, `SharedState`, `src-tauri/src/main.rs`, `actions.rs`, `window_with`, `queue.rs`, `HardwareApi`, `SubtitleProcessingOptions`, `MetadataProcessingOptions`, `AudioProcessingOptions`, `diskspace.rs`, `TitleFacts`, `windows/diagnostics.rs`, `Session`, `ScanResult`, `CoreError`, `pipeline.rs`, `persistence.rs`, `Job`, `tabs/mod.rs`, `sweep.rs`, `vise-core/src/lib.rs`, `results.rs`, `VideoProcessingOptions`, `AudioCodec`, `serialize`, `ContainerFormat`, `free_space`, `ChapterProcessingOptions`, `validation.rs`, `media_depth.rs`, `hdr.rs`, `PresetSpec`, `VideoCodec`, `contract.rs`, `subtitle.rs`, `DesktopState`?**
-  _High betweenness centrality (0.048) - this node is a cross-community bridge._
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
 - **What connects `System`, `Light`, `Dark` to the rest of the system?**
   _566 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `live-browser.js` be split into smaller, more focused modules?**
