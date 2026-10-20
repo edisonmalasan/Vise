@@ -588,9 +588,9 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1792451466.2470381,
-    "seen": 1792451536.4425933,
-    "ast_hash": "74c3bc17cca610dd419226e578b162d6",
+    "mtime": 1792455116.5055668,
+    "seen": 1792455213.5316536,
+    "ast_hash": "4a78073d969799bb47ef783e74a8c0c1",
     "semantic_hash": ""
   },
   "apps/vise-desktop/README.md": {
@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   "docs/ROADMAP.md": {
-    "mtime": 1792451466.2505841,
-    "seen": 1792451536.443138,
-    "ast_hash": "d8fca94f56a594ceceb038ee91e90e20",
+    "mtime": 1792455116.5084245,
+    "seen": 1792455213.5369618,
+    "ast_hash": "3266bb6b69079d3232bdbc790c9f16f1",
     "semantic_hash": ""
   },
   "docs/release-notes-template.md": {
@@ -636,9 +636,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792451466.2485518,
-    "seen": 1792451536.4426017,
-    "ast_hash": "1957a2e09945ec7745531da2868e79af",
+    "mtime": 1792453910.7713192,
+    "seen": 1792455213.5350246,
+    "ast_hash": "a48c8362eb31e546dbfb5ccb77066935",
     "semantic_hash": ""
   },
   "docs/SETUP.md": {
@@ -1308,9 +1308,9 @@
     "semantic_hash": ""
   },
   ".github/workflows/release.yml": {
-    "mtime": 1792451466.246032,
-    "seen": 1792451536.4425874,
-    "ast_hash": "dc8de5f72a3fd7ac60044bea5110a528",
+    "mtime": 1792453910.7707973,
+    "seen": 1792455213.5308938,
+    "ast_hash": "3055df443455ceb25d5955e097f45c58",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/icons/128x128.png": {
