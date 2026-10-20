@@ -149,14 +149,11 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
   line-height: 1.5;
-  padding: 20px;
-  /* The window is a shell, not a document: the title and the appearance strip
-     stay put, the work scrolls between them, and the action bar stays at the
-     foot. The page itself never scrolls, so the one control the reader came
-     to use is never more than a glance away, and nothing is ever hidden
-     underneath it. */
-  display: flex;
-  flex-direction: column;
+  /* The window is a shell, not a document: the rail and the work area hold
+     their own places, the step scrolls inside itself, and the action bar
+     stays at the foot. The page itself never scrolls, so the one control the
+     reader came to use is never more than a glance away, and nothing is ever
+     hidden underneath it. */
   height: 100vh;
   overflow: hidden;
 }
@@ -185,63 +182,246 @@ p {
   margin: 0 0 8px;
 }
 
-/* The masthead is a bar, not a title block.
+/* The window is a rail and a work area.
  *
- * The name and the controls that open the other windows belong on one line:
- * the person using this has come to do something, and the windows are the
- * tools for doing it. A title and a paragraph stacked above nine buttons pushed
- * the first thing they needed — the source — below the fold. */
-.masthead {
-  align-items: center;
-  border-bottom: 1px solid var(--border);
+ * The rail holds the name, the steps the work is done in, the windows the
+ * application can open, and the settings that change how it looks. The work
+ * area holds one step at a time.
+ *
+ * The two are not the same width. The rail is as wide as the step names and
+ * their answers need, and no wider, because the work area is where the
+ * reading happens. */
+.shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  /* One row, and it fills the window, so the work area is the full height
+     rather than as tall as its content. The action bar is pinned to the foot
+     of it because of that. */
+  grid-template-rows: minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.rail {
+  background: var(--surface-sunken);
+  border-inline-end: 1px solid var(--border);
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  justify-content: space-between;
-  margin-bottom: var(--space-4);
-  padding-bottom: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-4);
 }
 
-.masthead-id {
-  min-width: 0;
-}
-
-.masthead h1 {
-  font-size: 17px;
-  line-height: 1.2;
+.rail-head h1 {
+  font-size: 16px;
+  line-height: 1.25;
   margin: 0;
 }
 
-.masthead p {
+/* A heading for a group in the rail.
+ *
+ * The rail holds three kinds of thing: the steps, the windows, and the
+ * settings. They are not the same kind, and a column of fourteen rows with no
+ * division reads as a list of unrelated buttons. */
+.rail-heading {
   color: var(--muted);
-  font-size: 12px;
-  margin: 2px 0 0;
-  max-width: 62ch;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  margin: 0 0 var(--space-2);
+  text-transform: uppercase;
 }
 
-.layout {
+/* The steps.
+ *
+ * Each row is a step in the work and the answer that step has reached. The
+ * answer is why the row is worth its space: the reader can see the shape of
+ * the whole job from the rail, whether or not that step is the one on
+ * screen. */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.step {
   align-items: start;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
   display: grid;
-  /* The bands are separated by more space than the parts inside a band, so the
-     page reads as three steps rather than one long column of equal boxes. */
-  gap: var(--space-6);
-  grid-template-columns: 1fr;
-  /* The work is what scrolls; the title, the appearance strip, and the action
-     bar are the window around it. */
-  flex: 1 1 auto;
+  gap: 2px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  padding: var(--space-2) var(--space-2);
+  text-align: start;
+  width: 100%;
+}
+
+.step:hover {
+  background: var(--surface);
+}
+
+.step[aria-current="true"] {
+  background: var(--surface);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.step:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* The number of the step.
+ *
+ * The steps are done in order, so the order carries information the reader
+ * needs, and saying so is a number rather than a heading. A waiting step is
+ * dimmed rather than hidden: the reader can see what comes next and why it is
+ * not ready yet. */
+.step-index {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45;
+  text-align: end;
+}
+
+.step[aria-current="true"] .step-index {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.step-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+/* The name and the answer it has reached are two lines: the name says which
+   step this is, and the answer says what has been decided, so they read as
+   two things rather than one run-together line. */
+.step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.step-answer {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  /* The answer is a summary, not a sentence. It is cut where it stops being
+     one, so a long title does not push the steps apart. */
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step[data-waiting="true"] .step-name,
+.step[data-waiting="true"] .step-index {
+  color: var(--muted);
+  font-weight: 400;
+  opacity: 0.65;
+}
+
+/* The windows the application can open. */
+.rail-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rail-tools button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: space-between;
+  padding: 6px var(--space-2);
+  text-align: start;
+  width: 100%;
+}
+
+.rail-tools button:hover {
+  background: var(--surface);
+}
+
+.rail-tools button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.rail-tools .badge {
+  margin-inline-start: auto;
+}
+
+/* The settings that change how the window looks. They sit at the foot of the
+ * rail, where they are out of the way of the work and where a reader looks
+ * for them last rather than first. */
+.rail-look {
+  border-top: 1px solid var(--border);
+  margin-top: auto;
+  padding-top: var(--space-4);
+}
+
+/* The heading is the first thing in the group, and the group has a rule above
+ * it, so the heading carries the inset from that rule. */
+.rail-look > .rail-heading {
+  padding-top: var(--space-2);
+}
+
+.rail-look fieldset {
+  border: 0;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+}
+
+.rail-look legend {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 0 0 var(--space-1);
+  text-transform: uppercase;
+}
+
+/* The work area. */
+.work {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+}
+
+/* One step's card at a time.
+ *
+ * The card is the whole work area rather than the last card in a scroll, so
+ * the eight output tabs have the room they need. The selector carries the
+ * card as well, because the card's own display would otherwise win on order
+ * and every panel would show at once.
+ *
+ * The card is as tall as its content and no taller, so a step with little in
+ * it does not leave a field of empty panel below it. */
+.card.step-panel {
+  display: none;
+  flex: 0 0 auto;
+  margin: var(--space-5);
+  max-height: 100%;
   overflow-y: auto;
 }
 
-@media (min-width: 1000px) {
-  .layout {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
-  }
-
-  .layout .full {
-    grid-column: 1 / -1;
-  }
+.card.step-panel[data-active="true"] {
+  display: flex;
 }
+
 
 .card {
   background: var(--surface);
@@ -1001,25 +1181,9 @@ td.controls {
 
 /* Secondary windows -------------------------------------------------------- */
 
-/* The toolbar is built from the window catalog, so its buttons come and go with
-   the surfaces the build offers. */
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-/* The surfaces that describe or configure the application are pushed to the far
-   end of the row, so the ones that are part of the work are found first. */
-.toolbar button.setup {
-  margin-inline-start: var(--space-5);
-}
-
-.toolbar button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
+/* The windows are built from the window catalog, so their buttons come and go
+ * with the surfaces the build offers. They live in the rail, under a heading,
+ * so the column reads as a list rather than a stack of unrelated buttons. */
 
 .badge {
   background: var(--danger);
@@ -1213,59 +1377,53 @@ button.warn:hover:not(:disabled) {
 
 /* Appearance ---------------------------------------------------------------- */
 
-/* The appearance strip is chrome, and chrome belongs on one line.
+/* The appearance controls live in the rail, at its foot.
  *
- * It used to be a panel of its own above the work, which put a preference the
- * reader changes once between them and the thing they came to do. The options
- * are now a row of switches, and the line underneath says what the window
- * resolved and why, so the reason is still available without the panel. */
-.appearance {
-  align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3) var(--space-5);
-  margin-bottom: var(--space-6);
-  padding: var(--space-3) var(--space-4);
-}
-
+ * They used to be a panel of their own above the work, which put a preference
+ * the reader changes once between them and the thing they came to do. The
+ * options are now a stack of switches in the rail, and the line underneath
+ * says what the window resolved and why, so the reason is still available
+ * without a panel. */
 .appearance-options {
-  align-items: center;
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3) var(--space-5);
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
-.appearance fieldset {
+.rail-look fieldset {
   border: 0;
   display: flex;
-  gap: var(--space-2);
+  flex-direction: column;
+  gap: var(--space-1);
   margin: 0;
   /* The fieldset has no border of its own, but its contents are still inset
-     from the strip's edge, so nothing sits flush against a boundary. */
+     from the rail's edge, so nothing sits flush against a boundary. */
   padding: var(--space-1) var(--space-1) var(--space-1) 0;
 }
 
-.appearance legend {
-  float: inline-start;
-  font-size: 12px;
+.rail-look legend {
   color: var(--muted);
-  padding: 0;
+  float: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  /* The legend names the group and sits at the top of it, so it is inset from
+     the group's own edge rather than flush against it. */
+  padding: 0 0 var(--space-1);
+  text-transform: uppercase;
 }
 
-/* The options are a row of switches. Each one's explanation is left for the
+/* The options are a stack of switches. Each one's explanation is left for the
    summary line, which says what the window actually resolved; showing every
    explanation at once is what made this tall in the first place. */
-.appearance .rules {
+.rail-look .rules {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   flex-wrap: wrap;
   gap: var(--space-1);
 }
 
-.appearance .choice {
+.rail-look .choice {
   align-items: center;
   background: transparent;
   border: 1px solid var(--border);
@@ -1277,21 +1435,21 @@ button.warn:hover:not(:disabled) {
   padding: 3px 12px 3px 10px;
 }
 
-.appearance .choice:hover {
+.rail-look .choice:hover {
   border-color: var(--border-strong);
 }
 
-.appearance .choice:has(input:checked) {
+.rail-look .choice:has(input:checked) {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
 
-.appearance .choice .text {
+.rail-look .choice .text {
   font-size: 13px;
   line-height: 1.4;
 }
 
-.appearance .choice .facts {
+.rail-look .choice .facts {
   display: none;
 }
 
@@ -1316,6 +1474,9 @@ button.warn:hover:not(:disabled) {
   flex: 0 0 auto;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-3);
+  /* The bar sits at the foot of the work area rather than under the card, so
+     it is always in the same place however short the step on screen is. */
+  margin-top: auto;
   padding: var(--space-3) var(--space-4);
 }
 
@@ -1840,5 +2001,94 @@ button.warn:hover:not(:disabled) {
   * {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* The narrow-window layout is last so it wins on order. The rules for
+   the wide window are written for a rail and a card side by side, and
+   this is the one place they are undone. */
+/* Below the width where a rail and a card both fit, the rail becomes a strip
+ * along the top: the steps go in a row, and the windows and the settings
+ * become a row of their own. The strip is as many bands tall as it needs and
+ * no more, so the work area keeps the rest of the height. */
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .rail {
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    border-inline-end: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-3) var(--space-4);
+    overflow: visible;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .rail-head {
+    width: 100%;
+  }
+
+  .steps {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .step {
+    grid-template-columns: 18px minmax(0, 1fr);
+    width: auto;
+  }
+
+  /* The answer to a step is the rail's job when there is room for it. A
+     narrow window has none, so the step keeps its name and the reader opens
+     the step to see what it holds. */
+  .step-answer {
+    display: none;
+  }
+
+  .rail-tools {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .rail-tools button {
+    width: auto;
+  }
+
+  .rail-look {
+    align-items: center;
+    border-top: 0;
+    display: flex;
+    gap: var(--space-4);
+    margin-top: 0;
+    padding-top: 0;
+    width: 100%;
+  }
+
+  /* The heading names the group, and the group is a row here, so the heading
+     sits above the row rather than beside it. */
+  .rail-look > .rail-heading {
+    flex: 0 0 100%;
+    margin-bottom: 0;
+  }
+
+  .rail-look fieldset {
+    margin: 0;
+  }
+
+  .rail-look .rules {
+    flex-direction: row;
+  }
+
+  .rail-look .appearance-summary,
+  .rail-look .hint {
+    display: none;
+  }
+
+  .card.step-panel {
+    margin: var(--space-4);
   }
 }

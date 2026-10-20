@@ -61,53 +61,60 @@
 </script>
 </head>
 <body>
-<header class="masthead">
-  <div class="masthead-id">
-    <h1 data-i18n="app.title">Vise Transcoder</h1>
-    <p data-i18n="app.tagline">Pick a source, scan it, choose the title, range, angle, and tracks, then set the output up on the tabs below.</p>
-  </div>
+<!-- The window is a rail and a work area.
+     The rail holds the name, the steps the work is done in, the windows the
+     application can open, and the settings that change how it looks. The work
+     area holds one step at a time, so the eight output tabs get the whole
+     window rather than being the last card in a scroll.
 
-  <!-- The toolbar is built from the window catalog: every surface the window
-       offers gets a control that opens it, and a surface it does not offer has
-       no control at all. The surfaces that are part of the work sit on the
-       left and the ones that configure or describe the application sit on the
-       right, so a row of nine equal buttons does not have to be read all the
-       way through to find the one the user wants. -->
-  <nav class="toolbar" id="toolbar" aria-label="Windows and dialogs"></nav>
-</header>
+     The steps are in the order they are done in, and each one carries the
+     answer it has reached, so the rail is a summary of the whole job rather
+     than only a way to move around it. -->
+<div class="shell">
+  <aside class="rail" aria-label="Vise Transcoder">
+    <div class="rail-head">
+      <h1 data-i18n="app.title">Vise Transcoder</h1>
+    </div>
 
-<!-- Theme, layout direction, and language. Every control here is a preference
-     the window holds and resolves; the line underneath says what the window
-     resolved and why, so the user never has to work out which of the two
-     systems the colours on screen came from. The language lives in the
-     preferences rather than here, and a change to it arrives as an event with
-     the two answers that moved.
+    <!-- The steps. The window owns the words: each one says which message it
+         wants, so a locale that lacks one shows the base language rather than
+         a blank. -->
+    <nav class="steps" id="steps" aria-label="Steps"></nav>
 
-     This is a strip rather than a panel because it is chrome, not work. It
-     belongs with the title, and it is short enough that the source is still
-     the first thing on the page. -->
-<section class="appearance" aria-labelledby="appearanceHeading">
-  <h2 class="visually-hidden" id="appearanceHeading">Appearance</h2>
+    <!-- The windows the application can open. They are built from the window
+         catalog: every surface the window offers gets a control that opens it,
+         and a surface it does not offer has no control at all. -->
+    <nav class="rail-tools" id="toolbar" aria-label="Windows and dialogs"></nav>
 
-  <div class="appearance-options">
-    <fieldset>
-      <legend data-i18n="appearance.theme">Theme</legend>
-      <div class="rules" id="appearanceThemeList"></div>
-    </fieldset>
-    <fieldset>
-      <legend data-i18n="appearance.direction">Layout direction</legend>
-      <div class="rules" id="appearanceDirectionList"></div>
-    </fieldset>
-  </div>
+    <!-- Theme and layout direction. Every control here is a preference the
+         window holds and resolves; the line underneath says what the window
+         resolved and why, so the user never has to work out which of the two
+         systems the colours on screen came from. The language lives in the
+         preferences rather than here, and a change to it arrives as an event
+         with the two answers that moved. -->
+    <section class="rail-look" aria-labelledby="appearanceHeading">
+      <h2 class="rail-heading" id="appearanceHeading" data-i18n="appearance.heading">Appearance</h2>
 
-  <p class="appearance-summary" id="appearanceSummary" role="status" aria-live="polite"><span
-       class="icon-flow" id="appearanceFlow" aria-hidden="true"></span><span
-       id="appearanceSummaryText"></span></p>
-  <span class="hint" id="appearanceObservation"></span>
-</section>
+      <div class="appearance-options">
+        <fieldset>
+          <legend data-i18n="appearance.theme">Theme</legend>
+          <div class="rules" id="appearanceThemeList"></div>
+        </fieldset>
+        <fieldset>
+          <legend data-i18n="appearance.direction">Layout direction</legend>
+          <div class="rules" id="appearanceDirectionList"></div>
+        </fieldset>
+      </div>
 
-<main class="layout">
-  <section class="card" aria-labelledby="sourceHeading">
+      <p class="appearance-summary" id="appearanceSummary" role="status" aria-live="polite"><span
+           class="icon-flow" id="appearanceFlow" aria-hidden="true"></span><span
+           id="appearanceSummaryText"></span></p>
+      <span class="hint" id="appearanceObservation"></span>
+    </section>
+  </aside>
+
+  <main class="work" id="work">
+  <section class="card step-panel" data-step="source" aria-labelledby="sourceHeading">
     <div class="card-head">
       <h2 id="sourceHeading">Source</h2>
       <button type="button" class="quiet" id="clearSourceBtn">Forget source</button>
@@ -150,7 +157,7 @@
     </fieldset>
   </section>
 
-  <section class="card" aria-labelledby="titleHeading">
+  <section class="card step-panel" data-step="titles" aria-labelledby="titleHeading">
     <div class="card-head">
       <h2 id="titleHeading">Titles</h2>
       <span class="hint" id="titleCount"></span>
@@ -159,7 +166,7 @@
     <div class="empty" id="titleEmpty">Scan a source to see the titles it contains.</div>
   </section>
 
-  <section class="card" aria-labelledby="rangeHeading">
+  <section class="card step-panel" data-step="range" aria-labelledby="rangeHeading">
     <div class="card-head">
       <h2 id="rangeHeading">Range and angle</h2>
       <span class="hint" id="rangeSummary"></span>
@@ -197,7 +204,7 @@
     </fieldset>
   </section>
 
-  <section class="card" aria-labelledby="trackHeading">
+  <section class="card step-panel" data-step="tracks" aria-labelledby="trackHeading">
     <div class="card-head">
       <h2 id="trackHeading">Tracks</h2>
       <span class="hint" id="trackSummary"></span>
@@ -216,7 +223,7 @@
     </fieldset>
   </section>
 
-  <section class="card full" aria-labelledby="settingsHeading">
+  <section class="card step-panel" data-step="output" aria-labelledby="settingsHeading">
     <div class="card-head">
       <h2 id="settingsHeading">Output settings</h2>
       <span class="hint" id="tabSource">Choose a title to configure the output.</span>
@@ -545,24 +552,25 @@
 
         </div>
       </section>
-    </main>
 
-<!-- The commit action stays on screen. The work is a long column of choices,
-     and the one thing the user came to do — put it in the queue — must not be
-     something they have to scroll back up to find. The path and the button
-     that uses it sit together, because one without the other is a decision the
-     window cannot carry out. -->
-<div class="actionbar" role="group" aria-label="Output and queue">
-  <div class="actionbar-path">
-    <label for="outPath">Output path</label>
-    <input type="text" id="outPath" spellcheck="false" autocomplete="off" dir="ltr"
-           placeholder="C:\media\out.mp4" />
-  </div>
-  <div class="actionbar-buttons">
-    <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
-    <button type="button" id="openSelectionBtn">Choose titles to queue…</button>
-  </div>
-  <span class="hint" id="queueHint">Scan a source and choose a title first.</span>
+    <!-- The commit action stays on screen. The work is a long column of
+         choices, and the one thing the user came to do — put it in the queue —
+         must not be something they have to scroll back up to find. The path and
+         the button that uses it sit together, because one without the other is
+         a decision the window cannot carry out. -->
+    <div class="actionbar" role="group" aria-label="Output and queue">
+      <div class="actionbar-path">
+        <label for="outPath">Output path</label>
+        <input type="text" id="outPath" spellcheck="false" autocomplete="off" dir="ltr"
+               placeholder="C:\media\out.mp4" />
+      </div>
+      <div class="actionbar-buttons">
+        <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
+        <button type="button" id="openSelectionBtn">Choose titles to queue…</button>
+      </div>
+      <span class="hint" id="queueHint">Scan a source and choose a title first.</span>
+    </div>
+  </main>
 </div>
 
 <!-- Every secondary surface is built here as well, from the catalog: role,

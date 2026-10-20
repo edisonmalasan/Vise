@@ -31,6 +31,12 @@
   "tab.chapters": "الفصول",
   "tab.metadata": "بيانات الوصف",
 
+  "step.source": "المصدر",
+  "step.titles": "العناوين",
+  "step.range": "المدى والزاوية",
+  "step.tracks": "المسارات",
+  "step.output": "المخرجات",
+
   "source.none": "لا يوجد مصدر مفتوح.",
   "source.choose": "اختر ملفًا أو مجلدًا للبدء.",
   "source.scanning": "جارٍ فحص {name}",
@@ -70,6 +76,7 @@
   "appearance.directionAutoHint": "تُقرأ {locale} {reads}، لذلك رُتِّبت النافذة {flows}.",
   "appearance.directionFixedLtr": "دائمًا من اليسار إلى اليمين، مهما كانت اللغة.",
   "appearance.directionFixedRtl": "دائمًا من اليمين إلى اليسار، مهما كانت اللغة.",
+  "appearance.heading": "المظهر",
 
   "language.followSystem": "حسب النظام",
   "language.coverage": "{translated} من {total} نصًّا مترجمة. تُعرض النصوص الأخرى بلغة {base}.",

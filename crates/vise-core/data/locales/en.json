@@ -31,6 +31,12 @@
   "tab.chapters": "Chapters",
   "tab.metadata": "Metadata",
 
+  "step.source": "Source",
+  "step.titles": "Titles",
+  "step.range": "Range and angle",
+  "step.tracks": "Tracks",
+  "step.output": "Output",
+
   "source.none": "No source is open.",
   "source.choose": "Choose a file or a folder to begin.",
   "source.scanning": "Scanning {name}",
@@ -70,6 +76,7 @@
   "appearance.directionAutoHint": "{locale} reads {reads}, so the window is laid out {flows}.",
   "appearance.directionFixedLtr": "Always left to right, whatever the language reads.",
   "appearance.directionFixedRtl": "Always right to left, whatever the language reads.",
+  "appearance.heading": "Appearance",
 
   "language.followSystem": "Follow the system",
   "language.coverage": "{translated} of {total} strings are translated. The rest are shown in {base}.",

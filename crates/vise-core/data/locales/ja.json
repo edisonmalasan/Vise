@@ -31,6 +31,12 @@
   "tab.chapters": "チャプター",
   "tab.metadata": "メタデータ",
 
+  "step.source": "ソース",
+  "step.titles": "タイトル",
+  "step.range": "範囲とアングル",
+  "step.tracks": "トラック",
+  "step.output": "出力",
+
   "source.none": "ソースが開かれていません。",
   "source.choose": "ファイルまたはフォルダーを選んでください。",
   "source.scanning": "{name} をスキャンしています",
@@ -70,6 +76,7 @@
   "appearance.directionAutoHint": "{locale} は{reads}に読むため、ウィンドウは{flows}に配置されます。",
   "appearance.directionFixedLtr": "言語がどんな向きでも、常に左から右に配置します。",
   "appearance.directionFixedRtl": "言語がどんな向きでも、常に右から左に配置します。",
+  "appearance.heading": "外観",
 
   "language.followSystem": "システムに合わせる",
   "language.coverage": "{total} 個中 {translated} 個が翻訳済みです。残りは {base} で表示します。",

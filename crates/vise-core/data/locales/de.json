@@ -31,6 +31,12 @@
   "tab.chapters": "Kapitel",
   "tab.metadata": "Metadaten",
 
+  "step.source": "Quelle",
+  "step.titles": "Titel",
+  "step.range": "Bereich und Winkel",
+  "step.tracks": "Spuren",
+  "step.output": "Ausgabe",
+
   "source.none": "Es ist keine Quelle geöffnet.",
   "source.choose": "Wählen Sie eine Datei oder einen Ordner, um zu beginnen.",
   "source.scanning": "{name} wird eingelesen",
@@ -70,6 +76,7 @@
   "appearance.directionAutoHint": "{locale} wird {reads} gelesen, daher ist das Fenster {flows} angeordnet.",
   "appearance.directionFixedLtr": "Immer von links nach rechts, unabhängig von der Sprache.",
   "appearance.directionFixedRtl": "Immer von rechts nach links, unabhängig von der Sprache.",
+  "appearance.heading": "Darstellung",
 
   "language.followSystem": "Wie das System",
   "language.coverage": "{translated} von {total} Texten sind übersetzt. Die übrigen werden in {base} angezeigt.",

@@ -31,6 +31,12 @@
   "tab.chapters": "Capítulos",
   "tab.metadata": "Metadatos",
 
+  "step.source": "Origen",
+  "step.titles": "Títulos",
+  "step.range": "Rango y ángulo",
+  "step.tracks": "Pistas",
+  "step.output": "Salida",
+
   "source.none": "No hay ningún origen abierto.",
   "source.choose": "Elige un archivo o una carpeta para empezar.",
   "source.scanning": "Analizando {name}",
@@ -70,6 +76,7 @@
   "appearance.directionAutoHint": "{locale} se lee {reads}, así que la ventana se dispone {flows}.",
   "appearance.directionFixedLtr": "Siempre de izquierda a derecha, se lea como se lea el idioma.",
   "appearance.directionFixedRtl": "Siempre de derecha a izquierda, se lea como se lea el idioma.",
+  "appearance.heading": "Apariencia",
 
   "language.followSystem": "Seguir al sistema",
   "language.coverage": "{translated} de {total} textos están traducidos. Los demás se muestran en {base}.",

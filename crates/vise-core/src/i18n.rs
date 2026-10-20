@@ -478,6 +478,16 @@ pub enum MessageKey {
     TabChapters,
     /// The metadata tab.
     TabMetadata,
+    /// The step that picks the source.
+    StepSource,
+    /// The step that picks the title.
+    StepTitles,
+    /// The step that sets the range and the angle.
+    StepRange,
+    /// The step that picks the tracks.
+    StepTracks,
+    /// The step that sets the output.
+    StepOutput,
     /// Nothing is open.
     SourceNone,
     /// Nothing has been opened yet.
@@ -552,6 +562,8 @@ pub enum MessageKey {
     AppearanceDirectionFixedLtr,
     /// What overriding to right to left means.
     AppearanceDirectionFixedRtl,
+    /// The heading over the appearance controls.
+    AppearanceHeading,
     /// The option that follows the machine's own language.
     LanguageFollowSystem,
     /// How much of the interface is translated. Takes `{translated}`,
@@ -618,7 +630,7 @@ pub enum MessageKey {
 
 impl MessageKey {
     /// Every key, in the order the files are written in.
-    pub const ALL: [MessageKey; 93] = [
+    pub const ALL: [MessageKey; 99] = [
         MessageKey::AppTitle,
         MessageKey::AppTagline,
         MessageKey::CommonOk,
@@ -647,6 +659,11 @@ impl MessageKey {
         MessageKey::TabSubtitles,
         MessageKey::TabChapters,
         MessageKey::TabMetadata,
+        MessageKey::StepSource,
+        MessageKey::StepTitles,
+        MessageKey::StepRange,
+        MessageKey::StepTracks,
+        MessageKey::StepOutput,
         MessageKey::SourceNone,
         MessageKey::SourceChoose,
         MessageKey::SourceScanning,
@@ -682,6 +699,7 @@ impl MessageKey {
         MessageKey::AppearanceDirectionAutoHint,
         MessageKey::AppearanceDirectionFixedLtr,
         MessageKey::AppearanceDirectionFixedRtl,
+        MessageKey::AppearanceHeading,
         MessageKey::LanguageFollowSystem,
         MessageKey::LanguageCoverage,
         MessageKey::LanguageSwitched,
@@ -775,7 +793,7 @@ impl MessageKey {
 ///
 /// The length is checked against [`MessageKey::ALL`] by a test rather than by
 /// the type system, because an array length is not part of an enum's identity.
-const NAMES: [&str; 93] = [
+const NAMES: [&str; 99] = [
     "app.title",
     "app.tagline",
     "common.ok",
@@ -804,6 +822,11 @@ const NAMES: [&str; 93] = [
     "tab.subtitles",
     "tab.chapters",
     "tab.metadata",
+    "step.source",
+    "step.titles",
+    "step.range",
+    "step.tracks",
+    "step.output",
     "source.none",
     "source.choose",
     "source.scanning",
@@ -839,6 +862,7 @@ const NAMES: [&str; 93] = [
     "appearance.directionAutoHint",
     "appearance.directionFixedLtr",
     "appearance.directionFixedRtl",
+    "appearance.heading",
     "language.followSystem",
     "language.coverage",
     "language.switched",

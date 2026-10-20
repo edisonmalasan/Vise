@@ -244,6 +244,7 @@
     show(current, Boolean(source));
     offer(el("clearSourceBtn"), Boolean(source));
     offer(el("scanBtn"), Boolean(source));
+    state.stepAnswers.source = source ? source.name : "";
     if (source) {
       setText(el("sourceKind"), source.kind === "folder" ? "Folder" : "File");
       setText(el("sourceName"), source.name);
@@ -330,6 +331,20 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     setText(el("titleCount"), titles.length ? titles.length + " found" : "");
     show(el("titleEmpty"), titles.length === 0);
 
+    /* The rail says which title is chosen, so the reader knows the answer
+       without visiting this step. */
+    var chosen = null;
+    titles.forEach(function (title) {
+      if (title.index === selection.selectedTitleIndex) {
+        chosen = title;
+      }
+    });
+    state.stepAnswers.titles = chosen
+      ? chosen.label
+      : titles.length
+      ? titles.length + " found"
+      : "";
+
     titles.forEach(function (title) {
       var item = document.createElement("li");
       item.appendChild(
@@ -371,6 +386,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
 
     if (!range) {
       setText(el("rangeSummary"), "Choose a title to set a range.");
+      state.stepAnswers.range = "";
       return;
     }
 
@@ -378,6 +394,8 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       el("rangeSummary"),
       range.startLabel + " – " + range.endLabel + " (" + range.durationLabel + ")"
     );
+    state.stepAnswers.range =
+      range.startLabel + " – " + range.endLabel;
 
     range.modes.forEach(function (mode) {
       var item = document.createElement("li");
@@ -503,6 +521,9 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         ? tracks.audio.length + " audio · " + tracks.subtitle.length + " subtitle"
         : ""
     );
+    state.stepAnswers.tracks = tracks.audio.length
+      ? tracks.audio.length + " audio · " + tracks.subtitle.length + " subtitle"
+      : "";
 
     function push(list, node) {
       var wrapper = document.createElement("div");
@@ -542,6 +563,9 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     // The tabs describe the chosen title, so they are re-read whenever it or its
     // tracks change.
     refreshTabs();
+
+    renderStepStates(selection);
+    renderStepAnswers();
 
     var usable = selection.phase === "ready" && selection.selectedTitleIndex > 0;
     if (!usable) {
@@ -812,11 +836,133 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
   /* Which surfaces keep themselves up to date while they are open. */
   var POLLED = { queue: 1500, error: 1500, activity: 1500, diagnostics: 2000 };
 
-  /* The surfaces that describe or configure the application rather than being
-     part of the work: what it is, what it is set to, what it is made of. They
-     are pushed to the far end of the toolbar so the ones a reader reaches for
-     while working are found first. */
-  var SETUP_SURFACES = ["about", "presets", "preferences", "diagnostics"];
+  /* The steps the work is done in.
+   *
+   * The order is the order the work happens in, so the rail shows the shape of
+   * the job and the keyboard order and the visual order agree. Each step says
+   * which message it wants, so a locale that lacks one shows the base
+   * language rather than a blank. */
+  var STEPS = [
+    { id: "source", label: "Source" },
+    { id: "titles", label: "Titles" },
+    { id: "range", label: "Range and angle" },
+    { id: "tracks", label: "Tracks" },
+    { id: "output", label: "Output" }
+  ];
+
+  /* The step on screen, and the answers the rail shows. */
+  state.step = "source";
+  state.stepAnswers = {};
+
+  /* The step a step depends on, if any.
+   *
+   * A step that is waiting on an earlier one is shown as waiting rather than
+   * hidden, so the reader can see what comes next and why it is not ready
+   * yet. */
+  function stepWaitingOn(step) {
+    if (step === "titles" || step === "range" || step === "tracks") {
+      return "titles";
+    }
+    if (step === "output") {
+      return "tracks";
+    }
+    return "";
+  }
+
+  /* Build the step list in the rail.
+   *
+   * The steps are buttons rather than links because they change what is on
+   * screen rather than where the page is, and because a button says so. */
+  function buildSteps() {
+    var list = el("steps");
+    if (!list) {
+      return;
+    }
+    clear(list);
+    STEPS.forEach(function (step, index) {
+      var button = node("button", "step");
+      button.type = "button";
+      button.id = "step-" + step.id;
+      button.dataset.step = step.id;
+
+      var number = node("span", "step-index", String(index + 1));
+      number.setAttribute("aria-hidden", "true");
+
+      var body = node("span", "step-body");
+      var name = node("span", "step-name", step.label);
+      name.dataset.i18n = "step." + step.id;
+      var answer = node("span", "step-answer", "");
+      answer.id = "stepAnswer-" + step.id;
+
+      body.appendChild(name);
+      body.appendChild(answer);
+      button.appendChild(number);
+      button.appendChild(body);
+      button.addEventListener("click", function () {
+        showStep(step.id);
+      });
+      list.appendChild(button);
+    });
+  }
+
+  /* Show one step's card, and say so in the rail. */
+  function showStep(id) {
+    var known = STEPS.some(function (step) {
+      return step.id === id;
+    });
+    if (!known) {
+      return;
+    }
+    state.step = id;
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".step-panel"),
+      function (panel) {
+        panel.dataset.active = panel.dataset.step === id ? "true" : "false";
+      }
+    );
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".step"),
+      function (button) {
+        button.setAttribute(
+          "aria-current",
+          button.dataset.step === id ? "true" : "false"
+        );
+      }
+    );
+  }
+
+  /* Put the answer each step has reached beside its name.
+   *
+   * This is what makes the rail a summary of the job rather than only a way
+   * to move around it: the state of every step is visible whether or not that
+   * step is the one on screen. */
+  function renderStepAnswers() {
+    STEPS.forEach(function (step) {
+      var node = el("stepAnswer-" + step.id);
+      if (node) {
+        setText(node, state.stepAnswers[step.id] || "");
+      }
+    });
+  }
+
+  /* Say which steps are waiting on an earlier one. */
+  function renderStepStates(selection) {
+    var chosen = selection && selection.selectedTitleIndex > 0;
+    STEPS.forEach(function (step) {
+      var button = el("step-" + step.id);
+      if (!button) {
+        return;
+      }
+      var needs = stepWaitingOn(step.id);
+      var waiting = false;
+      if (needs === "titles") {
+        waiting = !chosen;
+      } else if (needs === "tracks") {
+        waiting = !chosen;
+      }
+      button.dataset.waiting = waiting ? "true" : "false";
+    });
+  }
 
   function shellOf(id) {
     return el("surface-" + id);
@@ -867,7 +1013,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     return shell;
   }
 
-  /* The toolbar and the surface shells, built from the catalog. */
+  /* The steps and the surface shells, built from the catalog. */
   function loadCatalog() {
     return call("window_catalog").then(function (catalog) {
       state.catalog = catalog.surfaces || [];
@@ -895,13 +1041,6 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         button.id = spec.buttonId;
         button.setAttribute("aria-haspopup", "dialog");
         button.title = spec.hint;
-        /* The surfaces that describe or configure the application are pushed to
-           the far end of the row, so the ones that are part of the work are
-           found first. They are marked rather than reordered, so the order the
-           window offers them in is the order they appear. */
-        if (SETUP_SURFACES.indexOf(spec.id) !== -1) {
-          button.classList.add("setup");
-        }
         button.addEventListener("click", function () {
           openSurface(spec.id);
         });
@@ -4119,6 +4258,11 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         ? tabs.source.name + " · " + tabs.source.summary
         : tabs.source.summary
     );
+    /* The rail says what the output is, so the reader knows what they would
+       get without visiting the step. The tab on screen is not the answer: the
+       answer is the format the settings describe. */
+    state.stepAnswers.output = tabs.summary ? tabs.summary.formatLabel : "";
+    renderStepAnswers();
     // A disc is read differently from a file, so the user is told which they
     // picked rather than being left to work it out from a failure.
     var sourceNote = el("tabSourceNote");
@@ -5173,6 +5317,8 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       renderRecents();
       return;
     }
+    buildSteps();
+    showStep(state.step);
     loadCatalog()
       .then(function () {
         renderRecents();
