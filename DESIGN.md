@@ -19,49 +19,54 @@ The window is a rail and a work area, not a document.
 
 ```
 ┌──────────────┬──────────────────────────────────────────────┐
-│ Vise         │  ┌────────────────────────────────────────┐  │
-│ Transcoder   │  │  Source                                 │  │
-│              │  │  ...the card for the selected step...   │  │
-│  1 Source    │  └────────────────────────────────────────┘  │
-│    film.mkv  │                                              │
-│  2 Titles    │                                              │
-│    Title 1   │                                              │
-│  3 Range     │                                              │
-│    0:00–0:12 │                                              │
-│  4 Tracks    │                                              │
-│  5 Output    │                                              │
-│    MP4 · H264 │                                              │
-│              │                                              │
-│  Queue       │                                              │
-│  Activity    │                                              │
-│  …           │                                              │
-│  Theme       │                                              │
-│  Direction   │                                              │
+│ Vise         │  SOURCE            │ TITLES                  │
+│ Transcoder   │  ┌───────────────┐ │ ┌─────────────────────┐ │
+│              │  │ drop, path    │ │ │ Title 1             │ │
+│  1 Source    │  │ scan, recent  │ │ │ Title 2             │ │
+│    film.mkv  │  └───────────────┘ │ └─────────────────────┘ │
+│  2 Titles    │                                            │
+│    Title 1   │  RANGE AND ANGLE   │ TRACKS                 │
+│  3 Range     │  ┌───────────────┐ │ ┌─────────────────────┐ │
+│    0:00–0:12 │  │ modes, points │ │ │ audio, subtitles   │ │
+│  4 Tracks    │  └───────────────┘ │ └─────────────────────┘ │
+│    1 audio   │                                            │
+│  5 Output    │  OUTPUT SETTINGS                          │
+│    MP4 · H264 │  ┌──────────────────────────────────────┐  │
+│              │  │ Summary Dimensions Filters Video …    │  │
+│  Queue       │  │ …                                    │  │
+│  Activity    │  └──────────────────────────────────────┘  │
+│  …           │                                            │
+│  Theme       │                                            │
+│  Direction   │                                            │
 ├──────────────┴──────────────────────────────────────────────┤
 │  Output path [...............]  [Add to queue] [Choose…]    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-- **The rail is the pipeline.** The steps are in the order the work is done in,
-  so the shape of the job is legible rather than inferred from where the cards
-  happen to sit. A step that is waiting on an earlier one is dimmed rather
-  than hidden, so the reader always knows what comes next.
-- **Each step carries its answer.** The source's name, the title that is
-  chosen, the range that is set, the tracks that are on, the container and the
-  codecs the output will be. The rail is therefore a summary of the whole job,
-  not only a way to move around it.
-- **One step at a time.** The work area shows the step that is chosen. This is
-  what gives the eight output tabs the room they need; they were the last card
-  in a scroll, below four cards of setup.
+- **Nothing is hidden behind a click.** Every control is on screen. The work
+  is one scroll with the five steps in the order the work is done in, so the
+  order the cards are read in is the order the work happens in, and the reader
+  never switches anything to reach a control.
+- **The rail is a summary, not a menu.** Each step carries the answer it has
+  reached: the source's name, the title that is chosen, the range that is
+  set, the tracks that are on, the container and the codecs the output will
+  be. The state of the whole job is visible without scrolling.
+- **A step in the rail is a link, not a switch.** Clicking it scrolls to that
+  step; the step in view is marked as the reader scrolls, so the rail is a
+  position indicator as well as a summary.
+- **The work area is two columns of setup over one full-width band of
+  output.** The four selection cards are in a two-up grid and the output
+  settings take the whole width, because the eight tabs need the room and the
+  selection cards do not. Reading order is left to right and then down.
 - **The windows are in the rail** because they are chrome rather than work,
   and the appearance controls are at its foot because they are settings a
   reader changes once.
 - **The action bar is pinned to the foot** of the work area. Where the file is
   written and the button that writes it are always together and always
-  reachable, whatever the step on screen.
-- **Below the width where a rail and a card both fit**, the rail becomes a
-  strip along the top with the steps in a row. The strip is as many bands
-  tall as it needs and no more, so the work area keeps the rest of the height.
+  reachable, whatever the length of the work above them.
+- **Below the width where two cards fit side by side**, the work is one
+  column. Below the width where a rail and a card both fit, the rail becomes a
+  strip along the top with the steps in a row.
 
 ### Spacing
 

@@ -113,7 +113,12 @@
     </section>
   </aside>
 
+  <!-- The work. Every control is on screen: the reader never switches
+       anything to reach one. The steps are in the order they are done in, so
+       the order the cards are read in is the order the work happens in, and
+       the rail beside them says what each step has already reached. -->
   <main class="work" id="work">
+  <div class="work-scroll" id="workScroll">
   <section class="card step-panel" data-step="source" aria-labelledby="sourceHeading">
     <div class="card-head">
       <h2 id="sourceHeading">Source</h2>
@@ -552,6 +557,7 @@
 
         </div>
       </section>
+  </div>
 
     <!-- The commit action stays on screen. The work is a long column of
          choices, and the one thing the user came to do — put it in the queue —

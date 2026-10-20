@@ -871,8 +871,9 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
 
   /* Build the step list in the rail.
    *
-   * The steps are buttons rather than links because they change what is on
-   * screen rather than where the page is, and because a button says so. */
+   * The steps are links rather than switches. The work is all on screen, so a
+   * step moves the reader to a step rather than hiding the others, and the
+   * step the reader is looking at is worked out from where they are. */
   function buildSteps() {
     var list = el("steps");
     if (!list) {
@@ -899,27 +900,37 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       button.appendChild(number);
       button.appendChild(body);
       button.addEventListener("click", function () {
-        showStep(step.id);
+        jumpToStep(step.id);
       });
       list.appendChild(button);
     });
   }
 
-  /* Show one step's card, and say so in the rail. */
-  function showStep(id) {
-    var known = STEPS.some(function (step) {
-      return step.id === id;
-    });
-    if (!known) {
+  /* Move the reader to a step.
+   *
+   * The work is one scroll, so this is a scroll and not a switch: the other
+   * steps stay on screen. The reader is put on the step they asked for rather
+   * than left looking at the top of the work. */
+  function jumpToStep(id) {
+    var panel = document.querySelector('.step-panel[data-step="' + id + '"]');
+    var scroller = el("workScroll");
+    if (!panel || !scroller) {
       return;
     }
+    var top = panel.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+    scroller.scrollTo({
+      top: scroller.scrollTop + top - 8,
+      behavior: "smooth"
+    });
+    markStep(id);
+  }
+
+  /* Say which step the reader is looking at.
+   *
+   * The step whose card is nearest the top of the work area is the one they
+   * are on, so the rail says where they are without them having to say so. */
+  function markStep(id) {
     state.step = id;
-    Array.prototype.forEach.call(
-      document.querySelectorAll(".step-panel"),
-      function (panel) {
-        panel.dataset.active = panel.dataset.step === id ? "true" : "false";
-      }
-    );
     Array.prototype.forEach.call(
       document.querySelectorAll(".step"),
       function (button) {
@@ -931,11 +942,31 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     );
   }
 
+  /* The step the reader is on, worked out from the scroll. */
+  function stepInView() {
+    var scroller = el("workScroll");
+    if (!scroller) {
+      return state.step;
+    }
+    var scrollerTop = scroller.getBoundingClientRect().top;
+    var current = STEPS[0] ? STEPS[0].id : "";
+    STEPS.forEach(function (step) {
+      var panel = document.querySelector('.step-panel[data-step="' + step.id + '"]');
+      if (!panel) {
+        return;
+      }
+      if (panel.getBoundingClientRect().top - scrollerTop <= 24) {
+        current = step.id;
+      }
+    });
+    return current;
+  }
+
   /* Put the answer each step has reached beside its name.
    *
    * This is what makes the rail a summary of the job rather than only a way
    * to move around it: the state of every step is visible whether or not that
-   * step is the one on screen. */
+   * step is the one the reader is on. */
   function renderStepAnswers() {
     STEPS.forEach(function (step) {
       var node = el("stepAnswer-" + step.id);
@@ -945,7 +976,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     });
   }
 
-  /* Say which steps are waiting on an earlier one. */
+  /* Put the answer each step has reached beside its name. */
   function renderStepStates(selection) {
     var chosen = selection && selection.selectedTitleIndex > 0;
     STEPS.forEach(function (step) {
@@ -5318,7 +5349,23 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       return;
     }
     buildSteps();
-    showStep(state.step);
+    markStep(state.step);
+    /* The rail says which step the reader is on, worked out from where they
+       are, so it is a position indicator as well as a summary. The work is
+       one scroll, so this is a scroll and not a switch. */
+    var scroller = el("workScroll");
+    if (scroller) {
+      scroller.addEventListener(
+        "scroll",
+        function () {
+          var current = stepInView();
+          if (current !== state.step) {
+            markStep(current);
+          }
+        },
+        { passive: true }
+      );
+    }
     loadCatalog()
       .then(function () {
         renderRecents();
