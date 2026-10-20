@@ -606,9 +606,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/ui/index.html": {
-    "mtime": 1792450365.2292576,
-    "seen": 1792451536.4429524,
-    "ast_hash": "d9417fc782a8b2a4b93bc527ee37be64",
+    "mtime": 1792483683.7490284,
+    "seen": 1792483773.1300986,
+    "ast_hash": "5be1989b8ba7e91fbadeda7a47b7b96b",
     "semantic_hash": ""
   },
   "docs/CONTEXT.md": {
@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   "docs/ROADMAP.md": {
-    "mtime": 1792455116.5084245,
-    "seen": 1792455213.5369618,
-    "ast_hash": "3266bb6b69079d3232bdbc790c9f16f1",
+    "mtime": 1792483683.7661917,
+    "seen": 1792483773.1304543,
+    "ast_hash": "ca7770cf5ab3be1fae271b308e88889d",
     "semantic_hash": ""
   },
   "docs/release-notes-template.md": {
@@ -636,9 +636,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792453910.7713192,
-    "seen": 1792455213.5350246,
-    "ast_hash": "a48c8362eb31e546dbfb5ccb77066935",
+    "mtime": 1792483683.742461,
+    "seen": 1792483773.129654,
+    "ast_hash": "1b4c3b03772bc1899fcbf30bd4e83c94",
     "semantic_hash": ""
   },
   "docs/SETUP.md": {
@@ -1038,9 +1038,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/ui/app.js": {
-    "mtime": 1792450053.404394,
-    "seen": 1792451536.4109719,
-    "ast_hash": "967e0fcce745da8be117409e1054881a",
+    "mtime": 1792483683.7465127,
+    "seen": 1792483773.1063862,
+    "ast_hash": "b296ad32555248ef24051d28d40b0998",
     "semantic_hash": ""
   },
   "crates/vise-core/data/builtin-presets.json": {
@@ -1050,39 +1050,39 @@
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/ar.json": {
-    "mtime": 1792316593.6593308,
-    "seen": 1792316628.1672773,
-    "ast_hash": "142f40686771dd5cec3674bd269d0c00",
+    "mtime": 1792483683.7521,
+    "seen": 1792483773.1074934,
+    "ast_hash": "cd33923752eb008aee29a079ddcf3403",
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/de.json": {
-    "mtime": 1792316593.6608374,
-    "seen": 1792316628.167279,
-    "ast_hash": "4152e5309bc26cd789629c2e0658509a",
+    "mtime": 1792483683.7545214,
+    "seen": 1792483773.1074963,
+    "ast_hash": "ff996f657a5f1132bda32a7244afb88b",
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/en.json": {
-    "mtime": 1792316593.6623852,
-    "seen": 1792316628.1672804,
-    "ast_hash": "dea9827f3c8fee6e5c86ab4cc8b729ab",
+    "mtime": 1792483683.7555273,
+    "seen": 1792483773.1074977,
+    "ast_hash": "749dbacb30df4e693df23099c527abac",
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/es.json": {
-    "mtime": 1792316593.6638997,
-    "seen": 1792316628.1672819,
-    "ast_hash": "bda96fc962c645803a7ca112753ad3dc",
+    "mtime": 1792483683.757039,
+    "seen": 1792483773.1074998,
+    "ast_hash": "99ff813001adcee2e56fe00d39aa529f",
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/fr.json": {
-    "mtime": 1792316593.666419,
-    "seen": 1792316628.1672833,
-    "ast_hash": "aedb5459eec144d04e4eb7cf735c97ac",
+    "mtime": 1792483683.7580855,
+    "seen": 1792483773.1075015,
+    "ast_hash": "03cce50b6662fa120e19da9d219a36d0",
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/ja.json": {
-    "mtime": 1792316593.6674287,
-    "seen": 1792316628.1672845,
-    "ast_hash": "49fbfd1a69558b2a843156ad723cc372",
+    "mtime": 1792483683.759596,
+    "seen": 1792483773.1075034,
+    "ast_hash": "5bb82eff5c7cf0aa924a317642bac39c",
     "semantic_hash": ""
   },
   "crates/vise-core/data/preset-descriptions/ar.json": {
@@ -1140,9 +1140,9 @@
     "semantic_hash": ""
   },
   "crates/vise-core/src/i18n.rs": {
-    "mtime": 1792316593.6710148,
-    "seen": 1792316628.1675706,
-    "ast_hash": "565a15c10792b7acea651c45333f1a5d",
+    "mtime": 1792483683.7636764,
+    "seen": 1792483773.1098151,
+    "ast_hash": "ac40545669325ea2c8b918b00d0906fb",
     "semantic_hash": ""
   },
   "crates/vise-core/src/lossless.rs": {
@@ -1404,9 +1404,9 @@
     "semantic_hash": ""
   },
   "DESIGN.md": {
-    "mtime": 1792450053.397446,
-    "seen": 1792451536.442596,
-    "ast_hash": "9fcc042b98447a2aa29d0006e36dfc20",
+    "mtime": 1792483683.7409396,
+    "seen": 1792483773.1294403,
+    "ast_hash": "7e585ce6f936c1b012ca50db50f430e9",
     "semantic_hash": ""
   },
   "PRODUCT.md": {
@@ -1422,21 +1422,21 @@
     "semantic_hash": ""
   },
   "docs/screenshot-desktop.png": {
-    "mtime": 1792450053.4099584,
-    "seen": 1792451536.4444451,
-    "ast_hash": "3688019b754dd79c15645779322d7f97",
+    "mtime": 1792483683.7692335,
+    "seen": 1792483773.1318786,
+    "ast_hash": "4cfaf4e2a2388f62ff5a7f622a03822b",
     "semantic_hash": ""
   },
   "docs/screenshot-presets.png": {
-    "mtime": 1792450053.412476,
-    "seen": 1792451536.4444482,
-    "ast_hash": "3cd8aa4f9ff94599136dcb8951f015e0",
+    "mtime": 1792483683.774798,
+    "seen": 1792483773.1318812,
+    "ast_hash": "00ac08d043fe4e583e5dd2bea078aa51",
     "semantic_hash": ""
   },
   "docs/screenshot-tabs.png": {
-    "mtime": 1792450053.4134977,
-    "seen": 1792451536.4444513,
-    "ast_hash": "3688019b754dd79c15645779322d7f97",
+    "mtime": 1792483683.7783732,
+    "seen": 1792483773.131894,
+    "ast_hash": "b6434bc777a0737d887348534d9b6757",
     "semantic_hash": ""
   }
 }
