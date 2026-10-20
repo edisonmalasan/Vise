@@ -30,7 +30,7 @@ filters the application offers are always the ones it was tested against.
 
 | | |
 |---|---|
-| ![The window with a source scanned](docs/screenshot-desktop.png)<br>**The window.** A rail carries the steps of the work and the answer each one has reached; the work area shows the step you are on, and the action that commits the job is always on screen. | ![The output settings](docs/screenshot-tabs.png)<br>**Eight configuration tabs.** Container, codecs, filters, dimensions, tracks, chapters, and metadata — each control explaining what it does, with the whole window to work in. |
+| ![The window with a source scanned](docs/screenshot-desktop.png)<br>**The window.** Every control is on screen at once. The rail carries the steps of the work and the answer each one has reached; the action that commits the job is always on screen. | ![The output settings](docs/screenshot-tabs.png)<br>**Eight configuration tabs.** Container, codecs, filters, dimensions, tracks, chapters, and metadata — each control explaining what it does. |
 | ![The preset catalogue](docs/screenshot-presets.png)<br>**138 built-in presets** across six categories, each resolved against the hardware this machine actually has. | |
 
 ## Install

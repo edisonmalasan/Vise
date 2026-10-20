@@ -237,8 +237,11 @@ p {
  *
  * Each row is a step in the work and the answer that step has reached. The
  * answer is why the row is worth its space: the reader can see the shape of
- * the whole job from the rail, whether or not that step is the one on
- * screen. */
+ * the whole job from the rail, whether or not that step is the one they are
+ * looking at.
+ *
+ * A row is a link, not a switch. The work is all on screen, so a row moves
+ * the reader to a step rather than hiding the others. */
 .steps {
   display: flex;
   flex-direction: column;
@@ -393,7 +396,11 @@ p {
   text-transform: uppercase;
 }
 
-/* The work area. */
+/* The work area.
+ *
+ * The work is one scroll with every step in it, so the reader never switches
+ * anything to reach a control. The action bar is outside the scroll, so it
+ * stays at the foot however far down the work is. */
 .work {
   display: flex;
   flex-direction: column;
@@ -401,25 +408,39 @@ p {
   overflow: hidden;
 }
 
-/* One step's card at a time.
- *
- * The card is the whole work area rather than the last card in a scroll, so
- * the eight output tabs have the room they need. The selector carries the
- * card as well, because the card's own display would otherwise win on order
- * and every panel would show at once.
- *
- * The card is as tall as its content and no taller, so a step with little in
- * it does not leave a field of empty panel below it. */
-.card.step-panel {
-  display: none;
-  flex: 0 0 auto;
-  margin: var(--space-5);
-  max-height: 100%;
+.work-scroll {
+  align-items: start;
+  display: grid;
+  flex: 1 1 auto;
+  gap: var(--space-5);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 0;
   overflow-y: auto;
+  padding: var(--space-5);
 }
 
-.card.step-panel[data-active="true"] {
+/* The four selection cards sit two to a band, and the output settings take
+ * the whole width, because the eight tabs need the room and the selection
+ * cards do not. Reading order is left to right and then down, which is the
+ * order the work is done in. */
+.step-panel {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  min-width: 0;
+}
+
+.step-panel[data-step="output"] {
+  grid-column: 1 / -1;
+}
+
+/* Below the width where two cards fit side by side, the work is one column
+ * and the output settings follow the selection cards. */
+@media (max-width: 1100px) {
+  .work-scroll {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 
@@ -2023,7 +2044,9 @@ button.warn:hover:not(:disabled) {
     border-inline-end: 0;
     flex-direction: row;
     flex-wrap: wrap;
-    gap: var(--space-3) var(--space-4);
+    /* The strip is a row of things, so the gap between them is the gap
+       between neighbours rather than the gap between groups. */
+    gap: var(--space-2) var(--space-4);
     overflow: visible;
     padding: var(--space-3) var(--space-4);
   }
@@ -2062,21 +2085,40 @@ button.warn:hover:not(:disabled) {
     align-items: center;
     border-top: 0;
     display: flex;
-    gap: var(--space-4);
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    /* The rail is a strip here rather than a column, so nothing is pushed to
+       the foot of it: the strip is as tall as its contents and no more. */
     margin-top: 0;
     padding-top: 0;
     width: 100%;
   }
 
-  /* The heading names the group, and the group is a row here, so the heading
-     sits above the row rather than beside it. */
+  /* The heading names the group and the group is a row here, so the heading
+     sits with the row rather than on a row of its own. */
   .rail-look > .rail-heading {
-    flex: 0 0 100%;
+    flex: 0 0 auto;
     margin-bottom: 0;
   }
 
+  .rail-look .appearance-options {
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
   .rail-look fieldset {
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-2);
     margin: 0;
+  }
+
+  .rail-look legend {
+    float: inline-start;
+    padding: 0;
   }
 
   .rail-look .rules {
@@ -2086,9 +2128,5 @@ button.warn:hover:not(:disabled) {
   .rail-look .appearance-summary,
   .rail-look .hint {
     display: none;
-  }
-
-  .card.step-panel {
-    margin: var(--space-4);
   }
 }
