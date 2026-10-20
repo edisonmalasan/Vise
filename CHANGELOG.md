@@ -12,7 +12,8 @@ Nothing yet.
 ## [0.1.0] - 2026-10-19
 
 The first release. A working transcoder rather than a finished product; the
-release notes carry the honest account of what it does and does not do.
+release notes carry the honest account of what it does and does not do, and
+the downloads are on the [releases page](https://github.com/edisonmalasan/Vise/releases/tag/v0.1.0).
 
 ### Added
 
