@@ -15,20 +15,53 @@ that is not in use stays quiet.
 
 ## Layout
 
-The window is a shell, not a document.
+The window is a rail and a work area, not a document.
 
-- **The masthead** carries the name, one line of orientation, and the controls
-  that open the other windows. It is a bar, not a title block.
-- **The appearance strip** is chrome, not work. It holds the theme and the
-  layout direction as a row of switches, with one line underneath saying what
-  the window resolved and why. It belongs above the work because it is part of
-  the window, not part of the task.
-- **The work** is a scrolling column of three bands — the source and what is in
-  it, what to take from it, and what to make. The bands are separated by more
-  space than the parts inside a band.
-- **The action bar** is pinned to the foot of the window. Where the file is
+```
+┌──────────────┬──────────────────────────────────────────────┐
+│ Vise         │  ┌────────────────────────────────────────┐  │
+│ Transcoder   │  │  Source                                 │  │
+│              │  │  ...the card for the selected step...   │  │
+│  1 Source    │  └────────────────────────────────────────┘  │
+│    film.mkv  │                                              │
+│  2 Titles    │                                              │
+│    Title 1   │                                              │
+│  3 Range     │                                              │
+│    0:00–0:12 │                                              │
+│  4 Tracks    │                                              │
+│  5 Output    │                                              │
+│    MP4 · H264 │                                              │
+│              │                                              │
+│  Queue       │                                              │
+│  Activity    │                                              │
+│  …           │                                              │
+│  Theme       │                                              │
+│  Direction   │                                              │
+├──────────────┴──────────────────────────────────────────────┤
+│  Output path [...............]  [Add to queue] [Choose…]    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- **The rail is the pipeline.** The steps are in the order the work is done in,
+  so the shape of the job is legible rather than inferred from where the cards
+  happen to sit. A step that is waiting on an earlier one is dimmed rather
+  than hidden, so the reader always knows what comes next.
+- **Each step carries its answer.** The source's name, the title that is
+  chosen, the range that is set, the tracks that are on, the container and the
+  codecs the output will be. The rail is therefore a summary of the whole job,
+  not only a way to move around it.
+- **One step at a time.** The work area shows the step that is chosen. This is
+  what gives the eight output tabs the room they need; they were the last card
+  in a scroll, below four cards of setup.
+- **The windows are in the rail** because they are chrome rather than work,
+  and the appearance controls are at its foot because they are settings a
+  reader changes once.
+- **The action bar is pinned to the foot** of the work area. Where the file is
   written and the button that writes it are always together and always
-  reachable, whatever the length of the work above them.
+  reachable, whatever the step on screen.
+- **Below the width where a rail and a card both fit**, the rail becomes a
+  strip along the top with the steps in a row. The strip is as many bands
+  tall as it needs and no more, so the work area keeps the rest of the height.
 
 ### Spacing
 
@@ -50,10 +83,11 @@ where nothing is louder than anything else has no hierarchy at all.
 
 ### Grid
 
-`.layout` is a two-column grid above 1000px and one column below it. The
-columns are `5fr / 4fr`: the source carries a path field and wants more room
-than a list of titles. `align-items: start` keeps a card the height of its own
-content, so an empty list does not leave a void beside a full one.
+`.shell` is two columns: the rail at 280px and the work area taking the rest.
+The rail is as wide as the step names and their answers need and no wider,
+because the work area is where the reading happens. The rail and the work
+area are each their own scroll, so a long list of windows never pushes the
+action bar off the foot of the window.
 
 ## Colour
 
@@ -101,6 +135,8 @@ measure the eye reads comfortably.
 
 | Component | What it is |
 |---|---|
+| **Rail** | The window's chrome: the name, the steps, the windows, and the settings. It scrolls on its own and never moves the work area. |
+| **Step** | A row in the rail: the number of the step, its name, and the answer it has reached. The step on screen is marked with the accent and a leading edge; a step waiting on an earlier one is dimmed. |
 | **Card** | A panel with a heading, a hint on the right, and its content below. `--surface`, a 1px border, a 10px radius, 16px of padding. |
 | **Choice** | A radio in a label: the control, the name, and the reason beneath it. The chosen one carries the accent wash. |
 | **Switch** | A checkbox with a name and its reason beneath, in a row that wraps. |
