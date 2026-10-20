@@ -31,6 +31,9 @@
   "tab.chapters": "Kapitel",
   "tab.metadata": "Metadaten",
 
+  "rail.job": "Der Auftrag",
+  "rail.application": "Die Anwendung",
+
   "step.source": "Quelle",
   "step.titles": "Titel",
   "step.range": "Bereich und Winkel",

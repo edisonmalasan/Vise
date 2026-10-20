@@ -22,20 +22,23 @@ The window is a rail and a work area, not a document.
 │ Vise         │  SOURCE            │ TITLES                  │
 │ Transcoder   │  ┌───────────────┐ │ ┌─────────────────────┐ │
 │              │  │ drop, path    │ │ │ Title 1             │ │
-│  1 Source    │  │ scan, recent  │ │ │ Title 2             │ │
-│    film.mkv  │  └───────────────┘ │ └─────────────────────┘ │
-│  2 Titles    │                                            │
-│    Title 1   │  RANGE AND ANGLE   │ TRACKS                 │
-│  3 Range     │  ┌───────────────┐ │ ┌─────────────────────┐ │
-│    0:00–0:12 │  │ modes, points │ │ │ audio, subtitles   │ │
-│  4 Tracks    │  └───────────────┘ │ └─────────────────────┘ │
-│    1 audio   │                                            │
-│  5 Output    │  OUTPUT SETTINGS                          │
-│    MP4 · H264 │  ┌──────────────────────────────────────┐  │
-│              │  │ Summary Dimensions Filters Video …    │  │
-│  Queue       │  │ …                                    │  │
-│  Activity    │  └──────────────────────────────────────┘  │
+│ THE JOB      │  │ scan, recent  │ │ │ Title 2             │ │
+│  (1) Source  │  └───────────────┘ │ └─────────────────────┘ │
+│      film.mkv│  RANGE AND ANGLE   │ TRACKS                 │
+│  (2) Titles  │  ┌───────────────┐ │ ┌─────────────────────┐ │
+│      Title 1 │  │ modes, points │ │ │ audio, subtitles   │ │
+│  (3) Range   │  └───────────────┘ │ └─────────────────────┘ │
+│      0:00–0:12│  OUTPUT SETTINGS                          │
+│  (4) Tracks  │  ┌──────────────────────────────────────┐  │
+│      1 audio │  │ Summary Dimensions Filters Video …    │  │
+│  (5) Output  │  │ …                                    │  │
+│      MP4·H264 │  └──────────────────────────────────────┘  │
+│              │                                            │
+│ THE APPLICATION                                       │
+│  Queue       │                                            │
+│  Activity    │                                            │
 │  …           │                                            │
+│ APPEARANCE   │                                            │
 │  Theme       │                                            │
 │  Direction   │                                            │
 ├──────────────┴──────────────────────────────────────────────┤
@@ -54,10 +57,21 @@ The window is a rail and a work area, not a document.
 - **A step in the rail is a link, not a switch.** Clicking it scrolls to that
   step; the step in view is marked as the reader scrolls, so the rail is a
   position indicator as well as a summary.
+- **A step's marker says whether it is done.** A circle with the number in
+  it: hollow while the step has no answer, filled once it has one, and solid
+  for the step the reader is in. The pipeline is a shape to look at rather
+  than a list to read.
+- **The rail's groups are named.** "The job" over the steps and "The
+  application" over the windows, because five steps and nine windows set the
+  same way are one list of fourteen things rather than two kinds of thing.
 - **The work area is two columns of setup over one full-width band of
   output.** The four selection cards are in a two-up grid and the output
   settings take the whole width, because the eight tabs need the room and the
   selection cards do not. Reading order is left to right and then down.
+- **The source card is quiet once a source is chosen.** The drop target
+  becomes a strip that still takes a drop, because it is how the source is
+  replaced, but it no longer takes a third of the first screen and pushes the
+  work below the fold.
 - **The windows are in the rail** because they are chrome rather than work,
   and the appearance controls are at its foot because they are settings a
   reader changes once.
@@ -141,7 +155,7 @@ measure the eye reads comfortably.
 | Component | What it is |
 |---|---|
 | **Rail** | The window's chrome: the name, the steps, the windows, and the settings. It scrolls on its own and never moves the work area. |
-| **Step** | A row in the rail: the number of the step, its name, and the answer it has reached. The step on screen is marked with the accent and a leading edge; a step waiting on an earlier one is dimmed. |
+| **Step** | A row in the rail: a circle with the number in it, the step's name, and the answer it has reached. The circle is hollow until the step has an answer, filled once it has one, and solid for the step the reader is in. |
 | **Card** | A panel with a heading, a hint on the right, and its content below. `--surface`, a 1px border, a 10px radius, 16px of padding. |
 | **Choice** | A radio in a label: the control, the name, and the reason beneath it. The chosen one carries the accent wash. |
 | **Switch** | A checkbox with a name and its reason beneath, in a row that wraps. |

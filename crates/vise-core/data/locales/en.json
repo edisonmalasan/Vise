@@ -31,6 +31,9 @@
   "tab.chapters": "Chapters",
   "tab.metadata": "Metadata",
 
+  "rail.job": "The job",
+  "rail.application": "The application",
+
   "step.source": "Source",
   "step.titles": "Titles",
   "step.range": "Range and angle",
