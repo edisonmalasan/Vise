@@ -337,6 +337,16 @@ stops there, and nothing reaches a user until the tag is pushed. The notes
 come from `release-notes/<version>.md` through `scripts/release-notes.sh`, and
 a version with no notes is refused rather than published empty.
 
+The first release was cut and checked by downloading it. All four files were
+fetched from the release and matched the digests in `SHA256SUMS`, and each was
+confirmed to be the format it claims: a PE executable, an ar archive, an ELF
+file, and a disk image with its trailer. One defect turned up in that check:
+GitHub stores an asset with the space in its name turned into a dot, so the
+checksum file named four files the release did not have and `sha256sum -c`
+would have failed on every one of them. The name is now changed before the
+digests are taken, so the checksum file names the files that are actually
+there.
+
 Two defects were found by reading what the build actually produces rather than
 what it was meant to. The macOS bundle is aarch64, but the only published
 macOS encoder is the x86_64 one, so the application ships an encoder that
