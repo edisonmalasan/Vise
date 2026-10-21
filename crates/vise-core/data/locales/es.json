@@ -1,6 +1,7 @@
 {
   "app.title": "Vise Transcoder",
   "app.tagline": "Transcodifica vídeo y audio en tu propio equipo.",
+  "job.new": "Trabajo nuevo",
 
   "common.ok": "Aceptar",
   "common.cancel": "Cancelar",
@@ -30,9 +31,6 @@
   "tab.subtitles": "Subtítulos",
   "tab.chapters": "Capítulos",
   "tab.metadata": "Metadatos",
-
-  "rail.job": "El trabajo",
-  "rail.application": "La aplicación",
 
   "step.source": "Origen",
   "step.titles": "Títulos",

@@ -5865,6 +5865,43 @@ mod tests {
         assert!(json["problems"].is_array());
     }
 
+    /// Writes the tab set to a file, for the browser harness the design
+    /// inspector opens. The page asks the window for the tab set and the
+    /// window answers with this shape; a hand-written copy of it would drift
+    /// from the real one the first time a field was added.
+    ///
+    /// The file lands outside the product's own folder, because that folder is
+    /// what the application ships.
+    #[test]
+    #[ignore]
+    fn write_the_tab_set_for_the_design_harness() {
+        let settings = TabSettings::new();
+        // A real title, so the harness shows the interface with something
+        // chosen rather than with the empty state.
+        let facts = TitleFacts {
+            number: 1,
+            name: "Big Buck Bunny".to_string(),
+            width: 1920,
+            height: 1080,
+            frame_rate: 23.976,
+            duration_seconds: 596.5,
+            ..Default::default()
+        };
+        let view = settings.view(&facts);
+        let json = serde_json::to_string_pretty(&view).expect("serialise");
+        // The test runs with the crate as its working directory, so the path
+        // is walked back to the repository root rather than assumed.
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+            .join("..");
+        let folder = root.join(".taste-skill");
+        std::fs::create_dir_all(&folder).expect("folder");
+        let path = folder.join("tab-set.json");
+        std::fs::write(&path, json).expect("write");
+        println!("wrote {}", path.display());
+    }
+
     #[test]
     fn a_tab_change_arrives_as_camel_case_the_command_accepts() {
         let payload = r#"{"container":"mkv","videoCodec":"vp9","audioCodec":"opus",
@@ -6329,6 +6366,44 @@ mod tests {
                 assert!(
                     resolved.catalog.message(key).source.is_translated(),
                     "{}: '{name}' falls back in a shipped locale",
+                    table.tag
+                );
+            }
+        }
+    }
+
+    /// The window can answer every word the page asks for.
+    ///
+    /// The page names the message it wants and the window's language answers.
+    /// That only works if the window actually sends the catalogue to the page,
+    /// so the answer the page reads is checked against the names the page
+    /// uses: a name the window does not send is a name the page shows in the
+    /// base language, in every language, and nobody notices.
+    #[test]
+    fn the_language_answer_carries_every_word_the_page_asks_for() {
+        let page = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/index.html");
+        let markup = std::fs::read_to_string(&page).expect("the page");
+        let names: Vec<&str> = markup
+            .match_indices("data-i18n=\"")
+            .map(|(at, found)| {
+                let rest = &markup[at + found.len()..];
+                let end = rest.find('"').expect("a closed attribute");
+                &rest[..end]
+            })
+            .collect();
+
+        for table in vise_core::message_tables() {
+            let resolved = vise_core::resolve_catalog(table.tag);
+            let view = locale::language_view(&resolved, appearance::DirectionMode::Auto);
+            for name in &names {
+                assert!(
+                    view.strings.contains_key(*name),
+                    "{}: the window does not send '{name}', which the page asks for",
+                    table.tag
+                );
+                assert!(
+                    !view.strings[*name].is_empty(),
+                    "{}: '{name}' is sent empty",
                     table.tag
                 );
             }

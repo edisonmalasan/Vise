@@ -1,6 +1,7 @@
 {
   "app.title": "Vise Transcoder",
   "app.tagline": "Video und Audio auf dem eigenen Rechner umwandeln.",
+  "job.new": "Neuer Auftrag",
 
   "common.ok": "OK",
   "common.cancel": "Abbrechen",
@@ -30,9 +31,6 @@
   "tab.subtitles": "Untertitel",
   "tab.chapters": "Kapitel",
   "tab.metadata": "Metadaten",
-
-  "rail.job": "Der Auftrag",
-  "rail.application": "Die Anwendung",
 
   "step.source": "Quelle",
   "step.titles": "Titel",

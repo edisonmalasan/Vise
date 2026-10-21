@@ -1,6 +1,7 @@
 {
   "app.title": "Vise Transcoder",
   "app.tagline": "حوِّل الفيديو والصوت على جهازك أنت.",
+  "job.new": "مهمة جديدة",
 
   "common.ok": "موافق",
   "common.cancel": "إلغاء",
@@ -30,9 +31,6 @@
   "tab.subtitles": "الترجمات",
   "tab.chapters": "الفصول",
   "tab.metadata": "بيانات الوصف",
-
-  "rail.job": "المهمة",
-  "rail.application": "التطبيق",
 
   "step.source": "المصدر",
   "step.titles": "العناوين",

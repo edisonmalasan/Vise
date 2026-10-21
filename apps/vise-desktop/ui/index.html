@@ -62,32 +62,31 @@
 </head>
 <body>
 <!-- The window is a rail and a work area.
-     The rail holds the name, the steps the work is done in, the windows the
-     application can open, and the settings that change how it looks. The work
-     area holds one step at a time, so the eight output tabs get the whole
-     window rather than being the last card in a scroll.
+     The rail holds the application's own destinations: the windows it can open
+     and the settings that change how it looks. The work area holds the whole
+     of one job — the source, the title, the range, the tracks, the output —
+     in the order the work is done in, with every control on screen at once.
 
-     The steps are in the order they are done in, and each one carries the
-     answer it has reached, so the rail is a summary of the whole job rather
-     than only a way to move around it. -->
+     The rail is not a menu for the work area. A list of anchors into one long
+     page asks the reader to keep a second map of the page in their head, and
+     the work area already says where it is: each step names itself and states
+     what has been decided for it. -->
 <div class="shell">
   <aside class="rail" aria-label="Vise Transcoder">
     <div class="rail-head">
-      <h1 data-i18n="app.title">Vise Transcoder</h1>
+      <!-- The application's mark: two chevrons, the shape of a thing running
+           through. Drawn rather than loaded, so it takes the ink of whatever
+           theme the window resolved. -->
+      <svg class="rail-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 4 L12 12 L4 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M12 4 L20 12 L12 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span class="rail-name" data-i18n="app.title">Vise Transcoder</span>
     </div>
-
-    <!-- The steps. The window owns the words: each one says which message it
-         wants, so a locale that lacks one shows the base language rather than
-         a blank. -->
-    <h2 class="rail-heading" data-i18n="rail.job">The job</h2>
-    <nav class="steps" id="steps" aria-label="Steps"></nav>
 
     <!-- The windows the application can open. They are built from the window
          catalog: every surface the window offers gets a control that opens it,
-         and a surface it does not offer has no control at all. They are under
-         a heading of their own because they are a different kind of thing from
-         the steps: one moves the work along, the other opens a window. -->
-    <h2 class="rail-heading" data-i18n="rail.application">The application</h2>
+         and a surface it does not offer has no control at all. -->
     <nav class="rail-tools" id="toolbar" aria-label="Windows and dialogs"></nav>
 
     <!-- Theme and layout direction. Every control here is a preference the
@@ -97,7 +96,7 @@
          preferences rather than here, and a change to it arrives as an event
          with the two answers that moved. -->
     <section class="rail-look" aria-labelledby="appearanceHeading">
-      <h2 class="rail-heading" id="appearanceHeading" data-i18n="appearance.heading">Appearance</h2>
+      <h2 class="rail-group" id="appearanceHeading" data-i18n="appearance.heading">Appearance</h2>
 
       <div class="appearance-options">
         <fieldset>
@@ -119,448 +118,466 @@
 
   <!-- The work. Every control is on screen: the reader never switches
        anything to reach one. The steps are in the order they are done in, so
-       the order the cards are read in is the order the work happens in, and
-       the rail beside them says what each step has already reached. -->
+       the order the panels are read in is the order the work happens in, and
+       the title at the top says what is being made. -->
   <main class="work" id="work">
-  <div class="work-scroll" id="workScroll">
-  <section class="card step-panel" data-step="source" aria-labelledby="sourceHeading">
-    <div class="card-head">
-      <h2 id="sourceHeading">Source</h2>
-      <button type="button" class="quiet" id="clearSourceBtn">Forget source</button>
-    </div>
+    <header class="work-head">
+      <h1 id="jobTitle" data-i18n="job.new">New job</h1>
+      <p class="work-summary">
+        <span id="jobFacts"></span>
+        <span class="job-format" id="jobFormat"></span>
+      </p>
+    </header>
 
-    <div class="dropzone" id="dropzone" data-dragging="false">
-      <strong id="dropTitle">Drop a file or folder here</strong>
-      <span class="hint" id="dropHint">Or type the full path below and open it.</span>
-    </div>
-
-    <div class="row">
-      <div class="grow">
-        <label for="pathInput">Source path</label>
-        <input type="text" id="pathInput" spellcheck="false" autocomplete="off" dir="ltr"
-               placeholder="C:\media\movie.mkv" aria-describedby="pathHint" />
+    <div class="work-scroll" id="workScroll">
+    <section class="step" data-step="source" aria-labelledby="sourceHeading">
+      <div class="step-label">
+        <h2 class="step-name" id="sourceHeading" data-i18n="step.source">Source</h2>
+        <p class="step-answer" id="stepAnswer-source"></p>
       </div>
-      <button type="button" id="openBtn" data-i18n="common.open">Open</button>
-      <button type="button" class="primary" id="scanBtn" data-i18n="action.scan" disabled>Scan</button>
-    </div>
-    <span class="hint" id="pathHint">A file is probed directly; a folder is scanned file by file.</span>
+      <div class="step-panel">
+        <div class="dropzone" id="dropzone" data-dragging="false">
+          <strong id="dropTitle">Drop a file or folder here</strong>
+          <span class="hint" id="dropHint">Or type the full path below and open it.</span>
+        </div>
 
-    <div class="source-current" id="sourceCurrent" hidden>
-      <span class="chip" id="sourceKind"></span>
-      <span class="name ltr" id="sourceName"></span>
-      <span class="location ltr" id="sourceLocation"></span>
-    </div>
-
-    <div class="status" role="status" aria-live="polite" aria-atomic="true">
-      <div class="status-line" id="scanStatus">No source scanned yet.</div>
-      <div class="progress" id="scanProgress" hidden><div id="scanProgressFill"></div></div>
-      <div class="notice" id="scanNotice" data-tone="muted" hidden></div>
-    </div>
-
-    <fieldset>
-      <legend>Recent sources</legend>
-      <ul class="list" id="recentList"></ul>
-      <div class="row">
-        <button type="button" class="quiet" id="clearRecentsBtn">Clear recent sources</button>
-      </div>
-    </fieldset>
-  </section>
-
-  <section class="card step-panel" data-step="titles" aria-labelledby="titleHeading">
-    <div class="card-head">
-      <h2 id="titleHeading">Titles</h2>
-      <span class="hint" id="titleCount"></span>
-    </div>
-    <ul class="list" id="titleList"></ul>
-    <div class="empty" id="titleEmpty">Scan a source to see the titles it contains.</div>
-  </section>
-
-  <section class="card step-panel" data-step="range" aria-labelledby="rangeHeading">
-    <div class="card-head">
-      <h2 id="rangeHeading">Range and angle</h2>
-      <span class="hint" id="rangeSummary"></span>
-    </div>
-
-    <fieldset>
-      <legend>Range</legend>
-      <div class="list" id="rangeModeList"></div>
-    </fieldset>
-
-    <div class="row" id="pointRow" hidden>
-      <div class="grow">
-        <label for="startPoint">Start point</label>
-        <select id="startPoint"></select>
-      </div>
-      <div class="grow">
-        <label for="endPoint">End point</label>
-        <select id="endPoint"></select>
-      </div>
-    </div>
-
-    <div class="row" id="angleRow" hidden>
-      <div class="grow">
-        <label for="angleSelect">Angle</label>
-        <select id="angleSelect"></select>
-      </div>
-    </div>
-
-    <div class="notice" id="rangeNotice" data-tone="error" hidden></div>
-
-    <fieldset>
-      <legend>Chapters</legend>
-      <ul class="list" id="chapterList"></ul>
-      <div class="empty" id="chapterEmpty">Chapters appear once a title with chapters is chosen.</div>
-    </fieldset>
-  </section>
-
-  <section class="card step-panel" data-step="tracks" aria-labelledby="trackHeading">
-    <div class="card-head">
-      <h2 id="trackHeading">Tracks</h2>
-      <span class="hint" id="trackSummary"></span>
-    </div>
-
-    <fieldset>
-      <legend>Audio</legend>
-      <div id="audioList"></div>
-      <div class="empty" id="audioEmpty">Audio tracks appear once a title is chosen.</div>
-    </fieldset>
-
-    <fieldset>
-      <legend>Subtitles</legend>
-      <div id="subtitleList"></div>
-      <div class="empty" id="subtitleEmpty">This title carries no subtitle tracks.</div>
-    </fieldset>
-  </section>
-
-  <section class="card step-panel" data-step="output" aria-labelledby="settingsHeading">
-    <div class="card-head">
-      <h2 id="settingsHeading">Output settings</h2>
-      <span class="hint" id="tabSource">Choose a title to configure the output.</span>
-      <span class="hint" id="tabSourceNote" hidden></span>
-    </div>
-
-    <div class="tabs">
-      <div class="tablist" role="tablist" aria-label="Output settings" id="tabList"></div>
-      <div class="notice" id="tabProblems" data-tone="error" role="status" aria-live="polite" hidden></div>
-
-      <div class="tabpanels" id="tabPanels">
-        <!-- Summary ---------------------------------------------------------- -->
-        <div class="tabpanel" role="tabpanel" id="panel-summary" aria-labelledby="tab-summary" tabindex="0">
-          <div class="grid two">
-            <div class="field">
-              <label for="summaryContainer">Container</label>
-              <select id="summaryContainer"></select>
-              <span class="hint" id="summaryContainerHint"></span>
-            </div>
-            <div class="field">
-              <label for="summaryVideoCodec">Video codec</label>
-              <select id="summaryVideoCodec"></select>
-              <span class="hint" id="summaryVideoCodecHint"></span>
-            </div>
-            <div class="field">
-              <label for="summaryAudioCodec">Audio codec</label>
-              <select id="summaryAudioCodec"></select>
-              <span class="hint" id="summaryAudioCodecHint"></span>
-            </div>
-            <div class="field read-out">
-              <span class="label">Format</span>
-              <span class="value" id="summaryFormat"></span>
-            </div>
-            <div class="field read-out">
-              <span class="label">Quality</span>
-              <span class="value" id="summaryQuality"></span>
-            </div>
+        <div class="row">
+          <div class="grow">
+            <label for="pathInput">Source path</label>
+            <input type="text" id="pathInput" spellcheck="false" autocomplete="off" dir="ltr"
+                   placeholder="C:\media\movie.mkv" aria-describedby="pathHint" />
           </div>
-          <fieldset class="flags">
-            <legend>Output flags</legend>
-            <label class="switch" for="summaryWebOptimized">
-              <input type="checkbox" id="summaryWebOptimized" />
-              <span class="text"><span>Web optimised</span><span class="facts" id="summaryWebOptimizedHint"></span></span>
-            </label>
-            <label class="switch" for="summaryIpodCompatible">
-              <input type="checkbox" id="summaryIpodCompatible" />
-              <span class="text"><span>Older portable players</span><span class="facts" id="summaryIpodCompatibleHint"></span></span>
-            </label>
-            <label class="switch" for="summaryAlignAudioVideo">
-              <input type="checkbox" id="summaryAlignAudioVideo" />
-              <span class="text"><span>Align audio and video</span><span class="facts" id="summaryAlignAudioVideoHint"></span></span>
-            </label>
-            <label class="switch" for="summaryPassthroughMetadata">
-              <input type="checkbox" id="summaryPassthroughMetadata" />
-              <span class="text"><span>Keep the source tags</span><span class="facts" id="summaryPassthroughMetadataHint"></span></span>
-            </label>
-            <p class="hint" id="summaryFlagLabel"></p>
-          </fieldset>
+          <button type="button" id="openBtn" data-i18n="common.open">Open</button>
+          <button type="button" id="scanBtn" data-i18n="action.scan" disabled>Scan</button>
+        </div>
+        <span class="hint" id="pathHint">A file is probed directly; a folder is scanned file by file.</span>
+
+        <div class="source-current" id="sourceCurrent" hidden>
+          <span class="chip" id="sourceKind"></span>
+          <span class="name ltr" id="sourceName"></span>
+          <span class="location ltr" id="sourceLocation"></span>
+          <button type="button" class="quiet" id="clearSourceBtn">Forget source</button>
         </div>
 
-        <!-- Dimensions ------------------------------------------------------- -->
-        <div class="tabpanel" role="tabpanel" id="panel-dimensions" aria-labelledby="tab-dimensions" tabindex="0" hidden>
-          <div class="grid two">
-            <div class="field">
-              <label for="cropMode">Crop</label>
-              <select id="cropMode"></select>
-              <span class="hint" id="cropModeHint"></span>
-            </div>
-            <div class="field">
-              <label for="scaleMode">Scaling</label>
-              <select id="scaleMode"></select>
-              <span class="hint" id="scaleModeHint"></span>
-            </div>
-          </div>
-          <fieldset>
-            <legend>Crop rectangle</legend>
-            <div class="grid four">
-              <div class="field"><label for="cropX">Left</label><input type="text" id="cropX" inputmode="numeric" /><span class="hint" id="cropXHint"></span></div>
-              <div class="field"><label for="cropY">Top</label><input type="text" id="cropY" inputmode="numeric" /><span class="hint" id="cropYHint"></span></div>
-              <div class="field"><label for="cropWidth">Width</label><input type="text" id="cropWidth" inputmode="numeric" /><span class="hint" id="cropWidthHint"></span></div>
-              <div class="field"><label for="cropHeight">Height</label><input type="text" id="cropHeight" inputmode="numeric" /><span class="hint" id="cropHeightHint"></span></div>
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend>Output size</legend>
-            <div class="grid four">
-              <div class="field"><label for="scaleWidth">Width</label><input type="text" id="scaleWidth" inputmode="numeric" /><span class="hint" id="scaleWidthHint"></span></div>
-              <div class="field"><label for="scaleHeight">Height</label><input type="text" id="scaleHeight" inputmode="numeric" /><span class="hint" id="scaleHeightHint"></span></div>
-              <div class="field"><label for="maxWidth">Largest width</label><input type="text" id="maxWidth" inputmode="numeric" /><span class="hint" id="maxWidthHint"></span></div>
-              <div class="field"><label for="maxHeight">Largest height</label><input type="text" id="maxHeight" inputmode="numeric" /><span class="hint" id="maxHeightHint"></span></div>
-            </div>
-            <div class="field">
-              <label for="aspectRatio">Shape</label>
-              <input type="text" id="aspectRatio" spellcheck="false" placeholder="16:9" />
-              <span class="hint" id="aspectRatioHint"></span>
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend>Orientation</legend>
-            <div class="grid two">
-              <div class="field">
-                <label for="rotate">Turn</label>
-                <select id="rotate"></select>
-                <span class="hint" id="rotateHint"></span>
-              </div>
-              <div class="field">
-                <label for="flip">Mirror</label>
-                <select id="flip"></select>
-                <span class="hint" id="flipHint"></span>
-              </div>
-            </div>
-            <p class="hint" id="dimensionsSummary"></p>
-          </fieldset>
+        <div class="status" role="status" aria-live="polite" aria-atomic="true">
+          <div class="status-line" id="scanStatus">No source scanned yet.</div>
+          <div class="progress" id="scanProgress" hidden><div id="scanProgressFill"></div></div>
+          <div class="notice" id="scanNotice" data-tone="muted" hidden></div>
         </div>
 
-        <!-- Filters --------------------------------------------------------- -->
-        <div class="tabpanel" role="tabpanel" id="panel-filters" aria-labelledby="tab-filters" tabindex="0" hidden>
-          <div class="filters" id="filterRows"></div>
-          <p class="hint" id="filtersSummary"></p>
-        </div>
-
-        <!-- Video ----------------------------------------------------------- -->
-        <div class="tabpanel" role="tabpanel" id="panel-video" aria-labelledby="tab-video" tabindex="0" hidden>
-          <div class="grid three">
-            <div class="field">
-              <label for="videoEncoder">Encoder</label>
-              <select id="videoEncoder"></select>
-              <span class="hint" id="videoEncoderHint"></span>
-            </div>
-            <div class="field">
-              <label for="rateControl">Rate control</label>
-              <select id="rateControl"></select>
-              <span class="hint" id="rateControlHint"></span>
-            </div>
-            <div class="field">
-              <label for="frameRateMode">Frame rate</label>
-              <select id="frameRateMode"></select>
-              <span class="hint" id="frameRateModeHint"></span>
-            </div>
-            <div class="field">
-              <label for="videoQuality">Quality</label>
-              <input type="text" id="videoQuality" inputmode="numeric" />
-              <span class="hint" id="videoQualityHint"></span>
-            </div>
-            <div class="field">
-              <label for="videoBitrate">Bit rate</label>
-              <input type="text" id="videoBitrate" inputmode="numeric" />
-              <span class="hint" id="videoBitrateHint"></span>
-            </div>
-            <div class="field">
-              <label for="videoTargetSize">File size</label>
-              <input type="text" id="videoTargetSize" inputmode="numeric" />
-              <span class="hint" id="videoTargetSizeHint"></span>
-            </div>
-            <div class="field">
-              <label for="frameRate">Frames per second</label>
-              <input type="text" id="frameRate" inputmode="numeric" />
-              <span class="hint" id="frameRateHint"></span>
-            </div>
-            <div class="field">
-              <label for="colourRange">Colour range</label>
-              <select id="colourRange"></select>
-              <span class="hint" id="colourRangeHint"></span>
-            </div>
-          </div>
-          <fieldset class="flags">
-            <legend>Rate control</legend>
-            <label class="switch" for="twoPass">
-              <input type="checkbox" id="twoPass" />
-              <span class="text"><span>Two-pass encode</span><span class="facts" id="twoPassHint"></span></span>
-            </label>
-            <label class="switch" for="lossless">
-              <input type="checkbox" id="lossless" />
-              <span class="text"><span>Lossless</span><span class="facts" id="losslessHint"></span></span>
-            </label>
-          </fieldset>
-          <fieldset>
-            <legend>Encoder</legend>
-            <div class="grid two">
-              <div class="field"><label for="encoderPreset">Preset</label><select id="encoderPreset"></select><span class="hint" id="encoderPresetHint"></span></div>
-              <div class="field"><label for="encoderProfile">Profile</label><select id="encoderProfile"></select><span class="hint" id="encoderProfileHint"></span></div>
-              <div class="field"><label for="encoderTune">Tune</label><select id="encoderTune"></select><span class="hint" id="encoderTuneHint"></span></div>
-              <div class="field"><label for="encoderLevel">Level</label><select id="encoderLevel"></select><span class="hint" id="encoderLevelHint"></span></div>
-            </div>
-            <p class="hint" id="videoPlan"></p>
-          </fieldset>
-          <fieldset>
-            <legend>HDR metadata</legend>
-            <div class="grid two">
-              <div class="field"><label for="videoDolbyVision">Dolby Vision</label><select id="videoDolbyVision"></select><span class="hint" id="videoDolbyVisionHint"></span></div>
-              <div class="field"><label for="videoHdr10Plus">HDR10+</label><select id="videoHdr10Plus"></select><span class="hint" id="videoHdr10PlusHint"></span></div>
-            </div>
-          </fieldset>
-        </div>
-
-        <!-- Audio ----------------------------------------------------------- -->
-        <div class="tabpanel" role="tabpanel" id="panel-audio" aria-labelledby="tab-audio" tabindex="0" hidden>
-          <div class="rules" id="audioDefaults"></div>
-          <h3>Tracks</h3>
-          <div class="rules" id="audioTracks"></div>
-          <div class="empty" id="audioTabEmpty" hidden>This title carries no audio tracks.</div>
-          <p class="hint" id="audioSummary"></p>
-        </div>
-
-        <!-- Subtitles ------------------------------------------------------- -->
-        <div class="tabpanel" role="tabpanel" id="panel-subtitles" aria-labelledby="tab-subtitles" tabindex="0" hidden>
-          <div class="grid two">
-            <div class="field">
-              <label for="subtitleBehaviour">Subtitles</label>
-              <select id="subtitleBehaviour"></select>
-              <span class="hint" id="subtitleBehaviourHint"></span>
-            </div>
-            <div class="field">
-              <label for="subtitleSearch">Find a language</label>
-              <input type="text" id="subtitleSearch" spellcheck="false" placeholder="English" />
-              <span class="hint" id="subtitleSearchHint"></span>
-            </div>
-          </div>
-          <fieldset class="flags">
-            <legend>All tracks</legend>
-            <label class="switch" for="forcedOnly">
-              <input type="checkbox" id="forcedOnly" />
-              <span class="text"><span>Forced dialogue only</span><span class="facts" id="forcedOnlyHint"></span></span>
-            </label>
-          </fieldset>
-          <fieldset>
-            <legend>Imported file</legend>
-            <div class="row">
-              <div class="grow">
-                <label for="externalSubtitle">Subtitle file path</label>
-                <input type="text" id="externalSubtitle" spellcheck="false" autocomplete="off" dir="ltr"
-                       placeholder="C:\media\extra.srt" aria-describedby="externalSubtitleHint" />
-              </div>
-              <button type="button" id="importSubtitlesBtn">Import</button>
-              <button type="button" class="quiet" id="forgetSubtitlesBtn">Forget</button>
-            </div>
-            <span class="hint" id="externalSubtitleHint"></span>
-          </fieldset>
-          <fieldset>
-            <legend>Tracks</legend>
-            <div id="subtitleTracks"></div>
-            <div class="empty" id="subtitleTabEmpty" hidden>This title carries no subtitle tracks.</div>
-            <p class="hint" id="subtitlesSummary"></p>
-          </fieldset>
-        </div>
-
-        <!-- Chapters -------------------------------------------------------- -->
-        <div class="tabpanel" role="tabpanel" id="panel-chapters" aria-labelledby="tab-chapters" tabindex="0" hidden>
-          <div class="field">
-            <label for="chapterMode">Chapters</label>
-            <select id="chapterMode"></select>
-            <span class="hint" id="chapterModeHint"></span>
-          </div>
-          <div class="markers" id="chapterMarkers"></div>
-          <div class="empty" id="chapterTabEmpty" hidden>No chapter markers.</div>
+        <fieldset>
+          <legend>Recent sources</legend>
+          <ul class="list" id="recentList"></ul>
           <div class="row">
-            <div class="grow">
-              <label for="markerStart">New marker start</label>
-              <input type="text" id="markerStart" inputmode="numeric" placeholder="0" />
-            </div>
-            <div class="grow">
-              <label for="markerEnd">New marker end</label>
-              <input type="text" id="markerEnd" inputmode="numeric" placeholder="0" />
-            </div>
-            <div class="grow">
-              <label for="markerName">Name</label>
-              <input type="text" id="markerName" spellcheck="false" placeholder="Chapter name" />
-            </div>
-            <button type="button" id="addMarkerBtn">Add marker</button>
+            <button type="button" class="quiet" id="clearRecentsBtn">Clear recent sources</button>
           </div>
-          <p class="hint" id="chaptersSummary"></p>
-          <fieldset class="import">
-            <legend>Import a chapter file</legend>
-            <div class="row">
-              <div class="field"><label for="chapterImportFormat">File type</label><select id="chapterImportFormat"></select><span class="hint" id="chapterImportFormatHint"></span></div>
-              <div class="grow"><label for="chapterImportSource">Chapter file</label><textarea id="chapterImportSource" rows="4" spellcheck="false" placeholder="start,end,name&#10;0,600,Opening"></textarea></div>
-            </div>
-            <p class="hint" id="chapterImportClaim"></p>
-            <ul class="markers" id="chapterImportPreview"></ul>
-            <div class="row">
-              <button type="button" id="chapterImportBtn" disabled>Replace the list</button>
-              <span class="hint" id="chapterImportProblem"></span>
-            </div>
-          </fieldset>
+        </fieldset>
+      </div>
+    </section>
+
+    <section class="step" data-step="titles" aria-labelledby="titleHeading">
+      <div class="step-label">
+        <h2 class="step-name" id="titleHeading" data-i18n="step.titles">Titles</h2>
+        <p class="step-answer" id="stepAnswer-titles"></p>
+      </div>
+      <div class="step-panel">
+        <ul class="list" id="titleList"></ul>
+        <div class="empty" id="titleEmpty">Scan a source to see the titles it contains.</div>
+      </div>
+    </section>
+
+    <section class="step" data-step="range" aria-labelledby="rangeHeading">
+      <div class="step-label">
+        <h2 class="step-name" id="rangeHeading" data-i18n="step.range">Range and angle</h2>
+        <p class="step-answer" id="stepAnswer-range"></p>
+      </div>
+      <div class="step-panel">
+        <p class="panel-note" id="rangeSummary"></p>
+
+        <fieldset>
+          <legend>Range</legend>
+          <div class="list" id="rangeModeList"></div>
+        </fieldset>
+
+        <div class="row" id="pointRow" hidden>
+          <div class="grow">
+            <label for="startPoint">Start point</label>
+            <select id="startPoint"></select>
+          </div>
+          <div class="grow">
+            <label for="endPoint">End point</label>
+            <select id="endPoint"></select>
+          </div>
         </div>
 
-        <!-- Metadata -------------------------------------------------------- -->
-        <div class="tabpanel" role="tabpanel" id="panel-metadata" aria-labelledby="tab-metadata" tabindex="0" hidden>
-          <fieldset>
-            <legend>Source tags</legend>
-            <div class="field">
-              <label for="metadataMode">What happens to the source tags</label>
-              <select id="metadataMode"></select>
-              <span class="hint" id="metadataModeHint"></span>
-            </div>
-            <p class="hint" id="metadataSourceNote"></p>
-          </fieldset>
+        <div class="row" id="angleRow" hidden>
+          <div class="grow">
+            <label for="angleSelect">Angle</label>
+            <select id="angleSelect"></select>
+          </div>
+        </div>
 
-          <fieldset class="flags">
-            <legend>Attachments</legend>
-            <div id="metadataAttachments"></div>
-          </fieldset>
+        <div class="notice" id="rangeNotice" data-tone="error" hidden></div>
 
-          <fieldset>
-            <legend>Tags</legend>
-            <div class="tags" id="metadataTags"></div>
-            <div class="empty" id="metadataTagEmpty">This title carries no tags.</div>
-            <div class="row">
-              <div class="grow">
-                <label for="metadataNewKey">New tag name</label>
-                <input type="text" id="metadataNewKey" spellcheck="false" />
-                <span class="hint" id="metadataNewKeyHint"></span>
+        <fieldset>
+          <legend>Chapters</legend>
+          <ul class="list" id="chapterList"></ul>
+          <div class="empty" id="chapterEmpty">Chapters appear once a title with chapters is chosen.</div>
+        </fieldset>
+      </div>
+    </section>
+
+    <section class="step" data-step="tracks" aria-labelledby="trackHeading">
+      <div class="step-label">
+        <h2 class="step-name" id="trackHeading" data-i18n="step.tracks">Tracks</h2>
+        <p class="step-answer" id="stepAnswer-tracks"></p>
+      </div>
+      <div class="step-panel">
+        <fieldset>
+          <legend>Audio</legend>
+          <div id="audioList"></div>
+          <div class="empty" id="audioEmpty">Audio tracks appear once a title is chosen.</div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Subtitles</legend>
+          <div id="subtitleList"></div>
+          <div class="empty" id="subtitleEmpty">This title carries no subtitle tracks.</div>
+        </fieldset>
+      </div>
+    </section>
+
+    <section class="step" data-step="output" aria-labelledby="settingsHeading">
+      <div class="step-label">
+        <h2 class="step-name" id="settingsHeading" data-i18n="step.output">Output</h2>
+        <p class="step-answer" id="stepAnswer-output"></p>
+      </div>
+      <div class="step-panel step-panel-wide">
+        <p class="panel-note" id="tabSource">Choose a title to configure the output.</p>
+        <span class="hint" id="tabSourceNote" hidden></span>
+
+        <div class="tabs">
+          <div class="tablist" role="tablist" aria-label="Output settings" id="tabList"></div>
+          <div class="notice" id="tabProblems" data-tone="error" role="status" aria-live="polite" hidden></div>
+
+          <div class="tabpanels" id="tabPanels">
+            <!-- Summary ---------------------------------------------------------- -->
+            <div class="tabpanel" role="tabpanel" id="panel-summary" aria-labelledby="tab-summary" tabindex="0">
+              <div class="grid two">
+                <div class="field">
+                  <label for="summaryContainer">Container</label>
+                  <select id="summaryContainer"></select>
+                  <span class="hint" id="summaryContainerHint"></span>
+                </div>
+                <div class="field">
+                  <label for="summaryVideoCodec">Video codec</label>
+                  <select id="summaryVideoCodec"></select>
+                  <span class="hint" id="summaryVideoCodecHint"></span>
+                </div>
+                <div class="field">
+                  <label for="summaryAudioCodec">Audio codec</label>
+                  <select id="summaryAudioCodec"></select>
+                  <span class="hint" id="summaryAudioCodecHint"></span>
+                </div>
+                <div class="field read-out">
+                  <span class="label">Format</span>
+                  <span class="value" id="summaryFormat"></span>
+                </div>
+                <div class="field read-out">
+                  <span class="label">Quality</span>
+                  <span class="value" id="summaryQuality"></span>
+                </div>
               </div>
-              <div class="grow">
-                <label for="metadataNewValue">Value</label>
-                <input type="text" id="metadataNewValue" spellcheck="false" />
-                <span class="hint" id="metadataNewValueHint"></span>
-              </div>
-              <button type="button" id="metadataAddBtn">Add tag</button>
+              <fieldset class="flags">
+                <legend>Output flags</legend>
+                <label class="switch" for="summaryWebOptimized">
+                  <input type="checkbox" id="summaryWebOptimized" />
+                  <span class="text"><span>Web optimised</span><span class="facts" id="summaryWebOptimizedHint"></span></span>
+                </label>
+                <label class="switch" for="summaryIpodCompatible">
+                  <input type="checkbox" id="summaryIpodCompatible" />
+                  <span class="text"><span>Older portable players</span><span class="facts" id="summaryIpodCompatibleHint"></span></span>
+                </label>
+                <label class="switch" for="summaryAlignAudioVideo">
+                  <input type="checkbox" id="summaryAlignAudioVideo" />
+                  <span class="text"><span>Align audio and video</span><span class="facts" id="summaryAlignAudioVideoHint"></span></span>
+                </label>
+                <label class="switch" for="summaryPassthroughMetadata">
+                  <input type="checkbox" id="summaryPassthroughMetadata" />
+                  <span class="text"><span>Keep the source tags</span><span class="facts" id="summaryPassthroughMetadataHint"></span></span>
+                </label>
+                <p class="hint" id="summaryFlagLabel"></p>
+              </fieldset>
             </div>
-          </fieldset>
 
-          <p class="hint" id="metadataSummary"></p>
+            <!-- Dimensions ------------------------------------------------------- -->
+            <div class="tabpanel" role="tabpanel" id="panel-dimensions" aria-labelledby="tab-dimensions" tabindex="0" hidden>
+              <div class="grid two">
+                <div class="field">
+                  <label for="cropMode">Crop</label>
+                  <select id="cropMode"></select>
+                  <span class="hint" id="cropModeHint"></span>
+                </div>
+                <div class="field">
+                  <label for="scaleMode">Scaling</label>
+                  <select id="scaleMode"></select>
+                  <span class="hint" id="scaleModeHint"></span>
+                </div>
+              </div>
+              <fieldset>
+                <legend>Crop rectangle</legend>
+                <div class="grid four">
+                  <div class="field"><label for="cropX">Left</label><input type="text" id="cropX" inputmode="numeric" /><span class="hint" id="cropXHint"></span></div>
+                  <div class="field"><label for="cropY">Top</label><input type="text" id="cropY" inputmode="numeric" /><span class="hint" id="cropYHint"></span></div>
+                  <div class="field"><label for="cropWidth">Width</label><input type="text" id="cropWidth" inputmode="numeric" /><span class="hint" id="cropWidthHint"></span></div>
+                  <div class="field"><label for="cropHeight">Height</label><input type="text" id="cropHeight" inputmode="numeric" /><span class="hint" id="cropHeightHint"></span></div>
+                </div>
+              </fieldset>
+              <fieldset>
+                <legend>Output size</legend>
+                <div class="grid four">
+                  <div class="field"><label for="scaleWidth">Width</label><input type="text" id="scaleWidth" inputmode="numeric" /><span class="hint" id="scaleWidthHint"></span></div>
+                  <div class="field"><label for="scaleHeight">Height</label><input type="text" id="scaleHeight" inputmode="numeric" /><span class="hint" id="scaleHeightHint"></span></div>
+                  <div class="field"><label for="maxWidth">Largest width</label><input type="text" id="maxWidth" inputmode="numeric" /><span class="hint" id="maxWidthHint"></span></div>
+                  <div class="field"><label for="maxHeight">Largest height</label><input type="text" id="maxHeight" inputmode="numeric" /><span class="hint" id="maxHeightHint"></span></div>
+                </div>
+                <div class="field">
+                  <label for="aspectRatio">Shape</label>
+                  <input type="text" id="aspectRatio" spellcheck="false" placeholder="16:9" />
+                  <span class="hint" id="aspectRatioHint"></span>
+                </div>
+              </fieldset>
+              <fieldset>
+                <legend>Orientation</legend>
+                <div class="grid two">
+                  <div class="field">
+                    <label for="rotate">Turn</label>
+                    <select id="rotate"></select>
+                    <span class="hint" id="rotateHint"></span>
+                  </div>
+                  <div class="field">
+                    <label for="flip">Mirror</label>
+                    <select id="flip"></select>
+                    <span class="hint" id="flipHint"></span>
+                  </div>
+                </div>
+                <p class="hint" id="dimensionsSummary"></p>
+              </fieldset>
+            </div>
+
+            <!-- Filters --------------------------------------------------------- -->
+            <div class="tabpanel" role="tabpanel" id="panel-filters" aria-labelledby="tab-filters" tabindex="0" hidden>
+              <div class="filters" id="filterRows"></div>
+              <p class="hint" id="filtersSummary"></p>
+            </div>
+
+            <!-- Video ----------------------------------------------------------- -->
+            <div class="tabpanel" role="tabpanel" id="panel-video" aria-labelledby="tab-video" tabindex="0" hidden>
+              <div class="grid three">
+                <div class="field">
+                  <label for="videoEncoder">Encoder</label>
+                  <select id="videoEncoder"></select>
+                  <span class="hint" id="videoEncoderHint"></span>
+                </div>
+                <div class="field">
+                  <label for="rateControl">Rate control</label>
+                  <select id="rateControl"></select>
+                  <span class="hint" id="rateControlHint"></span>
+                </div>
+                <div class="field">
+                  <label for="frameRateMode">Frame rate</label>
+                  <select id="frameRateMode"></select>
+                  <span class="hint" id="frameRateModeHint"></span>
+                </div>
+                <div class="field">
+                  <label for="videoQuality">Quality</label>
+                  <input type="text" id="videoQuality" inputmode="numeric" />
+                  <span class="hint" id="videoQualityHint"></span>
+                </div>
+                <div class="field">
+                  <label for="videoBitrate">Bit rate</label>
+                  <input type="text" id="videoBitrate" inputmode="numeric" />
+                  <span class="hint" id="videoBitrateHint"></span>
+                </div>
+                <div class="field">
+                  <label for="videoTargetSize">File size</label>
+                  <input type="text" id="videoTargetSize" inputmode="numeric" />
+                  <span class="hint" id="videoTargetSizeHint"></span>
+                </div>
+                <div class="field">
+                  <label for="frameRate">Frames per second</label>
+                  <input type="text" id="frameRate" inputmode="numeric" />
+                  <span class="hint" id="frameRateHint"></span>
+                </div>
+                <div class="field">
+                  <label for="colourRange">Colour range</label>
+                  <select id="colourRange"></select>
+                  <span class="hint" id="colourRangeHint"></span>
+                </div>
+              </div>
+              <fieldset class="flags">
+                <legend>Rate control</legend>
+                <label class="switch" for="twoPass">
+                  <input type="checkbox" id="twoPass" />
+                  <span class="text"><span>Two-pass encode</span><span class="facts" id="twoPassHint"></span></span>
+                </label>
+                <label class="switch" for="lossless">
+                  <input type="checkbox" id="lossless" />
+                  <span class="text"><span>Lossless</span><span class="facts" id="losslessHint"></span></span>
+                </label>
+              </fieldset>
+              <fieldset>
+                <legend>Encoder</legend>
+                <div class="grid two">
+                  <div class="field"><label for="encoderPreset">Preset</label><select id="encoderPreset"></select><span class="hint" id="encoderPresetHint"></span></div>
+                  <div class="field"><label for="encoderProfile">Profile</label><select id="encoderProfile"></select><span class="hint" id="encoderProfileHint"></span></div>
+                  <div class="field"><label for="encoderTune">Tune</label><select id="encoderTune"></select><span class="hint" id="encoderTuneHint"></span></div>
+                  <div class="field"><label for="encoderLevel">Level</label><select id="encoderLevel"></select><span class="hint" id="encoderLevelHint"></span></div>
+                </div>
+                <p class="hint" id="videoPlan"></p>
+              </fieldset>
+              <fieldset>
+                <legend>HDR metadata</legend>
+                <div class="grid two">
+                  <div class="field"><label for="videoDolbyVision">Dolby Vision</label><select id="videoDolbyVision"></select><span class="hint" id="videoDolbyVisionHint"></span></div>
+                  <div class="field"><label for="videoHdr10Plus">HDR10+</label><select id="videoHdr10Plus"></select><span class="hint" id="videoHdr10PlusHint"></span></div>
+                </div>
+              </fieldset>
+            </div>
+
+            <!-- Audio ----------------------------------------------------------- -->
+            <div class="tabpanel" role="tabpanel" id="panel-audio" aria-labelledby="tab-audio" tabindex="0" hidden>
+              <div class="rules" id="audioDefaults"></div>
+              <h3>Tracks</h3>
+              <div class="rules" id="audioTracks"></div>
+              <div class="empty" id="audioTabEmpty" hidden>This title carries no audio tracks.</div>
+              <p class="hint" id="audioSummary"></p>
+            </div>
+
+            <!-- Subtitles ------------------------------------------------------- -->
+            <div class="tabpanel" role="tabpanel" id="panel-subtitles" aria-labelledby="tab-subtitles" tabindex="0" hidden>
+              <div class="grid two">
+                <div class="field">
+                  <label for="subtitleBehaviour">Subtitles</label>
+                  <select id="subtitleBehaviour"></select>
+                  <span class="hint" id="subtitleBehaviourHint"></span>
+                </div>
+                <div class="field">
+                  <label for="subtitleSearch">Find a language</label>
+                  <input type="text" id="subtitleSearch" spellcheck="false" placeholder="English" />
+                  <span class="hint" id="subtitleSearchHint"></span>
+                </div>
+              </div>
+              <fieldset class="flags">
+                <legend>All tracks</legend>
+                <label class="switch" for="forcedOnly">
+                  <input type="checkbox" id="forcedOnly" />
+                  <span class="text"><span>Forced dialogue only</span><span class="facts" id="forcedOnlyHint"></span></span>
+                </label>
+              </fieldset>
+              <fieldset>
+                <legend>Imported file</legend>
+                <div class="row">
+                  <div class="grow">
+                    <label for="externalSubtitle">Subtitle file path</label>
+                    <input type="text" id="externalSubtitle" spellcheck="false" autocomplete="off" dir="ltr"
+                           placeholder="C:\media\extra.srt" aria-describedby="externalSubtitleHint" />
+                  </div>
+                  <button type="button" id="importSubtitlesBtn">Import</button>
+                  <button type="button" class="quiet" id="forgetSubtitlesBtn">Forget</button>
+                </div>
+                <span class="hint" id="externalSubtitleHint"></span>
+              </fieldset>
+              <fieldset>
+                <legend>Tracks</legend>
+                <div id="subtitleTracks"></div>
+                <div class="empty" id="subtitleTabEmpty" hidden>This title carries no subtitle tracks.</div>
+                <p class="hint" id="subtitlesSummary"></p>
+              </fieldset>
+            </div>
+
+            <!-- Chapters -------------------------------------------------------- -->
+            <div class="tabpanel" role="tabpanel" id="panel-chapters" aria-labelledby="tab-chapters" tabindex="0" hidden>
+              <div class="field">
+                <label for="chapterMode">Chapters</label>
+                <select id="chapterMode"></select>
+                <span class="hint" id="chapterModeHint"></span>
+              </div>
+              <div class="markers" id="chapterMarkers"></div>
+              <div class="empty" id="chapterTabEmpty" hidden>No chapter markers.</div>
+              <div class="row">
+                <div class="grow">
+                  <label for="markerStart">New marker start</label>
+                  <input type="text" id="markerStart" inputmode="numeric" placeholder="0" />
+                </div>
+                <div class="grow">
+                  <label for="markerEnd">New marker end</label>
+                  <input type="text" id="markerEnd" inputmode="numeric" placeholder="0" />
+                </div>
+                <div class="grow">
+                  <label for="markerName">Name</label>
+                  <input type="text" id="markerName" spellcheck="false" placeholder="Chapter name" />
+                </div>
+                <button type="button" id="addMarkerBtn">Add marker</button>
+              </div>
+              <p class="hint" id="chaptersSummary"></p>
+              <fieldset class="import">
+                <legend>Import a chapter file</legend>
+                <div class="row">
+                  <div class="field"><label for="chapterImportFormat">File type</label><select id="chapterImportFormat"></select><span class="hint" id="chapterImportFormatHint"></span></div>
+                  <div class="grow"><label for="chapterImportSource">Chapter file</label><textarea id="chapterImportSource" rows="4" spellcheck="false" placeholder="start,end,name&#10;0,600,Opening"></textarea></div>
+                </div>
+                <p class="hint" id="chapterImportClaim"></p>
+                <ul class="markers" id="chapterImportPreview"></ul>
+                <div class="row">
+                  <button type="button" id="chapterImportBtn" disabled>Replace the list</button>
+                  <span class="hint" id="chapterImportProblem"></span>
+                </div>
+              </fieldset>
+            </div>
+
+            <!-- Metadata -------------------------------------------------------- -->
+            <div class="tabpanel" role="tabpanel" id="panel-metadata" aria-labelledby="tab-metadata" tabindex="0" hidden>
+              <fieldset>
+                <legend>Source tags</legend>
+                <div class="field">
+                  <label for="metadataMode">What happens to the source tags</label>
+                  <select id="metadataMode"></select>
+                  <span class="hint" id="metadataModeHint"></span>
+                </div>
+                <p class="hint" id="metadataSourceNote"></p>
+              </fieldset>
+
+              <fieldset class="flags">
+                <legend>Attachments</legend>
+                <div id="metadataAttachments"></div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Tags</legend>
+                <div class="tags" id="metadataTags"></div>
+                <div class="empty" id="metadataTagEmpty">This title carries no tags.</div>
+                <div class="row">
+                  <div class="grow">
+                    <label for="metadataNewKey">New tag name</label>
+                    <input type="text" id="metadataNewKey" spellcheck="false" />
+                    <span class="hint" id="metadataNewKeyHint"></span>
+                  </div>
+                  <div class="grow">
+                    <label for="metadataNewValue">Value</label>
+                    <input type="text" id="metadataNewValue" spellcheck="false" />
+                    <span class="hint" id="metadataNewValueHint"></span>
+                  </div>
+                  <button type="button" id="metadataAddBtn">Add tag</button>
+                </div>
+              </fieldset>
+
+              <p class="hint" id="metadataSummary"></p>
+            </div>
+          </div>
         </div>
       </div>
-
-        </div>
-      </section>
+    </section>
   </div>
 
     <!-- The commit action stays on screen. The work is a long column of

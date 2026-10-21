@@ -1,6 +1,11 @@
 re
 target/
 
+# The design harness is a local measuring bench, not part of the product: it
+# renders the window's page in a browser so the layout can be measured, and it
+# is rebuilt whenever the page changes.
+.taste-skill/
+
 # Fetched media tooling is never tracked: the lock file records which binaries
 # belong here, and scripts/verify-media-tools.sh checks what is actually present.
 vendor/

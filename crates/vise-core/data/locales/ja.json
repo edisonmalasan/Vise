@@ -1,6 +1,7 @@
 {
   "app.title": "Vise Transcoder",
   "app.tagline": "自分のパソコンで動画と音声を変換します。",
+  "job.new": "新しいジョブ",
 
   "common.ok": "OK",
   "common.cancel": "キャンセル",
@@ -30,9 +31,6 @@
   "tab.subtitles": "字幕",
   "tab.chapters": "チャプター",
   "tab.metadata": "メタデータ",
-
-  "rail.job": "ジョブ",
-  "rail.application": "アプリケーション",
 
   "step.source": "ソース",
   "step.titles": "タイトル",
