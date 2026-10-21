@@ -426,6 +426,8 @@ pub enum MessageKey {
     AppTitle,
     /// One line under the title.
     AppTagline,
+    /// The title of a job that has no source yet.
+    JobNew,
     /// Confirmation.
     CommonOk,
     /// Refusal of a change.
@@ -478,10 +480,6 @@ pub enum MessageKey {
     TabChapters,
     /// The metadata tab.
     TabMetadata,
-    /// The heading over the steps in the rail.
-    RailJob,
-    /// The heading over the windows in the rail.
-    RailApplication,
     /// The step that picks the source.
     StepSource,
     /// The step that picks the title.
@@ -634,9 +632,10 @@ pub enum MessageKey {
 
 impl MessageKey {
     /// Every key, in the order the files are written in.
-    pub const ALL: [MessageKey; 101] = [
+    pub const ALL: [MessageKey; 100] = [
         MessageKey::AppTitle,
         MessageKey::AppTagline,
+        MessageKey::JobNew,
         MessageKey::CommonOk,
         MessageKey::CommonCancel,
         MessageKey::CommonClose,
@@ -663,8 +662,6 @@ impl MessageKey {
         MessageKey::TabSubtitles,
         MessageKey::TabChapters,
         MessageKey::TabMetadata,
-        MessageKey::RailJob,
-        MessageKey::RailApplication,
         MessageKey::StepSource,
         MessageKey::StepTitles,
         MessageKey::StepRange,
@@ -799,9 +796,10 @@ impl MessageKey {
 ///
 /// The length is checked against [`MessageKey::ALL`] by a test rather than by
 /// the type system, because an array length is not part of an enum's identity.
-const NAMES: [&str; 101] = [
+const NAMES: [&str; 100] = [
     "app.title",
     "app.tagline",
+    "job.new",
     "common.ok",
     "common.cancel",
     "common.close",
@@ -828,8 +826,6 @@ const NAMES: [&str; 101] = [
     "tab.subtitles",
     "tab.chapters",
     "tab.metadata",
-    "rail.job",
-    "rail.application",
     "step.source",
     "step.titles",
     "step.range",

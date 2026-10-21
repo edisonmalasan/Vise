@@ -1,6 +1,7 @@
 {
   "app.title": "Vise Transcoder",
   "app.tagline": "Transcode video and audio on your own machine.",
+  "job.new": "New job",
 
   "common.ok": "OK",
   "common.cancel": "Cancel",
@@ -30,9 +31,6 @@
   "tab.subtitles": "Subtitles",
   "tab.chapters": "Chapters",
   "tab.metadata": "Metadata",
-
-  "rail.job": "The job",
-  "rail.application": "The application",
 
   "step.source": "Source",
   "step.titles": "Titles",

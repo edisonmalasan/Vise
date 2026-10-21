@@ -246,10 +246,10 @@
     offer(el("scanBtn"), Boolean(source));
     state.stepAnswers.source = source ? source.name : "";
     /* Once a source is chosen the drop target is only a way to replace it, so
-       the card says so and the zone itself becomes a strip. The work the
+       the panel says so and the zone itself becomes a strip. The work the
        reader came for is below it and should not be pushed out of the way by
        the means of choosing the source. */
-    var panel = document.querySelector('.step-panel[data-step="source"]');
+    var panel = document.querySelector('.step[data-step="source"]');
     if (panel) {
       panel.dataset.loaded = source ? "true" : "false";
     }
@@ -346,11 +346,10 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     var list = el("titleList");
     clear(list);
     var titles = selection.titles || [];
-    setText(el("titleCount"), titles.length ? titles.length + " found" : "");
     show(el("titleEmpty"), titles.length === 0);
 
-    /* The rail says which title is chosen, so the reader knows the answer
-       without visiting this step. */
+    /* The work area says which title is chosen, beside the step that chooses
+       it, so the reader knows the answer without hunting for it. */
     var chosen = null;
     titles.forEach(function (title) {
       if (title.index === selection.selectedTitleIndex) {
@@ -408,10 +407,9 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       return;
     }
 
-    setText(
-      el("rangeSummary"),
-      range.startLabel + " – " + range.endLabel + " (" + range.durationLabel + ")"
-    );
+    /* The range itself is the step's answer, and it is written beside the
+       step's name. The note in the panel says why there is nothing to say
+       yet, and stays out of the way once there is a range. */
     state.stepAnswers.range =
       range.startLabel + " – " + range.endLabel;
 
@@ -533,12 +531,6 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     clear(subtitles);
     show(el("audioEmpty"), tracks.audio.length === 0);
     show(el("subtitleEmpty"), tracks.subtitle.length === 0);
-    setText(
-      el("trackSummary"),
-      tracks.audio.length
-        ? tracks.audio.length + " audio · " + tracks.subtitle.length + " subtitle"
-        : ""
-    );
     state.stepAnswers.tracks = tracks.audio.length
       ? tracks.audio.length + " audio · " + tracks.subtitle.length + " subtitle"
       : "";
@@ -582,8 +574,8 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     // tracks change.
     refreshTabs();
 
-    renderStepStates(selection);
     renderStepAnswers();
+    renderJobHead();
 
     var usable = selection.phase === "ready" && selection.selectedTitleIndex > 0;
     if (!usable) {
@@ -856,10 +848,9 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
 
   /* The steps the work is done in.
    *
-   * The order is the order the work happens in, so the rail shows the shape of
-   * the job and the keyboard order and the visual order agree. Each step says
-   * which message it wants, so a locale that lacks one shows the base
-   * language rather than a blank. */
+   * The order is the order the work happens in, so the keyboard order and the
+   * visual order agree. Each step says which message it wants, so a locale
+   * that lacks one shows the base language rather than a blank. */
   var STEPS = [
     { id: "source", label: "Source" },
     { id: "titles", label: "Titles" },
@@ -868,155 +859,86 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     { id: "output", label: "Output" }
   ];
 
-  /* The step on screen, and the answers the rail shows. */
-  state.step = "source";
+  /* The answer each step has reached. The work area shows them beside the
+   * step names, so the state of the whole job is legible without the rail
+   * having to carry a second copy of the page. */
   state.stepAnswers = {};
-
-  /* The step a step depends on, if any.
-   *
-   * A step that is waiting on an earlier one is shown as waiting rather than
-   * hidden, so the reader can see what comes next and why it is not ready
-   * yet. */
-  function stepWaitingOn(step) {
-    if (step === "titles" || step === "range" || step === "tracks") {
-      return "titles";
-    }
-    if (step === "output") {
-      return "tracks";
-    }
-    return "";
-  }
-
-  /* Build the step list in the rail.
-   *
-   * The steps are links rather than switches. The work is all on screen, so a
-   * step moves the reader to a step rather than hiding the others, and the
-   * step the reader is looking at is worked out from where they are. */
-  function buildSteps() {
-    var list = el("steps");
-    if (!list) {
-      return;
-    }
-    clear(list);
-    STEPS.forEach(function (step, index) {
-      var button = node("button", "step");
-      button.type = "button";
-      button.id = "step-" + step.id;
-      button.dataset.step = step.id;
-
-      var number = node("span", "step-index", String(index + 1));
-      number.setAttribute("aria-hidden", "true");
-
-      var body = node("span", "step-body");
-      var name = node("span", "step-name", step.label);
-      name.dataset.i18n = "step." + step.id;
-      var answer = node("span", "step-answer", "");
-      answer.id = "stepAnswer-" + step.id;
-
-      body.appendChild(name);
-      body.appendChild(answer);
-      button.appendChild(number);
-      button.appendChild(body);
-      button.addEventListener("click", function () {
-        jumpToStep(step.id);
-      });
-      list.appendChild(button);
-    });
-  }
-
-  /* Move the reader to a step.
-   *
-   * The work is one scroll, so this is a scroll and not a switch: the other
-   * steps stay on screen. The reader is put on the step they asked for rather
-   * than left looking at the top of the work. */
-  function jumpToStep(id) {
-    var panel = document.querySelector('.step-panel[data-step="' + id + '"]');
-    var scroller = el("workScroll");
-    if (!panel || !scroller) {
-      return;
-    }
-    var top = panel.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-    scroller.scrollTo({
-      top: scroller.scrollTop + top - 8,
-      behavior: "smooth"
-    });
-    markStep(id);
-  }
-
-  /* Say which step the reader is looking at.
-   *
-   * The step whose card is nearest the top of the work area is the one they
-   * are on, so the rail says where they are without them having to say so. */
-  function markStep(id) {
-    state.step = id;
-    Array.prototype.forEach.call(
-      document.querySelectorAll(".step"),
-      function (button) {
-        button.setAttribute(
-          "aria-current",
-          button.dataset.step === id ? "true" : "false"
-        );
-      }
-    );
-  }
-
-  /* The step the reader is on, worked out from the scroll. */
-  function stepInView() {
-    var scroller = el("workScroll");
-    if (!scroller) {
-      return state.step;
-    }
-    var scrollerTop = scroller.getBoundingClientRect().top;
-    var current = STEPS[0] ? STEPS[0].id : "";
-    STEPS.forEach(function (step) {
-      var panel = document.querySelector('.step-panel[data-step="' + step.id + '"]');
-      if (!panel) {
-        return;
-      }
-      if (panel.getBoundingClientRect().top - scrollerTop <= 24) {
-        current = step.id;
-      }
-    });
-    return current;
-  }
 
   /* Put the answer each step has reached beside its name.
    *
-   * This is what makes the rail a summary of the job rather than only a way
-   * to move around it: the state of every step is visible whether or not that
-   * step is the one the reader is on. A step that has an answer is also
-   * marked, so the pipeline can be seen as a shape rather than read. */
+   * This is what makes the work area a summary of the job as well as a place
+   * to do it: the state of every step is visible beside the step it belongs
+   * to, whether or not that step is the one the reader is on. */
   function renderStepAnswers() {
     STEPS.forEach(function (step) {
-      var node = el("stepAnswer-" + step.id);
-      var answer = state.stepAnswers[step.id] || "";
-      if (node) {
-        setText(node, answer);
-      }
-      var button = el("step-" + step.id);
-      if (button) {
-        button.dataset.done = answer ? "true" : "false";
+      var answer = el("stepAnswer-" + step.id);
+      if (answer) {
+        setText(answer, shorten(state.stepAnswers[step.id] || ""));
       }
     });
   }
 
-  /* Put the answer each step has reached beside its name. */
-  function renderStepStates(selection) {
-    var chosen = selection && selection.selectedTitleIndex > 0;
-    STEPS.forEach(function (step) {
-      var button = el("step-" + step.id);
-      if (!button) {
-        return;
-      }
-      var needs = stepWaitingOn(step.id);
-      var waiting = false;
-      if (needs === "titles") {
-        waiting = !chosen;
-      } else if (needs === "tracks") {
-        waiting = !chosen;
-      }
-      button.dataset.waiting = waiting ? "true" : "false";
-    });
+  /* A summary cut where it stops being one.
+   *
+   * The answer is a reading, and a reading is cut at a boundary rather than
+   * in the middle of a word: a word cut in half reads as a mistake rather than
+   * as a summary. The full text is in the panel below, so nothing is lost. */
+  function shorten(text, limit) {
+    var value = String(text || "");
+    var room = limit || 30;
+    if (value.length <= room) {
+      return value;
+    }
+    var cut = value.slice(0, room);
+    var space = cut.lastIndexOf(" ");
+    if (space > room * 0.5) {
+      cut = cut.slice(0, space);
+    }
+    return cut + "…";
+  }
+
+  /* The title row.
+   *
+   * It names the object the window is working on, and one grey line under it
+   * says what is being made: the title, the frame, the rate, the length and
+   * the format. That line is the answer to the screen's question, so it is
+   * the biggest thing on the page after the title itself.
+   *
+   * The title stops asking the window for a message once it names a real
+   * object, so a change of language cannot put "New job" back over the name
+   * of a file that is open. */
+  function renderJobHead() {
+    var title = el("jobTitle");
+    var facts = el("jobFacts");
+    var format = el("jobFormat");
+    var selection = state.selection;
+    var source = selection && selection.source;
+
+    if (source) {
+      title.removeAttribute("data-i18n");
+      setText(title, source.name);
+    } else {
+      title.setAttribute("data-i18n", "job.new");
+      setText(
+        title,
+        (state.strings && state.strings["job.new"]) || "New job"
+      );
+    }
+
+    var tabs = state.tabs;
+    var chosen = tabs && tabs.source && tabs.source.chosen ? tabs.source : null;
+    setText(
+      facts,
+      chosen
+        ? [
+            chosen.name,
+            chosen.resolutionLabel,
+            chosen.frameRateLabel,
+            chosen.durationLabel
+          ].join(" · ")
+        : ""
+    );
+    setText(format, state.stepAnswers.output || "");
   }
 
   function shellOf(id) {
@@ -3895,6 +3817,12 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
    * that did move - the words, the appearance, and the preferences - are put back
    * in the order the document is built: the language on the document first, so a
    * sentence in Arabic is laid out as Arabic while it arrives.
+   *
+   * Two shapes arrive here. The window pushes a change when the language is
+   * moved from the preferences, and that change carries the language answer
+   * inside it; the answer also arrives on its own, when the page asks for the
+   * language in force. The answer names its own locale, so it is recognised by
+   * that rather than by being unwrapped blindly.
    */
   function applyLanguage(change) {
     if (!change) {
@@ -3909,14 +3837,15 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       focused && focused.tagName === "INPUT" && focused.id ? focused.id : "";
     var typed = focusedId ? focused.value : "";
     var root = document.documentElement;
-    if (change.language && change.language.locale) {
-      root.lang = change.language.locale;
+    var language = change.locale ? change : change.language;
+    if (language && language.locale) {
+      root.lang = language.locale;
     }
     if (change.appearance) {
       applyAppearance(change.appearance);
     }
-    if (change.language) {
-      applyStrings(change.language.strings);
+    if (language && language.strings) {
+      applyStrings(language.strings);
     }
     if (change.preferences) {
       repaintPreferences(change.preferences);
@@ -3928,11 +3857,11 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         again.focus();
       }
     }
-    if (change.language && change.language.gaps && change.language.gaps.length) {
+    if (language && language.gaps && language.gaps.length) {
       /* A gap is not a failure and not a notice the user has to dismiss; it is
          reported once, where the answer is being shown, because a
          half-translated interface that says nothing about it reads as finished. */
-      setText(el("appearanceObservation"), change.language.coverage);
+      setText(el("appearanceObservation"), language.coverage);
     }
     return change;
   }
@@ -4313,18 +4242,12 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         ? tabs.source.name + " · " + tabs.source.summary
         : tabs.source.summary
     );
-    /* The rail says what the output is, so the reader knows what they would
-       get without visiting the step. The tab on screen is not the answer: the
-       answer is the format the settings describe. */
+    /* The work area says what the output is, so the reader knows what they
+       would get without visiting the step. The tab on screen is not the
+       answer: the answer is the format the settings describe. */
     state.stepAnswers.output = tabs.summary ? tabs.summary.formatLabel : "";
     renderStepAnswers();
-    // A disc is read differently from a file, so the user is told which they
-    // picked rather than being left to work it out from a failure.
-    var sourceNote = el("tabSourceNote");
-    if (sourceNote) {
-      setText(sourceNote, tabs.source.sourceNote || "");
-      show(sourceNote, !!(tabs.source.sourceNote));
-    }
+    renderJobHead();
     // A disc is read differently from a file, so the page says which it is.
     var sourceNote = el("tabSourceNote");
     if (sourceNote) {
@@ -5371,24 +5294,6 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       unavailable("This page needs the desktop window; open it from the application.");
       renderRecents();
       return;
-    }
-    buildSteps();
-    markStep(state.step);
-    /* The rail says which step the reader is on, worked out from where they
-       are, so it is a position indicator as well as a summary. The work is
-       one scroll, so this is a scroll and not a switch. */
-    var scroller = el("workScroll");
-    if (scroller) {
-      scroller.addEventListener(
-        "scroll",
-        function () {
-          var current = stepInView();
-          if (current !== state.step) {
-            markStep(current);
-          }
-        },
-        { passive: true }
-      );
     }
     loadCatalog()
       .then(function () {
