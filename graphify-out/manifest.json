@@ -1,8 +1,8 @@
 {
   "skills-lock.json": {
-    "mtime": 1792081843.5065682,
-    "seen": 1792098136.5664814,
-    "ast_hash": "35437c5bcd95c6577901668b1297d594",
+    "mtime": 1792612708.2162488,
+    "seen": 1792620993.7390018,
+    "ast_hash": "6edd8727846630429f3c6cf8422c93e8",
     "semantic_hash": ""
   },
   ".agents/skills/apple-design/SKILL.md": {
@@ -108,9 +108,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/src/main.rs": {
-    "mtime": 1792450365.1731153,
-    "seen": 1792451536.40638,
-    "ast_hash": "1ca4e355a27f51ae93ab0b7c4529a937",
+    "mtime": 1792620963.178658,
+    "seen": 1792620993.7188962,
+    "ast_hash": "4a89ebb4e34f7b88bc46b43d18feca75",
     "semantic_hash": ""
   },
   "apps/vise-desktop/src-tauri/tauri.conf.json": {
@@ -606,9 +606,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/ui/index.html": {
-    "mtime": 1792501459.2082407,
-    "seen": 1792501494.4645662,
-    "ast_hash": "7fbe008a32985ae29fa5b99030d0c984",
+    "mtime": 1792620963.1857784,
+    "seen": 1792620993.7478747,
+    "ast_hash": "d04615d4fbd3838f0f5643d8603ae336",
     "semantic_hash": ""
   },
   "docs/CONTEXT.md": {
@@ -624,9 +624,9 @@
     "semantic_hash": ""
   },
   "docs/ROADMAP.md": {
-    "mtime": 1792501459.2180548,
-    "seen": 1792501494.464951,
-    "ast_hash": "ca5c5cf42a7a82d9a5d9980c7012bd04",
+    "mtime": 1792620963.1928904,
+    "seen": 1792620993.748154,
+    "ast_hash": "e3822e5892a6fd9d1adaa5e0eeba5f92",
     "semantic_hash": ""
   },
   "docs/release-notes-template.md": {
@@ -636,9 +636,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792501459.205149,
-    "seen": 1792501494.4642105,
-    "ast_hash": "0ef646064c56ea9b21acdc5c5ac6ff90",
+    "mtime": 1792620963.1776521,
+    "seen": 1792620993.7476032,
+    "ast_hash": "259b28bf2b4be37285389e4d31d11537",
     "semantic_hash": ""
   },
   "docs/SETUP.md": {
@@ -1038,9 +1038,9 @@
     "semantic_hash": ""
   },
   "apps/vise-desktop/ui/app.js": {
-    "mtime": 1792501459.2072349,
-    "seen": 1792501494.4317346,
-    "ast_hash": "59a9b29722c212bfe4c8dcf6030a1775",
+    "mtime": 1792620963.1800282,
+    "seen": 1792620993.7253265,
+    "ast_hash": "2bfc5c78735478dd6b62db9c3e18be3b",
     "semantic_hash": ""
   },
   "crates/vise-core/data/builtin-presets.json": {
@@ -1050,39 +1050,39 @@
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/ar.json": {
-    "mtime": 1792501459.2113464,
-    "seen": 1792501494.4339113,
-    "ast_hash": "d90ed668660a60bff94aada2c6e265ec",
+    "mtime": 1792620963.1872897,
+    "seen": 1792620993.7268858,
+    "ast_hash": "0b02d7499d32abad7d81961d6d0a59e8",
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/de.json": {
-    "mtime": 1792501459.212381,
-    "seen": 1792501494.4339173,
-    "ast_hash": "e01198b743bc1f4dfe84e517b0050a1d",
+    "mtime": 1792620963.188315,
+    "seen": 1792620993.72689,
+    "ast_hash": "28f8d688ccdce45f2c60fdd8a1d85ac5",
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/en.json": {
-    "mtime": 1792501459.212897,
-    "seen": 1792501494.433921,
-    "ast_hash": "3e5ba85f41667d8e9cc7c943ee2b4eca",
+    "mtime": 1792620963.1888282,
+    "seen": 1792620993.7268927,
+    "ast_hash": "a2cb766790f25a0baf931607334b9e44",
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/es.json": {
-    "mtime": 1792501459.2139366,
-    "seen": 1792501494.4339237,
-    "ast_hash": "2b40173bf3f7b542c5a39f9f779a35d4",
+    "mtime": 1792620963.189348,
+    "seen": 1792620993.7268956,
+    "ast_hash": "ce70b453c200fea7431517b97c92a487",
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/fr.json": {
-    "mtime": 1792501459.2144508,
-    "seen": 1792501494.4339266,
-    "ast_hash": "cada7e88d2205202b5de57ff4a68efef",
+    "mtime": 1792620963.190354,
+    "seen": 1792620993.7268984,
+    "ast_hash": "68a365309a8674ce6af7ff8cf5bf67dc",
     "semantic_hash": ""
   },
   "crates/vise-core/data/locales/ja.json": {
-    "mtime": 1792501459.214968,
-    "seen": 1792501494.4339297,
-    "ast_hash": "764b7019dc1aeb00ef1a9acf853f1f53",
+    "mtime": 1792620963.191367,
+    "seen": 1792620993.7269015,
+    "ast_hash": "a13e307040e4302f307b7b28611715ea",
     "semantic_hash": ""
   },
   "crates/vise-core/data/preset-descriptions/ar.json": {
@@ -1140,9 +1140,9 @@
     "semantic_hash": ""
   },
   "crates/vise-core/src/i18n.rs": {
-    "mtime": 1792501459.2164814,
-    "seen": 1792501494.437408,
-    "ast_hash": "834d5abf71dce72e6d15b8199693e78c",
+    "mtime": 1792620963.191884,
+    "seen": 1792620993.7290654,
+    "ast_hash": "3ecf095329b7add1861b6a484a1b20f5",
     "semantic_hash": ""
   },
   "crates/vise-core/src/lossless.rs": {
@@ -1404,9 +1404,9 @@
     "semantic_hash": ""
   },
   "DESIGN.md": {
-    "mtime": 1792501459.2041183,
-    "seen": 1792501494.4640384,
-    "ast_hash": "0faaaf7b1cf6e5fcdbf77062db5375c4",
+    "mtime": 1792620963.1766346,
+    "seen": 1792620993.747463,
+    "ast_hash": "6e4c0ce239d153f1ba7dcedc2047bc98",
     "semantic_hash": ""
   },
   "PRODUCT.md": {
@@ -1422,21 +1422,237 @@
     "semantic_hash": ""
   },
   "docs/screenshot-desktop.png": {
-    "mtime": 1792501459.2196155,
-    "seen": 1792501494.4667518,
-    "ast_hash": "41c98507b526f067e7578d8bebb6dcd1",
+    "mtime": 1792620963.1952784,
+    "seen": 1792620993.7499852,
+    "ast_hash": "32dd9114c39f22b08b74fc1c3140aaa5",
     "semantic_hash": ""
   },
   "docs/screenshot-presets.png": {
-    "mtime": 1792501459.2216394,
-    "seen": 1792501494.4667552,
-    "ast_hash": "0ff8b22c8c429b815ce60397bcda5311",
+    "mtime": 1792620963.196939,
+    "seen": 1792620993.7499878,
+    "ast_hash": "44b8431d6cb259378c400ac764052348",
     "semantic_hash": ""
   },
   "docs/screenshot-tabs.png": {
-    "mtime": 1792501459.2231517,
-    "seen": 1792501494.4667587,
-    "ast_hash": "2a6b2de16a981177f3fcff43e9cb5ddf",
+    "mtime": 1792620963.1984668,
+    "seen": 1792620993.74999,
+    "ast_hash": "99100243a90491059a3d93a2af6f71cb",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/assets/base.js": {
+    "mtime": 1792612692.84946,
+    "seen": 1792620993.7142882,
+    "ast_hash": "059f84401869a3c87212e3fc68f68272",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/assets/charts.js": {
+    "mtime": 1792612692.8509746,
+    "seen": 1792620993.7142963,
+    "ast_hash": "8cda35fe0700ce01221e12174f7e6071",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/assets/scenes/stage.js": {
+    "mtime": 1792612692.851979,
+    "seen": 1792620993.7143,
+    "ast_hash": "93616f59e5200f1dd68d1793e86069d3",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/evals/evals.json": {
+    "mtime": 1792612692.853501,
+    "seen": 1792620993.714303,
+    "ast_hash": "a75d8d5408057dc109ae483090e46187",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/library/app.json": {
+    "mtime": 1792612692.854505,
+    "seen": 1792620993.714306,
+    "ast_hash": "976d160bba7f73576b5b9b6d88b0f203",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/library/directions.json": {
+    "mtime": 1792612692.8560238,
+    "seen": 1792620993.7143085,
+    "ast_hash": "53f939fbb829e65bc9957297e9fc1a60",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/library/heroes.json": {
+    "mtime": 1792612692.8570297,
+    "seen": 1792620993.7143111,
+    "ast_hash": "08b38a73b56ac1c3218aa35fc535bf37",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/library/motions.json": {
+    "mtime": 1792612692.8585403,
+    "seen": 1792620993.7143137,
+    "ast_hash": "c9ce58c6f800b3bc7ef5aef47326231f",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/library/palettes.json": {
+    "mtime": 1792612692.8595467,
+    "seen": 1792620993.714316,
+    "ast_hash": "1290620b2708921c2e5387e1b4b041ee",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/library/photos.json": {
+    "mtime": 1792612692.86159,
+    "seen": 1792620993.714318,
+    "ast_hash": "f3c7152af24daf438b45c4b388c603bc",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/library/sections.json": {
+    "mtime": 1792612692.8631005,
+    "seen": 1792620993.7143207,
+    "ast_hash": "c01d0c653818f06c47ea99ebb3c6a09c",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/library/sites.json": {
+    "mtime": 1792612692.8692176,
+    "seen": 1792620993.7143238,
+    "ast_hash": "0a2218a4156e2e6dffafe2e9b83cc583",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/library/type.json": {
+    "mtime": 1792612692.8692176,
+    "seen": 1792620993.7143264,
+    "ast_hash": "36ffbbfd938c7ec3147bcd1cf22b17a7",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/scripts/assets.mjs": {
+    "mtime": 1792612692.8788135,
+    "seen": 1792620993.7143285,
+    "ast_hash": "7e6a5f115b03d78e63198d94bed1a8a8",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/scripts/draw.mjs": {
+    "mtime": 1792612692.8798208,
+    "seen": 1792620993.714331,
+    "ast_hash": "120e1cccaf53946269ba72c450e6bc62",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/scripts/inspect.mjs": {
+    "mtime": 1792612692.8803265,
+    "seen": 1792620993.7143333,
+    "ast_hash": "671117fa0db48bdbd95cef4f11e50e1e",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/scripts/lib/app-draw.mjs": {
+    "mtime": 1792612692.8813355,
+    "seen": 1792620993.7143357,
+    "ast_hash": "b9039275b634c2636e42617f13cf8e50",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/scripts/lib/cdp.mjs": {
+    "mtime": 1792612692.8818395,
+    "seen": 1792620993.714338,
+    "ast_hash": "9b3bc7a3912dbfb853cd2cb0947fc481",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/scripts/lib/probe.mjs": {
+    "mtime": 1792612692.8828893,
+    "seen": 1792620993.7143407,
+    "ast_hash": "366bbfda6fe4338b72f6f87e422235cf",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/scripts/lib/rules.mjs": {
+    "mtime": 1792612692.8838942,
+    "seen": 1792620993.714343,
+    "ast_hash": "80143386ca015ed477289c0e3e222d79",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/scripts/lint.mjs": {
+    "mtime": 1792612692.8843997,
+    "seen": 1792620993.7143452,
+    "ast_hash": "c3f93ceaf0cb2ea3a6db1b05c91a2fe3",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/scripts/scenes.mjs": {
+    "mtime": 1792612692.8854973,
+    "seen": 1792620993.7143478,
+    "ast_hash": "dc421250af452ffd028e182beac026b7",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/README.md": {
+    "mtime": 1792612692.8479495,
+    "seen": 1792620993.7391417,
+    "ast_hash": "572eefa17225dca7b0e96b18f8bbcf7d",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/SKILL.md": {
+    "mtime": 1792612692.848455,
+    "seen": 1792620993.7391438,
+    "ast_hash": "8f184f0fb59f1ba1eb92e97aa013a6b2",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/app-screens.md": {
+    "mtime": 1792612692.8720486,
+    "seen": 1792620993.7391458,
+    "ast_hash": "b05d8dde85ed5e8fbb287f224daad8ef",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/colour.md": {
+    "mtime": 1792612692.8720486,
+    "seen": 1792620993.7391472,
+    "ast_hash": "813d4dbbd43bcbb16635b475ef0a152b",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/copy.md": {
+    "mtime": 1792612692.8731608,
+    "seen": 1792620993.739149,
+    "ast_hash": "f6a31b12e2a93044cf707b0b48ff54f2",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/critique.md": {
+    "mtime": 1792612692.8731608,
+    "seen": 1792620993.7391505,
+    "ast_hash": "876353ccd5e73cd0da5ed361dae7a41b",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/imagery.md": {
+    "mtime": 1792612692.8746746,
+    "seen": 1792620993.7391522,
+    "ast_hash": "20bc64cb09e3e9117991ade949013117",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/layout.md": {
+    "mtime": 1792612692.8746746,
+    "seen": 1792620993.7391534,
+    "ast_hash": "f6ec23d6d9fb2b72c7aa8ef64967b95a",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/motion.md": {
+    "mtime": 1792612692.8746746,
+    "seen": 1792620993.7391546,
+    "ast_hash": "a3aa668a4a47c951b4253d3a0750217c",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/research.md": {
+    "mtime": 1792612692.876663,
+    "seen": 1792620993.7391562,
+    "ast_hash": "80a1e52831085197e13b6e5a15fba92d",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/scenes.md": {
+    "mtime": 1792612692.876663,
+    "seen": 1792620993.7391577,
+    "ast_hash": "fafe4cfae94452813d057657e4f590d3",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/tells.md": {
+    "mtime": 1792612692.87727,
+    "seen": 1792620993.7391593,
+    "ast_hash": "575f2697b6725cd080c9b112ab4a848c",
+    "semantic_hash": ""
+  },
+  ".agents/skills/design-taste-frontend/references/type.md": {
+    "mtime": 1792612692.8777838,
+    "seen": 1792620993.7391605,
+    "ast_hash": "3c038076f4078e89a5bcf4115f05e128",
+    "semantic_hash": ""
+  },
+  "apps/vise-desktop/ui/fonts/Inter-OFL.txt": {
+    "mtime": 1792620963.1822388,
+    "seen": 1792620993.7478714,
+    "ast_hash": "5e95cb23ed621124015c5d23224ba2d3",
     "semantic_hash": ""
   }
 }
