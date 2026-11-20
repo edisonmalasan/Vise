@@ -355,6 +355,27 @@ h3 {
   unicode-bidi: isolate;
 }
 
+/* In a mirrored window a sentence that the window has not translated yet is
+   still English: without a base direction of its own, neutral punctuation such
+   as a full stop lands at the wrong end of the line. `plaintext` gives each
+   run the direction of its first strong character, so an English fallback
+   reads left to right and a translated sentence reads right to left in the
+   same control, with no extra markup and no second copy of the string. */
+[dir="rtl"] .hint,
+[dir="rtl"] .status-line,
+[dir="rtl"] .empty,
+[dir="rtl"] .panel-note,
+[dir="rtl"] .readout,
+[dir="rtl"] .notice,
+[dir="rtl"] .source-caption,
+[dir="rtl"] .job-line,
+[dir="rtl"] button,
+[dir="rtl"] .queue-item .name,
+[dir="rtl"] .summary-row .value,
+[dir="rtl"] .field .value {
+  unicode-bidi: plaintext;
+}
+
 .hint,
 .panel-note {
   color: var(--muted);
@@ -1533,7 +1554,7 @@ fieldset.import {
 
 .dock-queue {
   border-block-start: 1px solid var(--line);
-  margin-block-start: auto;
+  margin-block-start: var(--s2);
   padding-block-start: var(--s3);
 }
 

@@ -6373,6 +6373,32 @@ mod tests {
         }
     }
 
+    /// The job dock reads the queue view model the window actually sends.
+    ///
+    /// Queue rows are serialised in camelCase, so a field spelled in snake_case
+    /// on the page is silently empty: the card draws and the job never appears.
+    /// The dock is the only place the page reads those fields directly, so the
+    /// binding is checked here rather than left to a screenshot.
+    #[test]
+    fn the_dock_reads_the_queue_fields_the_window_sends() {
+        let script = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/app.js"),
+        )
+        .expect("the script");
+        for field in ["inputLabel", "stateLabel", "progressVisible"] {
+            assert!(
+                script.contains(&format!("item.{}", field)),
+                "the dock never reads the queue's '{field}' field"
+            );
+        }
+        for field in ["input_label", "state_label", "progress_visible"] {
+            assert!(
+                !script.contains(&format!("item.{}", field)),
+                "the dock reads '{field}' but the window sends camelCase"
+            );
+        }
+    }
+
     #[test]
     fn every_name_the_page_asks_for_is_a_key_this_build_has() {
         // The page holds no text: an element names the message it wants and the

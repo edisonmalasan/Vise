@@ -1027,11 +1027,11 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     items.slice(0, 3).forEach(function (item) {
       var row = node("div", "queue-item");
       row.dataset.state = item.state || "";
-      var name = node("span", "name ltr", item.input_label || "");
-      var label = node("span", "state", item.state_label || "");
+      var name = node("span", "name ltr", item.inputLabel || "");
+      var label = node("span", "state", item.stateLabel || "");
       row.appendChild(name);
       row.appendChild(label);
-      if (item.progress_visible) {
+      if (item.progressVisible) {
         var bar = node("div", "progress");
         var fill = node("div");
         fill.style.width = (item.percent || 0) + "%";
