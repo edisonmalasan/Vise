@@ -49,6 +49,10 @@
 
 Run from the repository root unless a command explicitly requires another directory.
 
+## Browser Support
+
+Browser support: Baseline Widely available; newer web features are adopted only with feature detection and graceful degradation, because Tauri targets WebView2, WKWebView and WebKitGTK.
+
 ## Architecture Non-Negotiables
 
 - Clean-room implementation: new code, not a fork. Evidence: `docs/ROADMAP.md`, architecture decision snapshot.
