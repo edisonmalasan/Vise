@@ -6332,6 +6332,47 @@ mod tests {
         state
     }
 
+    /// Every element the page looks up by id must exist in the markup.
+    ///
+    /// The page is a renderer: it asks the window for a view model and paints
+    /// it into a control it finds by id. A rename on one side leaves a control
+    /// that never receives its answer, and the failure is quiet — the element
+    /// is simply blank. This check makes a broken binding a build error, and
+    /// it is what lets the markup be rearranged without losing a connection.
+    #[test]
+    fn every_id_the_page_looks_up_is_in_the_markup() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let markup = std::fs::read_to_string(root.join("../ui/index.html")).expect("the page");
+        let script = std::fs::read_to_string(root.join("../ui/app.js")).expect("the script");
+
+        // A handful of ids are built at runtime rather than declared: the
+        // backdrop the window catalog used to add and the surface shells it
+        // builds from the catalog. Everything else is literal.
+        let runtime = ["backdrop"];
+        let mut wanted: Vec<&str> = Vec::new();
+        let mut rest = script.as_str();
+        while let Some(at) = rest.find("el(\"") {
+            rest = &rest[at + 4..];
+            if let Some(end) = rest.find('"') {
+                let id = &rest[..end];
+                // A name followed by `+` is a prefix of a name built at
+                // runtime (a step answer, a tab message, a surface shell).
+                let joined = rest[end + 1..].trim_start().starts_with('+');
+                if !joined && !runtime.contains(&id) && !wanted.contains(&id) {
+                    wanted.push(id);
+                }
+                rest = &rest[end + 1..];
+            }
+        }
+        assert!(!wanted.is_empty(), "the page looks up nothing at all");
+        for id in wanted {
+            assert!(
+                markup.contains(&format!("id=\"{}\"", id)),
+                "the script looks up '#{id}', which the page does not declare"
+            );
+        }
+    }
+
     #[test]
     fn every_name_the_page_asks_for_is_a_key_this_build_has() {
         // The page holds no text: an element names the message it wants and the
