@@ -136,13 +136,13 @@
 
   --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
-  --fs-2xs: 11px;
-  --fs-xs: 12px;
-  --fs-sm: 13px;
-  --fs-md: 14px;
-  --fs-lg: 16px;
-  --fs-xl: 20px;
-  --fs-2xl: 26px;
+  --fs-2xs: 0.6875rem;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.875rem;
+  --fs-lg: 1rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.625rem;
 
   --s1: 4px;
   --s2: 8px;
@@ -894,7 +894,7 @@ body[data-dock="closed"] .dock {
   border-radius: 999px;
   color: #fff;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 0.5625rem;
   inline-size: 16px;
   block-size: 16px;
   inset-block-start: 2px;
