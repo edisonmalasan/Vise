@@ -2,222 +2,195 @@
 
 <!-- impeccable:design-schema 1 -->
 
-The system the Vise Transcoder interface is built from. It is an *Operate*
-surface: a working tool, where predictability, density, and reaching the
-controls quickly matter more than expression.
+The system the Vise Transcoder interface is built from. It is an **Operate**
+surface: a working tool where an operator watches media move through a pipeline.
+Predictability, density, reachability and readable technical data come before
+expression. The reference is a professional media workstation, not a website
+or a settings form.
 
 ## Character
 
-Quiet, technical, and plain. The interface is a workspace, not a poster: it
-gets out of the way, uses the platform's own conventions, and spends its
-attention on the thing being configured. Nothing announces itself; a control
-that is not in use stays quiet.
+Deliberate, calm and capable. The window looks like an instrument: surfaces are
+graphite in the dark theme and warm paper in the light theme, one hue marks
+action and live state, and every number is a reading off a scale. Nothing
+shouts, nothing is ornament, and nothing needs a paragraph of copy to explain
+itself.
+
+The product's identity is carried by four things: the double-chevron mark, the
+format readout (`MP4 · H264 video · AAC audio`), IBM Plex as the voice, and the
+persistent job dock.
 
 ## Layout
 
-The window is a rail and a work area, not a document.
+The window is five regions with one job each, laid out with named grid areas.
 
 ```
-┌────────────┬──────────────────────────────────────────────────────────┐
-│ » Vise     │  Big Buck Bunny (2008).mkv                               │
-│   Transcoder│  Big Buck Bunny · 1920×1080 · 23.976 fps · 9:57          │
-│            │  · MP4 · H264 video · AAC audio                          │
-│ Queue      │  ──────────────────────────────────────────────────────── │
-│ Queue sel. │  SOURCE              │  ┌────────────────────────────┐  │
-│ Activity   │  Big Buck Bunny      │  │ drop, path, status         │  │
-│ Preview    │  (2008).mkv          │  │ recent sources             │  │
-│ Problems   │  ────────────────────┤  └────────────────────────────┘  │
-│ About      │                      │                                  │
-│ Presets    │  TITLES              │  ┌────────────────────────────┐  │
-│ Preferences│  Big Buck Bunny      │  │ the list                   │  │
-│ Diagnostics│  ────────────────────┤  └────────────────────────────┘  │
-│            │                      │  ┌────────────────────────────┐  │
-│ ────────── │  RANGE AND ANGLE     │  │ the modes                  │  │
-│ Appearance │  00:00 – 09:56       │  └────────────────────────────┘  │
-│ Theme      │  ────────────────────┴  ┌────────────────────────────┐  │
-│   ◉ system │                          │ OUTPUT SETTINGS              │  │
-│   ○ light  │                          │ Summary Dimensions Filters …  │  │
-│   ○ dark   │                          └────────────────────────────┘  │
-│ Direction  │                                                          │
-├────────────┴──────────────────────────────────────────────────────────┤
-│  Output path [...............]  [Add to queue] [Choose titles to queue…] │
-└────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ app bar  mark · job name & format                 presets · dock · display │
+├──────┬───────────────────────────────────────────────────────┬─────────────┤
+│      │ SOURCE   drop / path / open / scan / status           │ JOB         │
+│      │                                                       │ summary     │
+│ acts │ INSPECTOR  titles + range        tracks               │ destination │
+│      │                                                       │ commit      │
+│      │ PRESETS    catalogue launcher                         │ live queue  │
+│      │                                                       │             │
+│      │ OUTPUT     summary · dimensions · … · metadata        │             │
+├──────┴───────────────────────────────────────────────────────┴─────────────┤
+│ status  ready state · media facts · problems · live encode                 │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Nothing is hidden behind a click.** Every control is on screen. The work
-  is one scroll with the five steps in the order the work is done in, so the
-  order the panels are read in is the order the work happens in, and the reader
-  never switches anything to reach a control.
-- **The rail holds the application's own destinations, and only those.** The
-  name and mark, the windows the application can open, and the settings that
-  change how it looks. A navigation list is a list of *other* screens: a
-  sidebar that scroll-spies one long page asks the reader to hold a second map
-  of the page in their head, and the work area already says where it is.
-- **The work area is a label column beside the panels.** Each step names
-  itself and states what has been decided for it, in a 240px column, beside
-  the panel that decides it. The job's summary is here rather than in a rail,
-  and it is at 13px in a reading face rather than squeezed into 12px at the
-  edge of the window.
-- **The title row answers the screen's question.** The name of the object the
-  window is working on, and one grey line under it saying what is being made:
-  the title, the frame, the rate, the length, and the format. The format is
-  the element only this product has, and it is set in the trade's own words.
-- **One column of steps.** No two panels share a row, so no row can end
-  ragged, and each panel is as tall as its content.
-- **The source panel is quiet once a source is chosen.** The drop target
-  becomes a line that still takes a drop, because it is how the source is
-  replaced, but it no longer takes a third of the first screen and pushes the
-  work below the fold.
-- **The windows are in the rail** because they are chrome rather than work,
-  and the appearance controls are at its foot because they are settings a
-  reader changes once.
-- **The action bar is pinned to the foot** of the work area. Where the file is
-  written and the button that writes it are always together and always
-  reachable, whatever the length of the work above them.
-- **Below the width where a rail and a panel both fit**, the rail becomes a
-  strip along the top with the windows and the settings in rows of their own,
-  and each step stacks its label above its panel.
+- **App bar (56 px)** — the brand and the object being worked on. The job name
+  and its format are the centre of attention; global commands sit at the end.
+- **Activity rail (56 px)** — icon-only buttons for the windows the build
+  offers, built from `window_catalog`, each with an accessible name and a hint
+  from the window. Badges carry counts. It is tools, not a table of contents:
+  the work area already names every step of the job.
+- **Workspace** — one scroll containing the source, the media inspector, the
+  preset launcher and the eight-tab output configuration. Every control is on
+  screen in one scroll; nothing is hidden behind a step switcher.
+  - The **source** is a compact band: a drop zone that becomes a single line
+    once a source is chosen, the path field, and the live scan state.
+  - The **inspector** puts titles and range on the left and tracks on the right,
+    so what is in the source and what was chosen read together.
+  - The **output** keeps the full field set, hints and validation of the eight
+    tabs, in one non-wrapping tab strip.
+- **Job dock (320 px)** — the permanent answer to "what will be made and
+  where": source, format, destination, path field, primary action and the live
+  queue. It never scrolls out of reach.
+- **Status bar (28 px)** — ready/scanning/encoding state, media facts, problem
+  count and an inline progress bar, announced through a live region.
+
+**Progressive disclosure** is by region, not by hiding: common settings are on
+the Summary tab, advanced settings are one tab away, and the dock holds only
+the facts needed to commit. The primary workflow — choose media → inspect →
+select preset → configure → set destination → queue — is legible from top to
+bottom and left to right.
+
+Below 1180 px the dock becomes a compact strip under the workspace so the
+destination and commit action stay reachable. Below 900 px the rail becomes a
+top strip and the inspector stacks. Either region can be toggled from the app
+bar.
 
 ### Spacing
 
-A 4-unit base, used for the relationship it expresses rather than for a round
-number.
+A four-unit base, used for the relationship it expresses.
 
 | Token | Value | Used for |
 |---|---|---|
-| `--space-1` | 4px | inside one control |
-| `--space-2` | 8px | between two controls that act together |
-| `--space-3` | 12px | between the parts of one panel |
-| `--space-4` | 16px | a panel's own gap, and one step's padding |
-| `--space-5` | 24px | between two groups |
-| `--space-6` | 32px | between two bands of the page |
-
-One value repeated everywhere gives every element the same weight, and a page
-where nothing is louder than anything else has no hierarchy at all. One gap
-value is used horizontally and vertically, so the rhythm is the same in both
-directions.
+| `--s1` | 4px | inside a control, between a label and its hint |
+| `--s2` | 8px | between controls that act together |
+| `--s3` | 12px | between the parts of one panel |
+| `--s4` | 16px | a panel's padding |
+| `--s5` | 20px | a workspace's top padding |
+| `--s6` | 24px | between regions of the workspace |
+| `--s7` | 32px | workspace bottom padding |
 
 ### Grid
 
-`.shell` is two columns: the rail at 224px and the work area taking the rest.
-The rail is as wide as a list of destination names needs and no wider, because
-the work area is where the reading happens. The rail and the work area are
-each their own scroll, so a long list of windows never pushes the action bar
-off the foot of the window.
-
-The work area holds one column of at most 1152px, centred, with a gutter of at
-least 20px on each side. A step is a two-column row: a 240px label column and
-a panel that takes the rest. The column and the gutter are the same on the
-title row and on the action bar, so the header, the panels and the foot share
-one left edge.
+`.appbody` is `56px | minmax(0,1fr) | 320px` with areas `rail work dock`; the
+page itself is `56px | minmax(0,1fr) | 28px`. The workspace holds one column
+with a gutter that grows with the window and is never less than 16 px. The
+inspector is two columns that stack when the container cannot fit them. Paths
+live in flex items with `min-inline-size: 0` so a long Windows path never
+forces horizontal overflow.
 
 ## Colour
 
-Two token sets, one per theme, decided by the window rather than by the page:
-the operating system's preference is resolved in Rust and sent down as
-`data-theme`, so the stylesheet holds colours and no preference logic.
+Two token sets, one per theme, decided by the window and reported as
+`data-theme`. The stylesheet holds colours and no preference logic. The media
+query is only the state before the first answer arrives.
 
 | Role | Light | Dark |
 |---|---|---|
-| `--ground` | `#f9fafb` | `#000000` |
-| `--surface` | `#ffffff` | `#111111` |
-| `--raised` | `#f0f1f3` | `#2a2a2a` |
-| `--active` | `#eeeeee` | `#1c1c1c` |
-| `--border` | `#e8e8e8` | `#1a1a1a` |
-| `--rule` | `#f0f0f0` | `#161616` |
-| `--control` | `#d1d5db` | `#444444` |
-| `--text` | `#111111` | `#ffffff` |
-| `--muted` | `#5f6368` | `#b4b4b4` |
-| `--faint` | `#6b6b6b` | `#949494` |
-| `--accent` | `#0a6ba8` | `#4cb3f0` |
-| `--primary` | `#1d1f20` | `#ffffff` |
-| `--positive` | `#247b50` | `#3fc07a` |
-| `--negative` | `#c4242a` | `#e5566f` |
-| `--warning` | `#92400e` | `#e5a93b` |
+| `--ground` | `#edefe9` | `#0a0d10` |
+| `--panel` | `#ffffff` | `#131920` |
+| `--raised` | `#f5f6f2` | `#1b232c` |
+| `--sunken` | `#f9faf7` | `#0e1318` |
+| `--line` | `#d7dbd2` | `#25303a` |
+| `--line-strong` | `#b7c0b4` | `#35434f` |
+| `--text` | `#172026` | `#e7edf3` |
+| `--muted` | `#5b6a73` | `#94a3b0` |
+| `--faint` | `#79858d` | `#6f7f8c` |
+| `--signal` | `#0b8579` | `#35d6c3` |
+| `--good` | `#1e8a57` | `#52d18c` |
+| `--bad` | `#c13742` | `#ff6b77` |
+| `--warn` | `#9a6510` | `#e8b55a` |
 
-**Elevation is a lightness step alone.** A panel is a step above the ground and
-a nested panel a step above that; nothing at rest carries a border or a
-shadow, because a line reads as an edge to be crossed. A border or a shadow,
-never both, and only on what floats: a surface, a menu, a tooltip.
+The dark theme is graphite, not pure black: a surface step is visible without
+a border, and a border is one step above the surface. The light theme is warm
+paper rather than a blue-grey SaaS white.
 
-**Colour is spent on the data, and on one selected state.** The accent marks
-the things that have been chosen — a chosen title, a chosen track, the work in
-progress — and nothing else. It never touches a button, a tab or a navigation
-row. The primary control is made primary by inversion instead: a filled pill
-with the label turned the other way out.
+**The signal colour is spent on action and live state** — the primary button,
+the selected tab, the chosen option, the running job. It is never used as
+decoration and never on a whole card. Status always carries a word or a shape
+as well as a hue.
 
-The focus ring is two colours: a mark against the control and a halo against
-whatever is behind it. One colour alone disappears on one of the two themes.
+Depth is small radii (6/10/14 px), 1 px lines, and one soft shadow reserved for
+floating surfaces: the display menu and native dialogs. No gradient
+decoration, no glass on cards, no pill on every button.
 
 ## Type
 
-One grotesk and one monospace, at five sizes.
+Two bundled faces, offline by construction:
 
-- **Inter** is the text face, bundled with the application rather than
-  fetched from a website: a desktop program that asks a website for its
-  typeface has a typeface on the days the website is unreachable, and a
-  program that is installed should not need a network to look right. The
-  languages this build ships that Inter has no glyphs for fall back to the
-  system's own face for those letters, which is what a system face is for.
-- **A monospace** is the second face, and it has one job: the figures that
-  describe media — a time code, a resolution, a frame rate, a bit rate, a
-  container, a codec. Those are readings off a scale rather than prose, and a
-  time code is not proportional text.
-- **20px** is the title. **16px** is a step's name. **14px** is the body.
-  **13px** is a label, a note, and an answer. **12px** is for the marks that
-  are almost not text: a count, a table heading, a level. Nothing is smaller
-  than 12, and most of the page is at 13 or above.
-- Sentence case everywhere, tracking zero, and no capitals used as decoration.
-- Weight 600 marks the chosen item and a heading. Nothing is bolder.
+- **IBM Plex Sans** carries the words. Variable weight, 400–700 in use.
+- **IBM Plex Mono** carries the readings: a time code, a resolution, a frame
+  rate, a bit rate, a container, a codec, a path. It is not a costume applied
+  to prose.
 
-A line of supporting text is capped at about 62 characters, which is the
-measure the eye reads comfortably.
+The scale is 11/12/13/14/16/20/26 px. Body text is 14 px, labels and hints
+12 px, readings 12–13 px, section names 13–14 px, the job name 16 px. Every
+reading uses tabular figures. Sentence case throughout, tracking near zero,
+no decorative capitals, weight 600 for emphasis and nothing bolder.
+
+A line of supporting text is capped at roughly 62 characters.
+
+## Icons
+
+One inline SVG sprite, `<use href="#i-…">`, stroke-based at 1.5–1.9 px, 18 px
+in the rail and 16 px in buttons, drawn in `currentColor` so they follow the
+theme. No emoji, no image files, no remote requests. Every icon has a text
+alternative: the rail buttons carry `aria-label` and `title`.
 
 ## Components
 
 | Component | What it is |
 |---|---|
-| **Rail** | The window's chrome: the name and mark, the windows, and the settings. It scrolls on its own and never moves the work area. |
-| **Title row** | The name of the object the window is working on, and the grey line under it saying what is being made. |
-| **Step** | A row of the work: a label column carrying the step's name and the answer it has reached, beside the panel that decides it. |
-| **Panel** | A card with no border and no shadow: `--surface`, a 20px radius, 20px of padding. |
-| **Choice** | A radio in a label: the control, the name, and the reason beneath it. The chosen one carries the weight; the control itself is the mark. |
-| **Switch** | A checkbox with a name and its reason beneath, in a row that wraps. |
-| **Field** | A label, a control, and a hint beneath it, in a column. |
-| **Tab strip** | The same strip the preset catalogue and the preferences use, so the arrow keys, the one tab stop, and the wrapping all behave identically. The tab on screen is marked by a neutral fill and by weight, never by the accent. A tab that needs something fixed says so with a dot rather than a colour alone. |
-| **List row** | A title, a chip, and a line of facts. The chosen row carries the wash, the weight, and a dot. |
-| **Chip** | A short label: a file kind, an encoder, a hardware marker. A pale tint with the ink of the same hue. |
-| **Action bar** | The pinned foot: the path field and the button that uses it. |
-| **Surface** | A secondary window, centred over the application, dimming what is behind it. |
+| **App bar** | Brand, the job's name and format, and global commands. |
+| **Activity rail** | The build's secondary surfaces as icon buttons with badges. |
+| **Source band** | Drop zone, path, Open, Scan, live status, recents. |
+| **Inspector** | Titles and range beside tracks, with technical readings in mono. |
+| **Preset launcher** | One visible route into the 138-preset catalogue. |
+| **Output tabs** | A single scrolling row; selection marked with a shape from `aria-selected`. |
+| **Job dock** | Summary, destination, primary action and the live queue. |
+| **Status bar** | One `role="status"` line with state, facts and progress. |
+| **Native dialog** | Each secondary surface is a `<dialog>`, modal or modeless as the window says. The platform owns the backdrop, focus and Esc. |
+| **Chip** | A short technical label: file kind, encoder, hardware state. |
+| **Choice** | A native radio in a label; the chosen name takes the signal colour and weight. |
 
 ## Behaviour
 
-- The theme and the layout direction are resolved by the window and reported
-  back, so the interface never disagrees with itself about which system it
-  followed.
-- Right-to-left is a supported layout direction, not a mirror of a
-  left-to-right design: every offset, padding, and text alignment is a logical
-  property, and the two places that are physical are marked in the stylesheet
-  and are deliberate.
-- The words are the window's. An element says which message it wants and the
-  window's language answers; the page holds no text of its own, so a language
-  the build does not ship costs a sentence in the base language rather than a
-  blank control.
-- Focus is visible on everything, keyboard order follows the visual order, and
-  motion is reduced when the reader asks for less of it.
-- A control that cannot be used says which capability is missing, rather than
-  being hidden or quietly doing nothing.
+- The theme and direction are resolved by the window. The page applies what it
+  is given and decides nothing; the previous answer is replayed from local
+  storage before first paint so the window does not flash the other theme.
+- Right-to-left is a real layout: every offset, padding and alignment is a
+  logical property. English fallback sentences in a mirrored window use
+  `unicode-bidi: plaintext`, so their punctuation stays at the end until the
+  window's translation arrives.
+- The words are the window's. An element names the message it wants with
+  `data-i18n` and the window's language answers; a missing message costs a
+  sentence in the base language, never a blank control.
+- Keyboard order follows visual order, focus is visible on everything, and
+  motion is an opt-in behind `prefers-reduced-motion: no-preference`.
+- A disabled control says why in the nearby hint, not only in a tooltip.
 
 ## Rules that hold
 
-- No gradient text. Emphasis comes from weight or size.
-- No glass or blur as decoration.
-- No thick coloured edge on one side of a card, row, or callout.
-- No hard offset shadows outside a world that has chosen them.
-- No monospace as a costume; monospace is for the readings that describe
-  media, and for paths and code.
-- No emoji or unicode glyph standing in for an icon.
-- No section numbers unless the sequence itself carries information.
-- A panel is not a container for everything: grouping is done with proximity
-  first, and a nested panel is always wrong.
-- The accent is on the data, never on the chrome.
+- The dock and the commit action are never scrolled out of reach.
+- No step switcher: every step of the job stays in the one workspace scroll.
+- No focus trap, backdrop element or `aria-modal` on a native dialog.
+- No `focusgroup`, `popover`, `light-dark()`, anchor positioning or `closedby`
+  as a requirement — they are not Baseline Widely available for WebKitGTK.
+- No hardcoded English in new chrome; new messages go through the catalogue.
+- No emoji as icons, no decorative gradients, no tables used for layout.
