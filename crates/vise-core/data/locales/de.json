@@ -2,6 +2,11 @@
   "app.title": "Vise Transcoder",
   "app.tagline": "Video und Audio auf dem eigenen Rechner umwandeln.",
   "job.new": "Neuer Auftrag",
+  "skip.workspace": "Zum Arbeitsbereich springen",
+  "action.browsePresets": "Katalog durchsuchen…",
+  "preset.hint": "Beginnen Sie mit einer getesteten Konfiguration und passen Sie sie unten an.",
+  "dock.job": "Auftrag",
+  "dock.queue": "Warteschlange",
 
   "common.ok": "OK",
   "common.cancel": "Abbrechen",

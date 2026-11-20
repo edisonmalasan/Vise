@@ -939,6 +939,175 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         : ""
     );
     setText(format, state.stepAnswers.output || "");
+    renderDock();
+  }
+
+  /* The dock is the permanent answer to "what will be made and where".
+   *
+   * It reads the same view models as the work area — it holds no extra state
+   * and makes no extra decisions, so it cannot disagree with the tabs. */
+  function renderDock() {
+    var selection = state.selection || {};
+    var source = selection.source;
+    var tabs = state.tabs;
+    var out = el("outPath").value;
+
+    setText(el("dockSource"), source ? shorten(source.name, 26) : "");
+    setText(
+      el("dockFormat"),
+      state.stepAnswers.output || ""
+    );
+    setText(el("dockDestination"), out ? shorten(out, 26) : "");
+
+    var phase = selection.phase || "";
+    setText(
+      el("dockState"),
+      phase === "scanning"
+        ? "Scanning"
+        : phase === "ready"
+        ? "Ready"
+        : phase === "failed"
+        ? "Scan failed"
+        : "Idle"
+    );
+
+    var status = document.querySelector(".statusbar");
+    if (status) {
+      status.dataset.state =
+        phase === "failed" ? "error" : phase === "scanning" ? "busy" : "idle";
+    }
+    setText(
+      el("statusState"),
+      phase === "scanning"
+        ? "Scanning source"
+        : phase === "ready"
+        ? "Ready to queue"
+        : phase === "failed"
+        ? "Scan failed"
+        : "Waiting for a source"
+    );
+    setText(
+      el("statusMedia"),
+      tabs && tabs.source && tabs.source.chosen
+        ? [
+            tabs.source.resolutionLabel,
+            tabs.source.frameRateLabel,
+            tabs.source.durationLabel
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : ""
+    );
+    var errors = state.errors ? state.errors.total : 0;
+    setText(
+      el("statusProblems"),
+      errors ? String(errors) + " problem" + (errors === 1 ? "" : "s") : ""
+    );
+  }
+
+  /* A compact live readout of the queue, fed by the same poll that paints the
+     queue window. It tells the state without asking the reader to read logs. */
+  function renderDockQueue(view) {
+    var host = el("dockQueue");
+    if (!host) {
+      return;
+    }
+    clear(host);
+    var items = (view && view.items) || [];
+    setText(el("dockQueueCount"), view && view.total ? String(view.total) : "");
+    if (!items.length) {
+      var empty = node("div", "queue-item");
+      setText(
+        empty,
+        (state.strings && state.strings["queue.empty"]) || "No jobs queued"
+      );
+      host.appendChild(empty);
+      return;
+    }
+    items.slice(0, 3).forEach(function (item) {
+      var row = node("div", "queue-item");
+      row.dataset.state = item.state || "";
+      var name = node("span", "name ltr", item.inputLabel || "");
+      var label = node("span", "state", item.stateLabel || "");
+      row.appendChild(name);
+      row.appendChild(label);
+      if (item.progressVisible) {
+        var bar = node("div", "progress");
+        var fill = node("div");
+        fill.style.width = (item.percent || 0) + "%";
+        bar.appendChild(fill);
+        row.appendChild(bar);
+      }
+      host.appendChild(row);
+    });
+    var status = document.querySelector(".statusbar");
+    var running = items.filter(function (item) {
+      return item.state === "running";
+    })[0];
+    var bar = el("statusProgress");
+    if (running) {
+      show(bar, true);
+      el("statusProgressFill").style.width = (running.percent || 0) + "%";
+      if (status) {
+        status.dataset.state = "busy";
+      }
+      setText(el("statusState"), "Encoding " + (running.percent || 0) + "%");
+    } else {
+      show(bar, false);
+    }
+  }
+
+  /* The small pieces of chrome that are new to this layout. None of them
+     changes an application decision: they only open an existing surface,
+     toggle a region, or show the appearance controls the window already
+     paints into their preserved ids. */
+  function wireChrome() {
+    var display = el("displayMenu");
+    var toggle = el("displayToggle");
+    if (display && toggle) {
+      toggle.addEventListener("click", function (event) {
+        event.stopPropagation();
+        var open = display.hidden;
+        display.hidden = !open;
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      document.addEventListener("click", function (event) {
+        if (display.hidden) {
+          return;
+        }
+        if (display.contains(event.target) || toggle.contains(event.target)) {
+          return;
+        }
+        display.hidden = true;
+        toggle.setAttribute("aria-expanded", "false");
+      });
+    }
+    var rail = el("navToggle");
+    if (rail) {
+      rail.addEventListener("click", function () {
+        document.body.dataset.rail =
+          document.body.dataset.rail === "closed" ? "open" : "closed";
+      });
+    }
+    var dock = el("dockToggle");
+    if (dock) {
+      dock.addEventListener("click", function () {
+        document.body.dataset.dock =
+          document.body.dataset.dock === "closed" ? "open" : "closed";
+      });
+    }
+    ["presetLaunchBtn", "presetBrowseBtn"].forEach(function (id) {
+      var button = el(id);
+      if (button) {
+        button.addEventListener("click", function () {
+          openSurface("presets");
+        });
+      }
+    });
+    var path = el("outPath");
+    if (path) {
+      path.addEventListener("input", renderDock);
+    }
   }
 
   function shellOf(id) {
@@ -953,24 +1122,53 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     return state.open.indexOf(id) !== -1;
   }
 
-  /* Build one surface shell from its description.
+  /* One icon per destination in the activity rail. The names are the ones in
+     the sprite at the top of the page; the labels still come from the window's
+     catalog, so a surface the build does not offer has no icon. */
+  var SURFACE_ICONS = {
+    queue: "i-list",
+    "queue-selection": "i-layers",
+    activity: "i-activity",
+    preview: "i-play",
+    error: "i-alert",
+    alert: "i-alert",
+    about: "i-info",
+    presets: "i-cube",
+    preferences: "i-gear",
+    diagnostics: "i-pulse"
+  };
+
+  function surfaceIcon(id) {
+    var name = SURFACE_ICONS[id] || "i-dots";
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "icon");
+    svg.setAttribute("aria-hidden", "true");
+    var use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    use.setAttribute("href", "#" + name);
+    svg.appendChild(use);
+    return svg;
+  }
+
+  /* Build one surface as a native dialog.
    *
-   * The role, the modal flag, the heading, the close control, and the control
-   * that takes focus all come from the window, so a surface cannot be presented
-   * with accessibility semantics the window did not ask for.
-   */
+   * The platform owns the top layer, the backdrop, focus containment, Esc and
+   * focus return. The window still decides the heading, the close control and
+   * which surface is modal; the page adds none of that machinery itself. */
   function buildSurface(spec) {
-    var shell = node("section", "surface" + (spec.kind === "window" ? " surface-wide" : ""));
+    var shell = document.createElement("dialog");
     shell.id = "surface-" + spec.id;
-    shell.setAttribute("role", spec.role);
-    shell.setAttribute("aria-modal", spec.modal ? "true" : "false");
-    shell.tabIndex = -1;
-    shell.hidden = true;
+    if (spec.kind === "window") {
+      shell.classList.add("surface-wide");
+    }
+    shell.setAttribute("aria-labelledby", spec.id + "-label");
+    if (!spec.modal) {
+      // A tool window stays non-modal: the page behind it keeps working.
+      shell.setAttribute("data-nonmodal", "true");
+    }
 
     var head = node("header", "surface-head");
     var heading = node("h2", null, spec.label);
     heading.id = spec.id + "-label";
-    shell.setAttribute("aria-labelledby", heading.id);
     head.appendChild(heading);
     head.appendChild(para(spec.hint));
     if (spec.escapeCloses) {
@@ -987,10 +1185,37 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     var body = node("div", "surface-body");
     body.id = shell.id + "-body";
     shell.appendChild(body);
+
+    /* A modal dialog reports Esc as `cancel`. Intercept it so the window's
+       open list follows the platform's own dismissal, including where the
+       `closedby` attribute is not available. A non-modal dialog has no cancel
+       event, so it gets the same path from a plain keydown below. */
+    shell.addEventListener("cancel", function (event) {
+      if (!spec.escapeCloses) {
+        return;
+      }
+      event.preventDefault();
+      if (spec.id === "alert") {
+        call("dismiss_alert").then(function () {
+          return closeSurface(spec.id);
+        });
+        return;
+      }
+      closeSurface(spec.id);
+    });
+    if (!spec.modal && spec.escapeCloses) {
+      shell.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") {
+          return;
+        }
+        event.preventDefault();
+        closeSurface(spec.id);
+      });
+    }
     return shell;
   }
 
-  /* The steps and the surface shells, built from the catalog. */
+  /* The surface shells and the activity rail, built from the catalog. */
   function loadCatalog() {
     return call("window_catalog").then(function (catalog) {
       state.catalog = catalog.surfaces || [];
@@ -999,25 +1224,19 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       clear(bar);
       clear(host);
       state.specs = {};
-      /* One backdrop for every surface, so the window behind is dimmed and
-         cannot be clicked while something is up. It is a real element rather
-         than a pseudo-element because it has to take pointer events away from
-         the whole window, not just tint it. */
-      var backdrop = node("div", "backdrop");
-      backdrop.id = "backdrop";
-      backdrop.hidden = true;
-      host.appendChild(backdrop);
       state.catalog.forEach(function (spec) {
         state.specs[spec.id] = spec;
         host.appendChild(buildSurface(spec));
         if (!spec.openable) {
           return;
         }
-        var button = node("button", null, spec.label);
+        var button = node("button", null);
         button.type = "button";
         button.id = spec.buttonId;
+        button.setAttribute("aria-label", spec.label);
         button.setAttribute("aria-haspopup", "dialog");
         button.title = spec.hint;
+        button.appendChild(surfaceIcon(spec.id));
         button.addEventListener("click", function () {
           openSurface(spec.id);
         });
@@ -1030,7 +1249,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     });
   }
 
-  /* Put a count on the toolbar button of a surface that keeps one. */
+  /* Put a count on the rail button of a surface that keeps one. */
   function setBadge(count) {
     state.catalog.forEach(function (spec) {
       if (!spec.badge) {
@@ -1053,7 +1272,6 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
           state.open.push(id);
         }
         state.front = id;
-        syncBackdrop();
         showSurface(spec);
         if (painter) {
           state.pending += 1;
@@ -1066,23 +1284,16 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       .catch(failed);
   }
 
-  /* The dimmed backdrop exists only while something is open, so it can never
-     cover the window when it has nothing to dim. */
-  function syncBackdrop() {
-    var backdrop = el("backdrop");
-    if (backdrop) {
-      backdrop.hidden = !state.open.length;
-    }
-  }
-
   function showSurface(spec) {
     var shell = shellOf(spec.id);
-    if (!shell) {
+    if (!shell || shell.open) {
       return;
     }
-    shell.hidden = false;
-    // The surface that was opened last is the one in front.
-    el("surfaces").appendChild(shell);
+    if (spec.modal) {
+      shell.showModal();
+    } else {
+      shell.show();
+    }
     var focus = el(spec.initialFocus) || shell;
     if (focus) {
       focus.focus();
@@ -1098,14 +1309,13 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         });
         state.front = view.front || "";
         state.restoreFocus = view.restoreFocus || "";
-        syncBackdrop();
         if (id === "alert") {
           stopAlertCountdown();
           state.confirm = null;
         }
         /* The window decides where the caret goes when a surface closes: back
-           to the surface that was in front before, or to the toolbar control
-           that opens the queue. */
+           to the surface that was in front before, or to the rail control that
+           opens the queue. */
         var target = el(state.restoreFocus);
         if (target) {
           target.focus();
@@ -1118,63 +1328,18 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
   function hideSurface(id) {
     var shell = shellOf(id);
     if (shell) {
-      shell.hidden = true;
+      if (shell.open) {
+        shell.close();
+      }
       clear(bodyOf(shell));
     }
   }
 
-  /* Escape closes the surface in front, and only if the window says that
-     surface may be closed that way; Tab stays inside it while it is up. */
-  function wireSurfaceKeys() {
-    document.addEventListener("keydown", function (event) {
-      var id = state.front;
-      var spec = id ? state.specs[id] : null;
-      if (!spec) {
-        return;
-      }
-      if (event.key === "Escape" && spec.escapeCloses) {
-        event.preventDefault();
-        if (id === "alert") {
-          call("dismiss_alert").then(function () {
-            closeSurface("alert");
-          });
-          return;
-        }
-        closeSurface(id);
-        return;
-      }
-      if (event.key === "Tab") {
-        keepFocusInside(id, event);
-      }
-    });
-  }
-
-  /* Focus belongs to the surface in front while it is up: tabbing past its
-     last control comes back to its first rather than into the window behind. */
-  function keepFocusInside(id, event) {
-    var shell = shellOf(id);
-    if (!shell) {
-      return;
-    }
-    var focusable = shell.querySelectorAll(
-      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
-    );
-    if (!focusable.length) {
-      event.preventDefault();
-      shell.focus();
-      return;
-    }
-    var first = focusable[0];
-    var last = focusable[focusable.length - 1];
-    var here = document.activeElement;
-    if (event.shiftKey && (here === first || !shell.contains(here))) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && here === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
+  /* The surfaces are native dialogs now: the platform owns Esc, focus
+     containment, the backdrop and focus return, so there is no key handling to
+     duplicate here. Each dialog's own `cancel` listener keeps the window's
+     open list in sync when the platform dismisses it. */
+  function wireSurfaceKeys() {}
 
   /* Repaint whichever surfaces are open. The queue and the problem list are
      cheap to read and keep their toolbar counts honest while they are closed;
@@ -1223,8 +1388,9 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     return call("queue_window")
       .then(function (view) {
         state.queue = view;
+        renderDockQueue(view);
         var shell = shellOf("queue");
-        if (shell && !shell.hidden) {
+        if (shell && shell.open) {
           paintQueue(shell, view);
         }
         return view;
@@ -1588,7 +1754,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     return call("set_queue_selection", { change: input }).then(function (answer) {
       state.queueSelection = answer;
       var shell = shellOf("queue-selection");
-      if (shell && !shell.hidden) {
+      if (shell && !shell.open) {
         paintSelection(shell, answer);
       }
       return answer;
@@ -2090,7 +2256,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     return call("fetch_preview_still").then(function (answer) {
       state.preview = answer;
       var shell = shellOf("preview");
-      if (shell && !shell.hidden) {
+      if (shell && !shell.open) {
         paintPreview(shell, answer);
       }
       return answer;
@@ -2149,7 +2315,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
         .then(function (answer) {
           state.preview = answer;
           var shell = shellOf("preview");
-          if (shell && !shell.hidden) {
+          if (shell && !shell.open) {
             paintPreview(shell, answer);
           }
         })
@@ -2555,7 +2721,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       .then(function (view) {
         state.presets = view;
         var shell = shellOf("presets");
-        if (shell && !shell.hidden) {
+        if (shell && !shell.open) {
           paintPresets(shell, view);
           /* The list is rebuilt from the answer, so the option that is open now
              is the one that exists now: focus follows the selection rather than
@@ -2852,7 +3018,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       .then(function (view) {
         state.presets = view;
         var shell = shellOf("presets");
-        if (shell && !shell.hidden) {
+        if (shell && !shell.open) {
           paintPresets(shell, view);
           /* The form is painted again from scratch, so the field the user was
              in is focused again rather than dropped. */
@@ -2879,7 +3045,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
     return call("apply_preset_action", { change: input }).then(function (view) {
       state.presets = view;
       var shell = shellOf("presets");
-      if (shell && !shell.hidden) {
+      if (shell && !shell.open) {
         paintPresets(shell, view);
       }
       if (tabsNeedRepaint()) {
@@ -2930,7 +3096,6 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
           state.open.push("alert");
         }
         state.front = "alert";
-        syncBackdrop();
         showSurface(state.specs.alert);
         startAlertCountdown();
         return null;
@@ -2987,7 +3152,6 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
       state.open.push("alert");
     }
     state.front = "alert";
-    syncBackdrop();
     showSurface(state.specs.alert);
     if (view.armed) {
       stopAlertCountdown();
@@ -3684,7 +3848,7 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
   function repaintPreferences(view) {
     state.preferences = view;
     var shell = shellOf("preferences");
-    if (!shell || shell.hidden) {
+    if (!shell || !shell.open) {
       return view;
     }
     var focused = document.activeElement;
@@ -5266,6 +5430,8 @@ function choiceRow(item, group, checked, unavailable, onSelect) {
 
     wireSurfaceKeys();
     wireDropzone();
+    wireChrome();
+    renderDock();
   }
 
   function start() {

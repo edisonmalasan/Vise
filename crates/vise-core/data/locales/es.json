@@ -2,6 +2,11 @@
   "app.title": "Vise Transcoder",
   "app.tagline": "Transcodifica vídeo y audio en tu propio equipo.",
   "job.new": "Trabajo nuevo",
+  "skip.workspace": "Ir al espacio de trabajo",
+  "action.browsePresets": "Explorar el catálogo…",
+  "preset.hint": "Empiece con una configuración probada y ajústela abajo.",
+  "dock.job": "Trabajo",
+  "dock.queue": "Cola",
 
   "common.ok": "Aceptar",
   "common.cancel": "Cancelar",

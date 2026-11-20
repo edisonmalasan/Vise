@@ -2,6 +2,11 @@
   "app.title": "Vise Transcoder",
   "app.tagline": "Transcode video and audio on your own machine.",
   "job.new": "New job",
+  "skip.workspace": "Skip to workspace",
+  "action.browsePresets": "Browse the catalogue…",
+  "preset.hint": "Start from a tested configuration, then refine it below.",
+  "dock.job": "Job",
+  "dock.queue": "Queue",
 
   "common.ok": "OK",
   "common.cancel": "Cancel",

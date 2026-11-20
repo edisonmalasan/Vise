@@ -6332,6 +6332,73 @@ mod tests {
         state
     }
 
+    /// Every element the page looks up by id must exist in the markup.
+    ///
+    /// The page is a renderer: it asks the window for a view model and paints
+    /// it into a control it finds by id. A rename on one side leaves a control
+    /// that never receives its answer, and the failure is quiet — the element
+    /// is simply blank. This check makes a broken binding a build error, and
+    /// it is what lets the markup be rearranged without losing a connection.
+    #[test]
+    fn every_id_the_page_looks_up_is_in_the_markup() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let markup = std::fs::read_to_string(root.join("../ui/index.html")).expect("the page");
+        let script = std::fs::read_to_string(root.join("../ui/app.js")).expect("the script");
+
+        // A handful of ids are built at runtime rather than declared: the
+        // backdrop the window catalog used to add and the surface shells it
+        // builds from the catalog. Everything else is literal.
+        let runtime = ["backdrop"];
+        let mut wanted: Vec<&str> = Vec::new();
+        let mut rest = script.as_str();
+        while let Some(at) = rest.find("el(\"") {
+            rest = &rest[at + 4..];
+            if let Some(end) = rest.find('"') {
+                let id = &rest[..end];
+                // A name followed by `+` is a prefix of a name built at
+                // runtime (a step answer, a tab message, a surface shell).
+                let joined = rest[end + 1..].trim_start().starts_with('+');
+                if !joined && !runtime.contains(&id) && !wanted.contains(&id) {
+                    wanted.push(id);
+                }
+                rest = &rest[end + 1..];
+            }
+        }
+        assert!(!wanted.is_empty(), "the page looks up nothing at all");
+        for id in wanted {
+            assert!(
+                markup.contains(&format!("id=\"{}\"", id)),
+                "the script looks up '#{id}', which the page does not declare"
+            );
+        }
+    }
+
+    /// The job dock reads the queue view model the window actually sends.
+    ///
+    /// Queue rows are serialised in camelCase, so a field spelled in snake_case
+    /// on the page is silently empty: the card draws and the job never appears.
+    /// The dock is the only place the page reads those fields directly, so the
+    /// binding is checked here rather than left to a screenshot.
+    #[test]
+    fn the_dock_reads_the_queue_fields_the_window_sends() {
+        let script = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/app.js"),
+        )
+        .expect("the script");
+        for field in ["inputLabel", "stateLabel", "progressVisible"] {
+            assert!(
+                script.contains(&format!("item.{}", field)),
+                "the dock never reads the queue's '{field}' field"
+            );
+        }
+        for field in ["input_label", "state_label", "progress_visible"] {
+            assert!(
+                !script.contains(&format!("item.{}", field)),
+                "the dock reads '{field}' but the window sends camelCase"
+            );
+        }
+    }
+
     #[test]
     fn every_name_the_page_asks_for_is_a_key_this_build_has() {
         // The page holds no text: an element names the message it wants and the

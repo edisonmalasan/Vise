@@ -2,6 +2,11 @@
   "app.title": "Vise Transcoder",
   "app.tagline": "حوِّل الفيديو والصوت على جهازك أنت.",
   "job.new": "مهمة جديدة",
+  "skip.workspace": "تخطَّ إلى مساحة العمل",
+  "action.browsePresets": "تصفح الكتالوج…",
+  "preset.hint": "ابدأ بإعداد مجرّب ثم عدّله أدناه.",
+  "dock.job": "المهمة",
+  "dock.queue": "قائمة الانتظار",
 
   "common.ok": "موافق",
   "common.cancel": "إلغاء",
