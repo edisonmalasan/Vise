@@ -3,28 +3,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
 <title>Vise Transcoder</title>
 <link rel="stylesheet" href="styles.css" />
 <script>
-/* Put the theme and the direction on the document before anything is painted.
+/* The window decides the theme and the reading direction, but it can only
+ * tell the page after the bridge answers. Keep the last answer it gave and
+ * replay it here so a window that has been opened before opens in the theme it
+ * was left in rather than flashing the other one first.
  *
- * The window decides both and the page is told them, but the page cannot be told
- * them before its first paint: the answer arrives over the bridge, which is a
- * round trip later. So the last answer the window gave is kept here and replayed
- * synchronously, which means a window that has been opened before opens in the
- * theme it was left in rather than flashing the other one.
- *
- * This is a record of what the window said, not a preference of its own. There is
- * no rule in this file: a cached answer is applied exactly as it was given, a
- * missing one falls back to the media query the stylesheet already follows, and
- * the first answer from the window replaces both.
- *
- * The locale read below is a report of what this machine is set to, not a
- * decision about it — the same fact the window reads from the environment, read
- * here only because it is available before the first paint. It is used only when
- * there is no cached answer, so the first ever launch in a right-to-left locale
- * mirrors immediately rather than after a round trip.
- */
+ * This is a record of an answer, not a preference of the page: a cached value
+ * is applied exactly as it was given and the first answer from the window
+ * replaces it. */
 (function () {
   var root = document.documentElement;
   var cached = null;
@@ -47,9 +37,6 @@
     }
   }
   if (!root.dataset.theme) {
-    /* Right-to-left languages, spelled the way the window spells them. A locale
-       this does not know reads left to right, which is what the window does for
-       one it cannot name. */
     var language = (window.navigator && navigator.language) || "";
     var first = String(language).split("-")[0].toLowerCase();
     var mirrored = ["ar", "fa", "he", "ur", "ps", "yi", "dv", "sd", "ug", "ku", "ckb"];
@@ -61,206 +48,195 @@
 </script>
 </head>
 <body>
-<!-- The window is a rail and a work area.
-     The rail holds the application's own destinations: the windows it can open
-     and the settings that change how it looks. The work area holds the whole
-     of one job — the source, the title, the range, the tracks, the output —
-     in the order the work is done in, with every control on screen at once.
+<a class="skip-link" href="#work">Skip to workspace</a>
 
-     The rail is not a menu for the work area. A list of anchors into one long
-     page asks the reader to keep a second map of the page in their head, and
-     the work area already says where it is: each step names itself and states
-     what has been decided for it. -->
-<div class="shell">
-  <aside class="rail" aria-label="Vise Transcoder">
-    <div class="rail-head">
-      <!-- The application's mark: two chevrons, the shape of a thing running
-           through. Drawn rather than loaded, so it takes the ink of whatever
-           theme the window resolved. -->
-      <svg class="rail-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M4 4 L12 12 L4 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
-        <path d="M12 4 L20 12 L12 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-      <span class="rail-name" data-i18n="app.title">Vise Transcoder</span>
-    </div>
+<!-- One icon set for the whole application. Drawn with currentColor so the
+     rail, the buttons and the status bar all take their ink from the theme,
+     and inlined so the window never asks a server for an icon. -->
+<svg class="icon-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-mark" viewBox="0 0 24 24"><path d="M3.5 5 10 12l-6.5 7M12.5 5 19 12l-6.5 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2.5h6.5A2.5 2.5 0 0 1 21 10v7.5A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9m4 0h3M4 17h3m4 0h9M15 4.5v5M9 14.5v5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9.5 9 5 9-5M3 16l9 5 9-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="6" cy="18" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.2 7.7 20 18M8.2 16.3 20 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h2m2-4v8m3-11v14m3-10v6m3-9v12m3-8v4m2-2h1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 2.8 8 4.6v9.2l-8 4.6-8-4.6V7.4l8-4.6Zm0 9.2 8-4.6M12 12l-8-4.6M12 12v9.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M4.5 6h.01M4.5 12h.01M4.5 18h.01" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5 19 12 7 19.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 22 20H2L12 3.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 9v5m0 3h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 11v6m0-9.5h.01" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 3.2v2.2m0 13.2v2.2M3.2 12h2.2m13.2 0h2.2M5.8 5.8l1.6 1.6m9.2 9.2 1.6 1.6m0-12.4-1.6 1.6M7.4 16.6l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+  <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 17V7m4.5 10V9.5M12 17V4.5m4.5 12.5v-6M21 17V8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2v2.5m0 15V22M2 12h2.5m15 0H22M4.9 4.9l1.8 1.8m10.6 10.6 1.8 1.8m0-14.2-1.8 1.8M6.7 17.3l-1.8 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</svg>
 
-    <!-- The windows the application can open. They are built from the window
-         catalog: every surface the window offers gets a control that opens it,
-         and a surface it does not offer has no control at all. -->
-    <nav class="rail-tools" id="toolbar" aria-label="Windows and dialogs"></nav>
+<header class="appbar">
+  <button type="button" class="icon-btn rail-toggle" id="navToggle" aria-label="Toggle tool rail" title="Toggle tool rail">
+    <svg class="icon"><use href="#i-list" /></svg>
+  </button>
 
-    <!-- Theme and layout direction. Every control here is a preference the
-         window holds and resolves; the line underneath says what the window
-         resolved and why, so the user never has to work out which of the two
-         systems the colours on screen came from. The language lives in the
-         preferences rather than here, and a change to it arrives as an event
-         with the two answers that moved. -->
-    <section class="rail-look" aria-labelledby="appearanceHeading">
-      <h2 class="rail-group" id="appearanceHeading" data-i18n="appearance.heading">Appearance</h2>
+  <div class="brand" aria-label="Vise Transcoder">
+    <svg class="icon brand-mark"><use href="#i-mark" /></svg>
+    <span class="brand-name" data-i18n="app.title">Vise Transcoder</span>
+  </div>
 
-      <div class="appearance-options">
-        <fieldset>
-          <legend data-i18n="appearance.theme">Theme</legend>
-          <div class="rules" id="appearanceThemeList"></div>
-        </fieldset>
-        <fieldset>
-          <legend data-i18n="appearance.direction">Layout direction</legend>
-          <div class="rules" id="appearanceDirectionList"></div>
-        </fieldset>
-      </div>
+  <div class="job-identity">
+    <h1 id="jobTitle" data-i18n="job.new">New job</h1>
+    <p class="job-line"><span id="jobFacts"></span><span class="format" id="jobFormat"></span></p>
+  </div>
 
-      <p class="appearance-summary" id="appearanceSummary" role="status" aria-live="polite"><span
-           class="icon-flow" id="appearanceFlow" aria-hidden="true"></span><span
-           id="appearanceSummaryText"></span></p>
+  <div class="appbar-actions">
+    <button type="button" class="action-btn" id="presetLaunchBtn" title="Browse presets">
+      <svg class="icon"><use href="#i-cube" /></svg><span data-i18n="action.openPresets">Presets</span>
+    </button>
+    <button type="button" class="icon-btn" id="displayToggle" aria-expanded="false" aria-controls="displayMenu" aria-label="Appearance" title="Appearance">
+      <svg class="icon"><use href="#i-auto" /></svg>
+    </button>
+    <div class="display-menu" id="displayMenu" hidden>
+      <h2 id="appearanceHeading" data-i18n="appearance.heading">Appearance</h2>
+      <fieldset>
+        <legend data-i18n="appearance.theme">Theme</legend>
+        <div class="choice-stack" id="appearanceThemeList"></div>
+      </fieldset>
+      <fieldset>
+        <legend data-i18n="appearance.direction">Layout direction</legend>
+        <div class="choice-stack" id="appearanceDirectionList"></div>
+      </fieldset>
+      <p class="appearance-summary" id="appearanceSummary"><svg class="icon flow" id="appearanceFlow" aria-hidden="true"></svg><span id="appearanceSummaryText"></span></p>
       <span class="hint" id="appearanceObservation"></span>
-    </section>
-  </aside>
+    </div>
+  </div>
+</header>
 
-  <!-- The work. Every control is on screen: the reader never switches
-       anything to reach one. The steps are in the order they are done in, so
-       the order the panels are read in is the order the work happens in, and
-       the title at the top says what is being made. -->
-  <main class="work" id="work">
-    <header class="work-head">
-      <h1 id="jobTitle" data-i18n="job.new">New job</h1>
-      <p class="work-summary">
-        <span id="jobFacts"></span>
-        <span class="job-format" id="jobFormat"></span>
-      </p>
-    </header>
+<div class="appbody">
+  <!-- Primary destinations and contextual tools. The catalog decides which
+       surfaces this build offers, so the rail has no hardcoded entries. -->
+  <nav class="activity" id="toolbar" aria-label="Tools"></nav>
 
-    <div class="work-scroll" id="workScroll">
-    <section class="step" data-step="source" aria-labelledby="sourceHeading">
-      <div class="step-label">
-        <h2 class="step-name" id="sourceHeading" data-i18n="step.source">Source</h2>
-        <p class="step-answer" id="stepAnswer-source"></p>
-      </div>
-      <div class="step-panel">
-        <div class="dropzone" id="dropzone" data-dragging="false">
-          <strong id="dropTitle">Drop a file or folder here</strong>
-          <span class="hint" id="dropHint">Or type the full path below and open it.</span>
+  <main class="workspace" id="work" tabindex="-1">
+    <div class="workspace-scroll" id="workScroll">
+
+      <!-- Source: one compact band, not a card stacked with another card. -->
+      <section class="step source-step" data-step="source" aria-labelledby="sourceHeading">
+        <div class="section-head">
+          <h2 id="sourceHeading" data-i18n="step.source">Source</h2>
+          <span class="readout" id="stepAnswer-source"></span>
         </div>
-
-        <div class="row">
-          <div class="grow">
-            <label for="pathInput">Source path</label>
-            <input type="text" id="pathInput" spellcheck="false" autocomplete="off" dir="ltr"
-                   placeholder="C:\media\movie.mkv" aria-describedby="pathHint" />
+        <div class="source-grid">
+          <div class="dropzone" id="dropzone" data-dragging="false">
+            <svg class="icon drop-icon"><use href="#i-upload" /></svg>
+            <strong id="dropTitle">Drop a file or folder here</strong>
+            <span class="hint" id="dropHint">Or type the full path below and open it.</span>
           </div>
-          <button type="button" id="openBtn" data-i18n="common.open">Open</button>
-          <button type="button" id="scanBtn" data-i18n="action.scan" disabled>Scan</button>
+          <div class="path-entry">
+            <label for="pathInput">Source path</label>
+            <div class="input-row">
+              <input type="text" id="pathInput" spellcheck="false" autocomplete="off" dir="ltr" placeholder="C:\media\movie.mkv" aria-describedby="pathHint" />
+              <button type="button" id="openBtn" data-i18n="common.open">Open</button>
+              <button type="button" id="scanBtn" data-i18n="action.scan" disabled>Scan</button>
+            </div>
+            <span class="hint" id="pathHint">A file is probed directly; a folder is scanned file by file.</span>
+          </div>
         </div>
-        <span class="hint" id="pathHint">A file is probed directly; a folder is scanned file by file.</span>
-
         <div class="source-current" id="sourceCurrent" hidden>
           <span class="chip" id="sourceKind"></span>
           <span class="name ltr" id="sourceName"></span>
           <span class="location ltr" id="sourceLocation"></span>
-          <button type="button" class="quiet" id="clearSourceBtn">Forget source</button>
+          <button type="button" class="link-btn" id="clearSourceBtn">Forget source</button>
         </div>
-
-        <div class="status" role="status" aria-live="polite" aria-atomic="true">
-          <div class="status-line" id="scanStatus">No source scanned yet.</div>
+        <div class="scan-line" role="status" aria-live="polite" aria-atomic="true">
+          <span class="status-line" id="scanStatus">No source scanned yet.</span>
           <div class="progress" id="scanProgress" hidden><div id="scanProgressFill"></div></div>
           <div class="notice" id="scanNotice" data-tone="muted" hidden></div>
         </div>
-
-        <fieldset>
+        <fieldset class="recent">
           <legend>Recent sources</legend>
-          <ul class="list" id="recentList"></ul>
-          <div class="row">
-            <button type="button" class="quiet" id="clearRecentsBtn">Clear recent sources</button>
-          </div>
+          <ul class="list recent-list" id="recentList"></ul>
+          <button type="button" class="link-btn" id="clearRecentsBtn">Clear recent sources</button>
         </fieldset>
-      </div>
-    </section>
+      </section>
 
-    <section class="step" data-step="titles" aria-labelledby="titleHeading">
-      <div class="step-label">
-        <h2 class="step-name" id="titleHeading" data-i18n="step.titles">Titles</h2>
-        <p class="step-answer" id="stepAnswer-titles"></p>
-      </div>
-      <div class="step-panel">
-        <ul class="list" id="titleList"></ul>
-        <div class="empty" id="titleEmpty">Scan a source to see the titles it contains.</div>
-      </div>
-    </section>
-
-    <section class="step" data-step="range" aria-labelledby="rangeHeading">
-      <div class="step-label">
-        <h2 class="step-name" id="rangeHeading" data-i18n="step.range">Range and angle</h2>
-        <p class="step-answer" id="stepAnswer-range"></p>
-      </div>
-      <div class="step-panel">
-        <p class="panel-note" id="rangeSummary"></p>
-
-        <fieldset>
-          <legend>Range</legend>
-          <div class="list" id="rangeModeList"></div>
-        </fieldset>
-
-        <div class="row" id="pointRow" hidden>
-          <div class="grow">
-            <label for="startPoint">Start point</label>
-            <select id="startPoint"></select>
+      <!-- Inspection: what is in the source and what has been chosen. -->
+      <section class="inspector" aria-label="Media inspection">
+        <div class="inspect-column">
+          <div class="inspect-block">
+            <div class="section-head">
+              <h2 id="titleHeading" data-i18n="step.titles">Titles</h2>
+              <span class="readout" id="stepAnswer-titles"></span>
+            </div>
+            <ul class="list choice-list" id="titleList"></ul>
+            <div class="empty" id="titleEmpty">Scan a source to see the titles it contains.</div>
           </div>
-          <div class="grow">
-            <label for="endPoint">End point</label>
-            <select id="endPoint"></select>
-          </div>
-        </div>
 
-        <div class="row" id="angleRow" hidden>
-          <div class="grow">
-            <label for="angleSelect">Angle</label>
-            <select id="angleSelect"></select>
+          <div class="inspect-block">
+            <div class="section-head">
+              <h2 id="rangeHeading" data-i18n="step.range">Range and angle</h2>
+              <span class="readout" id="stepAnswer-range"></span>
+            </div>
+            <p class="panel-note" id="rangeSummary"></p>
+            <fieldset>
+              <legend>Range</legend>
+              <div class="choice-list" id="rangeModeList"></div>
+            </fieldset>
+            <div class="field-row" id="pointRow" hidden>
+              <div class="field"><label for="startPoint">Start point</label><select id="startPoint"></select></div>
+              <div class="field"><label for="endPoint">End point</label><select id="endPoint"></select></div>
+            </div>
+            <div class="field-row" id="angleRow" hidden>
+              <div class="field"><label for="angleSelect">Angle</label><select id="angleSelect"></select></div>
+            </div>
+            <div class="notice" id="rangeNotice" data-tone="error" hidden></div>
+            <fieldset>
+              <legend>Chapters</legend>
+              <ul class="list choice-list" id="chapterList"></ul>
+              <div class="empty" id="chapterEmpty">Chapters appear once a title with chapters is chosen.</div>
+            </fieldset>
           </div>
         </div>
 
-        <div class="notice" id="rangeNotice" data-tone="error" hidden></div>
+        <div class="inspect-column inspect-tracks">
+          <div class="section-head">
+            <h2 id="trackHeading" data-i18n="step.tracks">Tracks</h2>
+            <span class="readout" id="stepAnswer-tracks"></span>
+          </div>
+          <fieldset>
+            <legend data-i18n="tab.audio">Audio</legend>
+            <div id="audioList"></div>
+            <div class="empty" id="audioEmpty">Audio tracks appear once a title is chosen.</div>
+          </fieldset>
+          <fieldset>
+            <legend data-i18n="tab.subtitles">Subtitles</legend>
+            <div id="subtitleList"></div>
+            <div class="empty" id="subtitleEmpty">This title carries no subtitle tracks.</div>
+          </fieldset>
+        </div>
+      </section>
 
-        <fieldset>
-          <legend>Chapters</legend>
-          <ul class="list" id="chapterList"></ul>
-          <div class="empty" id="chapterEmpty">Chapters appear once a title with chapters is chosen.</div>
-        </fieldset>
+      <div class="preset-launch">
+        <div>
+          <h2 data-i18n="action.openPresets">Presets</h2>
+          <span class="hint">Start from a tested configuration, then refine it below.</span>
+        </div>
+        <button type="button" id="presetBrowseBtn">Browse the catalogue…</button>
       </div>
-    </section>
 
-    <section class="step" data-step="tracks" aria-labelledby="trackHeading">
-      <div class="step-label">
-        <h2 class="step-name" id="trackHeading" data-i18n="step.tracks">Tracks</h2>
-        <p class="step-answer" id="stepAnswer-tracks"></p>
-      </div>
-      <div class="step-panel">
-        <fieldset>
-          <legend>Audio</legend>
-          <div id="audioList"></div>
-          <div class="empty" id="audioEmpty">Audio tracks appear once a title is chosen.</div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Subtitles</legend>
-          <div id="subtitleList"></div>
-          <div class="empty" id="subtitleEmpty">This title carries no subtitle tracks.</div>
-        </fieldset>
-      </div>
-    </section>
-
-    <section class="step" data-step="output" aria-labelledby="settingsHeading">
-      <div class="step-label">
-        <h2 class="step-name" id="settingsHeading" data-i18n="step.output">Output</h2>
-        <p class="step-answer" id="stepAnswer-output"></p>
-      </div>
-      <div class="step-panel step-panel-wide">
-        <p class="panel-note" id="tabSource">Choose a title to configure the output.</p>
+      <!-- Output: every field and hint stays where the window expects it. -->
+      <section class="output-step" data-step="output" aria-labelledby="settingsHeading">
+        <div class="section-head">
+          <h2 id="settingsHeading" data-i18n="step.output">Output</h2>
+          <span class="readout" id="stepAnswer-output"></span>
+        </div>
+        <p class="source-caption" id="tabSource">Choose a title to configure the output.</p>
         <span class="hint" id="tabSourceNote" hidden></span>
-
-        <div class="tabs">
-          <div class="tablist" role="tablist" aria-label="Output settings" id="tabList"></div>
-          <div class="notice" id="tabProblems" data-tone="error" role="status" aria-live="polite" hidden></div>
-
-          <div class="tabpanels" id="tabPanels">
+        <div class="tablist" id="tabList" role="tablist" aria-label="Output settings"></div>
+        <div class="notice" id="tabProblems" data-tone="error" role="status" aria-live="polite" hidden></div>
+        <div class="tabpanels" id="tabPanels">
             <!-- Summary ---------------------------------------------------------- -->
             <div class="tabpanel" role="tabpanel" id="panel-summary" aria-labelledby="tab-summary" tabindex="0">
               <div class="grid two">
@@ -575,37 +551,44 @@
               <p class="hint" id="metadataSummary"></p>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-  </div>
-
-    <!-- The commit action stays on screen. The work is a long column of
-         choices, and the one thing the user came to do — put it in the queue —
-         must not be something they have to scroll back up to find. The path and
-         the button that uses it sit together, because one without the other is
-         a decision the window cannot carry out. -->
-    <div class="actionbar" role="group" aria-label="Output and queue">
-      <div class="actionbar-path">
-        <label for="outPath">Output path</label>
-        <input type="text" id="outPath" spellcheck="false" autocomplete="off" dir="ltr"
-               placeholder="C:\media\out.mp4" />
-      </div>
-      <div class="actionbar-buttons">
-        <button type="button" class="primary" id="queueBtn" disabled>Add selection to queue</button>
-        <button type="button" id="openSelectionBtn">Choose titles to queue…</button>
-      </div>
-      <span class="hint" id="queueHint">Scan a source and choose a title first.</span>
+      </section>
     </div>
   </main>
+
+  <!-- The job dock is the permanent answer to "what will be made and where". -->
+  <aside class="dock" aria-label="Job and queue">
+    <div class="dock-head">
+      <h2>Job</h2>
+      <span class="chip" id="dockState">Ready</span>
+    </div>
+    <div class="job-summary">
+      <div class="summary-row"><span class="label">Source</span><span class="value" id="dockSource">No source</span></div>
+      <div class="summary-row"><span class="label">Format</span><span class="value mono" id="dockFormat">—</span></div>
+      <div class="summary-row"><span class="label">Destination</span><span class="value mono" id="dockDestination">—</span></div>
+    </div>
+    <div class="destination-field">
+      <label for="outPath">Output path</label>
+      <input type="text" id="outPath" spellcheck="false" autocomplete="off" dir="ltr" placeholder="C:\media\out.mp4" />
+    </div>
+    <p class="hint" id="queueHint">Scan a source and choose a title first.</p>
+    <button type="button" class="accent" id="queueBtn" data-i18n="action.addToQueue" disabled>Add to queue</button>
+    <button type="button" class="ghost" id="openSelectionBtn">Choose titles to queue…</button>
+    <section class="dock-queue" aria-labelledby="dockQueueTitle">
+      <div class="section-head"><h3 id="dockQueueTitle">Queue</h3><span class="readout" id="dockQueueCount"></span></div>
+      <div id="dockQueue" role="status" aria-live="polite"></div>
+    </section>
+  </aside>
 </div>
 
-<!-- Every secondary surface is built here as well, from the catalog: role,
-     modal flag, heading, hint, close control, and which control takes focus.
-     The page cannot open one the window does not describe, and cannot present
-     one with the wrong accessibility semantics. -->
-<div class="surfaces" id="surfaces"></div>
+<footer class="statusbar">
+  <span class="state" id="statusState" role="status" aria-live="polite"></span>
+  <span class="spacer"></span>
+  <span id="statusMedia"></span>
+  <span id="statusProblems"></span>
+  <span class="progress" id="statusProgress" hidden><div id="statusProgressFill"></div></span>
+</footer>
 
+<div class="surfaces" id="surfaces"></div>
 <script src="app.js"></script>
 </body>
 </html>
