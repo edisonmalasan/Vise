@@ -2,6 +2,11 @@
   "app.title": "Vise Transcoder",
   "app.tagline": "自分のパソコンで動画と音声を変換します。",
   "job.new": "新しいジョブ",
+  "skip.workspace": "作業領域へ移動",
+  "action.browsePresets": "カタログを参照…",
+  "preset.hint": "テスト済みの構成から始め、下で調整します。",
+  "dock.job": "ジョブ",
+  "dock.queue": "キュー",
 
   "common.ok": "OK",
   "common.cancel": "キャンセル",

@@ -428,6 +428,16 @@ pub enum MessageKey {
     AppTagline,
     /// The title of a job that has no source yet.
     JobNew,
+    /// Skip the chrome and reach the workspace.
+    SkipWorkspace,
+    /// Open the preset catalogue.
+    ActionBrowsePresets,
+    /// What the preset launcher is for.
+    PresetHint,
+    /// The heading over the job dock.
+    DockJob,
+    /// The heading over the live queue.
+    DockQueue,
     /// Confirmation.
     CommonOk,
     /// Refusal of a change.
@@ -632,10 +642,15 @@ pub enum MessageKey {
 
 impl MessageKey {
     /// Every key, in the order the files are written in.
-    pub const ALL: [MessageKey; 100] = [
+    pub const ALL: [MessageKey; 105] = [
         MessageKey::AppTitle,
         MessageKey::AppTagline,
         MessageKey::JobNew,
+        MessageKey::SkipWorkspace,
+        MessageKey::ActionBrowsePresets,
+        MessageKey::PresetHint,
+        MessageKey::DockJob,
+        MessageKey::DockQueue,
         MessageKey::CommonOk,
         MessageKey::CommonCancel,
         MessageKey::CommonClose,
@@ -796,10 +811,15 @@ impl MessageKey {
 ///
 /// The length is checked against [`MessageKey::ALL`] by a test rather than by
 /// the type system, because an array length is not part of an enum's identity.
-const NAMES: [&str; 100] = [
+const NAMES: [&str; 105] = [
     "app.title",
     "app.tagline",
     "job.new",
+    "skip.workspace",
+    "action.browsePresets",
+    "preset.hint",
+    "dock.job",
+    "dock.queue",
     "common.ok",
     "common.cancel",
     "common.close",

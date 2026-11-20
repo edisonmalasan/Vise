@@ -48,7 +48,7 @@
 </script>
 </head>
 <body>
-<a class="skip-link" href="#work">Skip to workspace</a>
+<a class="skip-link" href="#work" data-i18n="skip.workspace">Skip to workspace</a>
 
 <!-- One icon set for the whole application. Drawn with currentColor so the
      rail, the buttons and the status bar all take their ink from the theme,
@@ -224,9 +224,9 @@
       <div class="preset-launch">
         <div>
           <h2 data-i18n="action.openPresets">Presets</h2>
-          <span class="hint">Start from a tested configuration, then refine it below.</span>
+          <span class="hint" data-i18n="preset.hint">Start from a tested configuration, then refine it below.</span>
         </div>
-        <button type="button" id="presetBrowseBtn">Browse the catalogue…</button>
+        <button type="button" id="presetBrowseBtn" data-i18n="action.browsePresets">Browse the catalogue…</button>
       </div>
 
       <!-- Output: every field and hint stays where the window expects it. -->
@@ -561,7 +561,7 @@
   <!-- The job dock is the permanent answer to "what will be made and where". -->
   <aside class="dock" aria-label="Job and queue">
     <div class="dock-head">
-      <h2>Job</h2>
+      <h2 data-i18n="dock.job">Job</h2>
       <span class="chip" id="dockState">Ready</span>
     </div>
     <div class="job-summary">
@@ -577,7 +577,7 @@
     <button type="button" class="accent" id="queueBtn" data-i18n="action.addToQueue" disabled>Add to queue</button>
     <button type="button" class="ghost" id="openSelectionBtn">Choose titles to queue…</button>
     <section class="dock-queue" aria-labelledby="dockQueueTitle">
-      <div class="section-head"><h3 id="dockQueueTitle">Queue</h3><span class="readout" id="dockQueueCount"></span></div>
+      <div class="section-head"><h3 id="dockQueueTitle" data-i18n="dock.queue">Queue</h3><span class="readout" id="dockQueueCount"></span></div>
       <div id="dockQueue" role="status" aria-live="polite"></div>
     </section>
   </aside>
